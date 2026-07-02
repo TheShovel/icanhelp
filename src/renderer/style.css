@@ -199,6 +199,7 @@ body {
 .message {
     display: flex;
     max-width: 85%;
+    min-width: 0;
     animation: fadeIn 0.2s ease;
 }
 
@@ -227,6 +228,9 @@ body {
     font-size: 13px;
     line-height: 1.5;
     word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    min-width: 0;
 }
 
 .message.user .bubble {
@@ -368,6 +372,81 @@ body {
 
 .response-content {
     white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    min-width: 0;
+}
+
+.tool-block {
+    margin: 6px 0;
+    border-left: 2px solid rgba(76, 175, 80, 0.3);
+    padding-left: 10px;
+}
+
+.tool-header {
+    font-size: 12px;
+    color: #66bb6a;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tool-header:hover {
+    color: #81c784;
+}
+
+.tool-header::after {
+    content: "▼";
+    font-size: 9px;
+    transition: transform 0.2s;
+}
+
+.tool-block.collapsed .tool-header::after {
+    transform: rotate(-90deg);
+}
+
+.tool-content {
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    max-height: 500px;
+    opacity: 1;
+    overflow: hidden;
+}
+
+.tool-block.collapsed .tool-content {
+    max-height: 0;
+    opacity: 0;
+}
+
+.tool-text {
+    margin: 4px 0;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+    font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #c8e6c9;
+    overflow-x: auto;
+    max-width: 100%;
+    word-break: break-word;
+}
+
+.tool-output {
+    margin: 4px 0 6px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #b0bec5;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    max-width: 100%;
+    word-break: break-word;
 }
 
 .message .bubble pre {
@@ -376,6 +455,7 @@ body {
     background: rgba(0, 0, 0, 0.3);
     border-radius: 8px;
     overflow-x: auto;
+    max-width: 100%;
 }
 
 .message .bubble pre code {
@@ -385,6 +465,16 @@ body {
     color: #c8c8d8;
     background: none;
     padding: 0;
+}
+
+.message .bubble > code {
+    font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e8e8e8;
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
 }
 
 #typing-indicator {

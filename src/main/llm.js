@@ -1,4 +1,5 @@
 const { loadConfig } = require('./store');
+const { tools, executeToolCall } = require('./tools/registry');
 
 const defaults = {
   provider: 'openrouter',
@@ -58,6 +59,22 @@ async function streamLLM(messages, effort) {
   if (!config.apiKey) return null;
 
   var reasoningEffort = effort || config.reasoningEffort || undefined;
+  var body = {
+    model: config.model,
+    stream: true,
+    tools: tools,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are icanhelp, a helpful AI assistant running on a Linux desktop. ' +
+          'You can run bash commands, read/write files, and list directories to help the user. ' +
+          'When a task requires running a command, use the appropriate tool rather than just describing what to do.',
+      },
+      ...messages,
+    ],
+  };
+  if (reasoningEffort) body.reasoning_effort = reasoningEffort;
 
   const res = await fetch(`${config.endpoint}/chat/completions`, {
     method: 'POST',
@@ -65,19 +82,7 @@ async function streamLLM(messages, effort) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${config.apiKey}`,
     },
-    body: JSON.stringify({
-      model: config.model,
-      stream: true,
-      reasoning_effort: reasoningEffort,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are icanhelp, a helpful AI assistant running on a Linux desktop. You help the user with tasks, answer questions, and automate things. Keep responses concise and practical.',
-        },
-        ...messages,
-      ],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

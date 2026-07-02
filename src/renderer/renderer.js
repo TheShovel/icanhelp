@@ -260,7 +260,7 @@ function sendMessage() {
   var thinkingBuf = "";
 
   const cleanup = window.electronAPI.onLLMChunk(function (chunk) {
-    if (!msgEl) {
+    if (!msgEl && (chunk.text || chunk.thinking || chunk.error || chunk.done)) {
       hideTyping();
       var el = createAssistantMessage();
       msgEl = el;
@@ -288,6 +288,56 @@ function sendMessage() {
         }, 600);
       }
       conversation.push({ role: "assistant", content: buffer });
+      return;
+    }
+
+    if (chunk.tool_start) {
+      if (!msgEl) {
+        hideTyping();
+        var el = createAssistantMessage();
+        msgEl = el;
+        bubble = el.querySelector(".bubble");
+        thinkingContent = el.querySelector(".thinking-content");
+        thinkingBlock = el.querySelector(".thinking-block");
+        responseContent = el.querySelector(".response-content");
+      }
+      var cmd = chunk.tool_start.args.command || JSON.stringify(chunk.tool_start.args);
+      var toolBlock = document.createElement("div");
+      toolBlock.className = "tool-block";
+      var toolHeader = document.createElement("div");
+      toolHeader.className = "tool-header";
+      var cmdLabel = (chunk.tool_start.args && chunk.tool_start.args.command) || chunk.tool_start.name;
+      if (cmdLabel.length > 50) cmdLabel = cmdLabel.slice(0, 50) + "...";
+      toolHeader.textContent = "⚡ $" + cmdLabel;
+      toolHeader.addEventListener("click", function () {
+        toolBlock.classList.toggle("collapsed");
+      });
+      var toolContent = document.createElement("div");
+      toolContent.className = "tool-content";
+      var pre = document.createElement("pre");
+      pre.className = "tool-text";
+      pre.textContent = cmd;
+      toolContent.appendChild(pre);
+      toolBlock.appendChild(toolHeader);
+      toolBlock.appendChild(toolContent);
+      bubble.insertBefore(toolBlock, responseContent);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return;
+    }
+
+    if (chunk.tool_end) {
+      var out = document.createElement("div");
+      out.className = "tool-output";
+      out.textContent = chunk.tool_end.output;
+      var tc = bubble.querySelector(".tool-content");
+      if (tc) {
+        tc.appendChild(out);
+        setTimeout(function () {
+          var tb = bubble.querySelector(".tool-block");
+          if (tb) tb.classList.add("collapsed");
+        }, 800);
+      }
+      chatMessages.scrollTop = chatMessages.scrollHeight;
       return;
     }
 
@@ -380,7 +430,8 @@ function renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, r
   }
 
   if (parsed.response) {
-    responseContent.textContent = parsed.response;
+    responseContent.innerHTML = "";
+    renderContent(responseContent, parsed.response);
   }
 
   chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -409,28 +460,48 @@ function addMessage(text, role) {
 }
 
 function renderContent(el, text) {
-  const parts = text.split(/(```[\s\S]*?```)/);
-  for (const part of parts) {
-    if (part.startsWith("```") && part.endsWith("```")) {
-      const code = part.slice(3, -3);
-      const langMatch = code.match(/^(\w+)\n/);
-      const lang = langMatch ? langMatch[1] : "";
-      const codeText = langMatch ? code.slice(lang.length + 1) : code;
-      const pre = document.createElement("pre");
-      const codeEl = document.createElement("code");
-      codeEl.textContent = codeText;
-      if (lang) codeEl.className = `lang-${lang}`;
-      pre.appendChild(codeEl);
-      el.appendChild(pre);
-    } else if (part) {
-      const lines = part.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        if (i > 0) el.appendChild(document.createElement("br"));
-        const textNode = document.createTextNode(lines[i]);
-        el.appendChild(textNode);
-      }
+  text = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  var html = "";
+  var i = 0;
+
+  while (i < text.length) {
+    var idx = text.indexOf("```", i);
+    if (idx === -1) {
+      html += text.slice(i).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>");
+      break;
     }
+
+    html += text.slice(i, idx).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>");
+
+    var after = text.slice(idx + 3);
+    var langEnd = after.indexOf("\n");
+    var lang = "";
+    var rest = after;
+    if (langEnd !== -1) {
+      lang = after.slice(0, langEnd);
+      rest = after.slice(langEnd + 1);
+    }
+
+    var closeIdx = rest.indexOf("```");
+    var codeContent;
+
+    if (closeIdx === -1) {
+      codeContent = rest;
+      i = text.length;
+    } else {
+      codeContent = rest.slice(0, closeIdx);
+      i = idx + 3 + (langEnd !== -1 ? langEnd + 1 : 0) + closeIdx + 3;
+    }
+
+    var langAttr = lang ? " class=\"lang-" + lang + "\"" : "";
+    html += "<pre><code" + langAttr + ">" + codeContent + "</code></pre>";
   }
+
+  el.innerHTML = html;
 }
 
 sendBtn.addEventListener("click", sendMessage);
