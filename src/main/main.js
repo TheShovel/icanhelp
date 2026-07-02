@@ -1,7 +1,10 @@
-const { app, BrowserWindow, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, shell } = require("electron");
 const path = require("path");
+const { marked } = require("marked");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
 const { loadConfig, saveConfig, saveEffort } = require("./store");
+
+marked.setOptions({ breaks: true, gfm: true });
 
 let mainWindow;
 
@@ -30,6 +33,16 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+
+  mainWindow.webContents.setWindowOpenHandler(function ({ url }) {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("will-navigate", function (event, url) {
+    event.preventDefault();
+    shell.openExternal(url);
+  });
 
   ipcMain.on("drag-window", (event, { deltaX, deltaY }) => {
     const [x, y] = mainWindow.getPosition();
@@ -196,6 +209,10 @@ function createWindow() {
     return true;
   });
 
+  ipcMain.handle("parse-markdown", (_event, text) => {
+    return marked.parse(text);
+  });
+
   if (process.env.ELECTRON_DEV) {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
@@ -206,6 +223,7 @@ app.whenReady().then(createWindow);
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
+
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {

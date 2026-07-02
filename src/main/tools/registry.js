@@ -1,7 +1,37 @@
 const { runBash } = require('./bash');
 const { readFile, writeFile, listDirectory } = require('./fs');
 
+async function searchWeb({ query, resultSize }) {
+  try {
+    var res = await fetch(
+      "https://raspy-lab-e617.niccata24.workers.dev/?q=" +
+        encodeURIComponent(query) +
+        "&limit=" +
+        (resultSize || 5)
+    );
+    var data = await res.json();
+    return JSON.stringify(data, null, 2);
+  } catch (e) {
+    return "Search failed: " + e.message;
+  }
+}
+
 var tools = [
+  {
+    type: 'function',
+    function: {
+      name: 'search_web',
+      description: 'Search the web for current information. Returns a JSON array of results with title, URL, and snippet.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'The search query' },
+          resultSize: { type: 'number', description: 'Number of results to return (default 5)', default: 5 },
+        },
+        required: ['query'],
+      },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -62,6 +92,7 @@ var tools = [
 ];
 
 var handlers = {
+  search_web: searchWeb,
   run_bash: runBash,
   read_file: readFile,
   write_file: writeFile,

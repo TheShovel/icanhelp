@@ -241,11 +241,11 @@ window.electronAPI.hasConfig().then((has) => {
   });
 });
 
-function sendMessage() {
+async function sendMessage() {
   var text = chatInput.value.trim();
   if (!text) return;
 
-  addMessage(text, "user");
+  await addMessage(text, "user");
   chatInput.value = "";
 
   conversation.push({ role: "user", content: text });
@@ -306,9 +306,17 @@ function sendMessage() {
       toolBlock.className = "tool-block";
       var toolHeader = document.createElement("div");
       toolHeader.className = "tool-header";
-      var cmdLabel = (chunk.tool_start.args && chunk.tool_start.args.command) || chunk.tool_start.name;
-      if (cmdLabel.length > 50) cmdLabel = cmdLabel.slice(0, 50) + "...";
-      toolHeader.textContent = "⚡ $" + cmdLabel;
+      var icon = "⚡";
+      var label = chunk.tool_start.name;
+      var args = chunk.tool_start.args || {};
+      if (chunk.tool_start.name === "search_web") {
+        icon = "🔍";
+        label = args.query || "search";
+      } else if (args.command) {
+        label = args.command;
+      }
+      if (label.length > 50) label = label.slice(0, 50) + "...";
+      toolHeader.textContent = icon + " " + label;
       toolHeader.addEventListener("click", function () {
         toolBlock.classList.toggle("collapsed");
       });
@@ -352,7 +360,7 @@ function sendMessage() {
 
     if (chunk.text) {
       buffer += chunk.text;
-      renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent);
+      renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent).then(function () {});
     }
   });
 
@@ -419,7 +427,7 @@ function parseBuffer(buffer) {
   };
 }
 
-function renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent) {
+async function renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent) {
   var parsed = parseBuffer(buffer);
 
   if (parsed.hasThinking) {
@@ -431,7 +439,7 @@ function renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, r
 
   if (parsed.response) {
     responseContent.innerHTML = "";
-    renderContent(responseContent, parsed.response);
+    await renderContent(responseContent, parsed.response);
   }
 
   chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -446,12 +454,12 @@ function hideTyping() {
   typingIndicator.classList.add("hidden");
 }
 
-function addMessage(text, role) {
+async function addMessage(text, role) {
   const div = document.createElement("div");
   div.className = `message ${role}`;
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  renderContent(bubble, text);
+  await renderContent(bubble, text);
   div.appendChild(bubble);
   chatMessages.appendChild(div);
   requestAnimationFrame(() => {
@@ -459,49 +467,12 @@ function addMessage(text, role) {
   });
 }
 
-function renderContent(el, text) {
-  text = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  var html = "";
-  var i = 0;
-
-  while (i < text.length) {
-    var idx = text.indexOf("```", i);
-    if (idx === -1) {
-      html += text.slice(i).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>");
-      break;
-    }
-
-    html += text.slice(i, idx).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>");
-
-    var after = text.slice(idx + 3);
-    var langEnd = after.indexOf("\n");
-    var lang = "";
-    var rest = after;
-    if (langEnd !== -1) {
-      lang = after.slice(0, langEnd);
-      rest = after.slice(langEnd + 1);
-    }
-
-    var closeIdx = rest.indexOf("```");
-    var codeContent;
-
-    if (closeIdx === -1) {
-      codeContent = rest;
-      i = text.length;
-    } else {
-      codeContent = rest.slice(0, closeIdx);
-      i = idx + 3 + (langEnd !== -1 ? langEnd + 1 : 0) + closeIdx + 3;
-    }
-
-    var langAttr = lang ? " class=\"lang-" + lang + "\"" : "";
-    html += "<pre><code" + langAttr + ">" + codeContent + "</code></pre>";
+async function renderContent(el, text) {
+  try {
+    el.innerHTML = await window.electronAPI.parseMarkdown(text);
+  } catch (e) {
+    el.textContent = text;
   }
-
-  el.innerHTML = html;
 }
 
 sendBtn.addEventListener("click", sendMessage);

@@ -477,6 +477,82 @@ body {
     white-space: nowrap;
 }
 
+.message .bubble h1,
+.message .bubble h2,
+.message .bubble h3,
+.message .bubble h4 {
+    margin: 8px 0 4px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.message .bubble h1 { font-size: 16px; }
+.message .bubble h2 { font-size: 15px; }
+.message .bubble h3 { font-size: 14px; }
+.message .bubble h4 { font-size: 13px; }
+
+.message .bubble p {
+    margin: 4px 0;
+}
+
+.message .bubble ul,
+.message .bubble ol {
+    margin: 4px 0;
+    padding-left: 20px;
+}
+
+.message .bubble li {
+    margin: 2px 0;
+}
+
+.message .bubble blockquote {
+    margin: 6px 0;
+    padding: 4px 10px;
+    border-left: 3px solid rgba(255, 255, 255, 0.15);
+    color: #aaa;
+}
+
+.message .bubble a {
+    color: #7c9aff;
+    text-decoration: underline;
+    text-decoration-color: rgba(124, 154, 255, 0.3);
+}
+
+.message .bubble a:hover {
+    color: #9ab0ff;
+    text-decoration-color: rgba(154, 176, 255, 0.6);
+}
+
+.message .bubble hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin: 8px 0;
+}
+
+.message .bubble table {
+    border-collapse: collapse;
+    margin: 6px 0;
+    font-size: 12px;
+    width: 100%;
+}
+
+.message .bubble th,
+.message .bubble td {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 4px 8px;
+    text-align: left;
+}
+
+.message .bubble th {
+    background: rgba(255, 255, 255, 0.06);
+    font-weight: 600;
+}
+
+.message .bubble del {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
 #typing-indicator {
     display: flex;
     gap: 5px;
