@@ -10,15 +10,15 @@
         <div id="app">
             <div id="chat-panel" class="hidden">
                 <div id="chat-header">
-                    <span id="assistant-name">✨ icanhelp</span>
+                    <span id="assistant-name" class="with-icon"></span>
                     <select id="chat-effort" title="Reasoning effort">
-                        <option value="">🧠 Auto</option>
-                        <option value="low">🧠 Low</option>
-                        <option value="medium">🧠 Medium</option>
-                        <option value="high">🧠 High</option>
+                        <option value="">Auto</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
                     </select>
-                    <button id="chat-settings" class="btn-icon" title="Settings">⚙️</button>
-                    <button id="close-chat" class="btn-icon">✕</button>
+                    <button id="chat-settings" class="btn-icon" title="Settings"></button>
+                    <button id="close-chat" class="btn-icon" title="Close"></button>
                 </div>
                 <div id="chat-messages">
                     <div class="message assistant">
@@ -39,14 +39,14 @@
                         id="chat-input"
                         placeholder="Ask me anything..."
                     />
-                    <button id="send-btn" class="btn-icon">➤</button>
+                    <button id="send-btn" class="btn-icon" title="Send"></button>
                 </div>
             </div>
 
             <div id="setup-panel" class="hidden">
                 <div id="setup-header">
                     <span>Configure LLM Provider</span>
-                    <button id="close-setup" class="btn-icon" title="Back to chat">✕</button>
+                    <button id="close-setup" class="btn-icon" title="Back to chat"></button>
                 </div>
                 <div id="setup-body">
                     <label>
@@ -79,6 +79,7 @@
                         <select id="setup-model">
                             <option value="">— enter API key to load models —</option>
                         </select>
+                    </label>label>
                     <button id="setup-save" class="btn-primary">
                         Save &amp; Start
                     </button>
@@ -88,9 +89,10 @@
 
             <div id="avatar" title="Click to ask me anything">
                 <div id="avatar-glow"></div>
-                <div id="avatar-inner">✨</div>
+                <div id="avatar-inner"></div>
             </div>
         </div>
+        <script src="icons.js"></script>
         <script src="renderer.js"></script>
     </body>
 </html>

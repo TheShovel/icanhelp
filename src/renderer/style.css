@@ -6,6 +6,20 @@
     box-sizing: border-box;
 }
 
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+}
+
 html,
 body {
     width: 100%;
@@ -169,9 +183,35 @@ body {
     line-height: 1;
 }
 
+.btn-icon svg {
+    display: block;
+    stroke: currentColor;
+}
+
 .btn-icon:hover {
     background: rgba(255, 255, 255, 0.08);
     color: #ccc;
+}
+
+.with-icon svg,
+.thinking-header svg,
+.tool-header svg {
+    vertical-align: middle;
+    margin-right: 4px;
+    stroke: currentColor;
+    flex-shrink: 0;
+}
+
+#assistant-name svg {
+    stroke: #c8c8d0;
+}
+
+.thinking-header svg {
+    stroke: #b8860b;
+}
+
+.tool-header svg {
+    stroke: #66bb6a;
 }
 
 #chat-messages {
@@ -183,18 +223,7 @@ body {
     gap: 8px;
 }
 
-#chat-messages::-webkit-scrollbar {
-    width: 4px;
-}
 
-#chat-messages::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#chat-messages::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 2px;
-}
 
 .message {
     display: flex;
@@ -347,18 +376,7 @@ body {
     opacity: 1;
 }
 
-.thinking-content::-webkit-scrollbar {
-    width: 4px;
-}
 
-.thinking-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.thinking-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 2px;
-}
 
 .thinking-block.collapsed .thinking-content {
     max-height: 0;

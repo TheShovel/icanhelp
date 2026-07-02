@@ -16,6 +16,13 @@ const setupSave = document.getElementById("setup-save");
 const setupStatus = document.getElementById("setup-status");
 const closeSetupBtn = document.getElementById("close-setup");
 
+document.getElementById("assistant-name").innerHTML = iconSvg("sparkle", 14) + " icanhelp";
+document.getElementById("avatar-inner").innerHTML = iconSvg("sparkle", 28);
+document.getElementById("chat-settings").innerHTML = iconSvg("settings", 16);
+document.getElementById("close-chat").innerHTML = iconSvg("close", 16);
+document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
+document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
+
 let chatOpen = false;
 let isDragging = false;
 let dragStartX = 0;
@@ -306,17 +313,17 @@ async function sendMessage() {
       toolBlock.className = "tool-block";
       var toolHeader = document.createElement("div");
       toolHeader.className = "tool-header";
-      var icon = "⚡";
+      var iconName = "terminal";
       var label = chunk.tool_start.name;
       var args = chunk.tool_start.args || {};
       if (chunk.tool_start.name === "search_web") {
-        icon = "🔍";
+        iconName = "search";
         label = args.query || "search";
       } else if (args.command) {
         label = args.command;
       }
       if (label.length > 50) label = label.slice(0, 50) + "...";
-      toolHeader.textContent = icon + " " + label;
+      toolHeader.innerHTML = iconSvg(iconName, 14) + " " + label;
       toolHeader.addEventListener("click", function () {
         toolBlock.classList.toggle("collapsed");
       });
@@ -377,7 +384,7 @@ function createAssistantMessage() {
   tb.className = "thinking-block hidden";
   var th = document.createElement("div");
   th.className = "thinking-header";
-  th.textContent = "🧠 Thinking";
+  th.innerHTML = iconSvg("brain", 14) + " Thinking";
   th.addEventListener("click", function () {
     tb.classList.toggle("collapsed");
   });
