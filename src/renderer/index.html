@@ -40,6 +40,7 @@
                         placeholder="Ask me anything..."
                     />
                     <button id="send-btn" class="btn-icon" title="Send"></button>
+                    <button id="cancel-btn" class="btn-icon hidden" title="Cancel"></button>
                 </div>
             </div>
 
@@ -95,7 +96,7 @@
             <div id="sudo-overlay" class="hidden">
                 <div id="sudo-dialog">
                     <div id="sudo-header">
-                        <span></span>🔑 Authentication Required</span>
+                        <span>Authentication Required</span>
                     </div>
                     <div id="sudo-body">
                         <p id="sudo-message">sudo requires your password</p>
@@ -109,6 +110,22 @@
                             <button id="sudo-submit" class="btn-primary">Submit</button>
                         </div>
                         <p id="sudo-status"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="confirm-overlay" class="hidden">
+                <div id="confirm-dialog">
+                    <div id="confirm-header">
+                        <span>Confirm Command</span>
+                    </div>
+                    <div id="confirm-body">
+                        <p id="confirm-message">Run the following command?</p>
+                        <pre id="confirm-command"></pre>
+                        <div id="confirm-actions">
+                            <button id="confirm-no" class="btn-secondary">Cancel</button>
+                            <button id="confirm-yes" class="btn-primary">Run</button>
+                        </div>
                     </div>
                 </div>
             </div>

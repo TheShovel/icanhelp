@@ -54,7 +54,7 @@ function buildConfig() {
   return { ...defaults, ...stored };
 }
 
-async function streamLLM(messages, effort) {
+async function streamLLM(messages, effort, signal) {
   const config = buildConfig();
   if (!config.apiKey) return null;
 
@@ -85,14 +85,17 @@ async function streamLLM(messages, effort) {
   };
   if (reasoningEffort) body.reasoning_effort = reasoningEffort;
 
-  const res = await fetch(`${config.endpoint}/chat/completions`, {
+  var opts = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
-  });
+  };
+  if (signal) opts.signal = signal;
+
+  const res = await fetch(`${config.endpoint}/chat/completions`, opts);
 
   if (!res.ok) {
     const error = await res.text();

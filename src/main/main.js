@@ -3,6 +3,7 @@ const path = require("path");
 const { marked } = require("marked");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
 const { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition } = require("./store");
+const { createTray } = require("./tray");
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -65,14 +66,25 @@ function createWindow() {
     saveWindowPosition(newX, newY);
   });
 
-  ipcMain.on("start-llm-stream", function (event, payload) {
-    runLLMLoop(event, payload.messages, payload.effort);
+  var currentAbort = null;
+
+  ipcMain.on("cancel-stream", function () {
+    if (currentAbort) {
+      currentAbort.abort();
+      currentAbort = null;
+    }
   });
 
-  async function runLLMLoop(event, messages, effort) {
+  ipcMain.on("start-llm-stream", function (event, payload) {
+    currentAbort = new AbortController();
+    runLLMLoop(event, payload.messages, payload.effort, currentAbort.signal);
+  });
+
+  async function runLLMLoop(event, messages, effort, signal) {
+    if (signal && signal.aborted) return;
     var stream;
     try {
-      stream = await streamLLM(messages, effort);
+      stream = await streamLLM(messages, effort, signal);
     } catch (e) {
       event.sender.send("llm-chunk", { error: e.message });
       return;
@@ -91,66 +103,83 @@ function createWindow() {
     var buf = "";
     var toolCalls = [];
 
-    while (true) {
-      var result = await reader.read();
-      if (result.done) break;
+    try {
+      while (true) {
+        var result = await reader.read();
+        if (result.done) break;
 
-      buf += decoder.decode(result.value, { stream: true });
-      var lines = buf.split("\n");
-      buf = lines.pop() || "";
+        buf += decoder.decode(result.value, { stream: true });
+        var lines = buf.split("\n");
+        buf = lines.pop() || "";
 
-      for (var line of lines) {
-        var trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("data: ")) continue;
-        var data = trimmed.slice(6);
-        if (data === "[DONE]") continue;
+        for (var line of lines) {
+          var trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith("data: ")) continue;
+          var data = trimmed.slice(6);
+          if (data === "[DONE]") continue;
 
-        try {
-          var parsed = JSON.parse(data);
-          var choice = parsed.choices?.[0];
-          if (!choice) continue;
-          var finish = choice.finish_reason;
-          var delta = choice.delta || {};
+          try {
+            var parsed = JSON.parse(data);
+            var choice = parsed.choices?.[0];
+            if (!choice) continue;
+            var finish = choice.finish_reason;
+            var delta = choice.delta || {};
 
-          if (delta.content) {
-            event.sender.send("llm-chunk", { text: delta.content });
-          }
-          if (delta.reasoning_content) {
-            event.sender.send("llm-chunk", { thinking: delta.reasoning_content });
-          }
+            if (delta.content) {
+              event.sender.send("llm-chunk", { text: delta.content });
+            }
+            if (delta.reasoning_content) {
+              event.sender.send("llm-chunk", { thinking: delta.reasoning_content });
+            }
 
-          if (delta.tool_calls) {
-            for (var tc of delta.tool_calls) {
-              var idx = tc.index;
-              if (!toolCalls[idx]) {
-                toolCalls[idx] = {
-                  id: tc.id || "",
-                  function: { name: "", arguments: "" },
-                };
-              }
-              if (tc.id) toolCalls[idx].id = tc.id;
-              if (tc.function) {
-                if (tc.function.name) toolCalls[idx].function.name = tc.function.name;
-                if (tc.function.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+            if (delta.tool_calls) {
+              for (var tc of delta.tool_calls) {
+                var idx = tc.index;
+                if (!toolCalls[idx]) {
+                  toolCalls[idx] = {
+                    id: tc.id || "",
+                    function: { name: "", arguments: "" },
+                  };
+                }
+                if (tc.id) toolCalls[idx].id = tc.id;
+                if (tc.function) {
+                  if (tc.function.name) toolCalls[idx].function.name = tc.function.name;
+                  if (tc.function.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                }
               }
             }
-          }
 
-          if (finish === "tool_calls") {
-            // tool calls complete — execution happens after the loop
+            if (finish === "tool_calls") {
+              // tool calls complete — execution happens after the loop
+            }
+          } catch {
+            // skip malformed lines
           }
-        } catch {
-          // skip malformed lines
         }
       }
+    } catch (e) {
+      if (e.name === "AbortError") {
+        event.sender.send("llm-chunk", { done: true });
+      } else {
+        event.sender.send("llm-chunk", { error: e.message });
+      }
+      return;
     }
 
     var pendingSudo = null;
+    var pendingConfirm = null;
 
     ipcMain.on("sudo-response", function (_, pw) {
       if (pendingSudo) {
         pendingSudo(pw);
         pendingSudo = null;
+      }
+    });
+
+    ipcMain.on("confirm-response", function (_, ok) {
+      if (pendingConfirm) {
+        pendingConfirm(ok);
+        pendingConfirm = null;
       }
     });
 
@@ -172,7 +201,14 @@ function createWindow() {
           });
         };
 
-        var result = await executeToolCall(tc, { onSudoPrompt: onSudoPrompt });
+        var onConfirm = async function (cmd) {
+          event.sender.send("llm-chunk", { confirm_prompt: { command: cmd } });
+          return await new Promise(function (resolve) {
+            pendingConfirm = resolve;
+          });
+        };
+
+        var result = await executeToolCall(tc, { onSudoPrompt: onSudoPrompt, onConfirm: onConfirm });
         event.sender.send("llm-chunk", {
           tool_end: { name: tc.function.name, output: result },
         });
@@ -193,7 +229,7 @@ function createWindow() {
         messages.push({ role: "tool", tool_call_id: tc.id, content: result });
       }
       // loop for next response
-      await runLLMLoop(event, messages, effort);
+      await runLLMLoop(event, messages, effort, signal);
     } else {
       event.sender.send("llm-chunk", { done: true });
     }
@@ -259,7 +295,10 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(function () {
+  createWindow();
+  createTray(mainWindow);
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

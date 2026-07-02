@@ -9,19 +9,38 @@ const BLOCKED_PATTERNS = [
   /^\s*init\s/,
 ];
 
-function isDangerous(command) {
-  return BLOCKED_PATTERNS.some((p) => p.test(command));
+const CONFIRM_PATTERNS = [
+  /\brm\s+-rf\b/,
+  /\bkill\b/,
+  /\bpkill\b/,
+  /\bkillall\b/,
+  /\bchmod\s+777\b/,
+  /\bchown\b/,
+  /\bpasswd\b/,
+  /\buserdel\b/,
+  /\bgroupdel\b/,
+  /\bwipefs\b/,
+  /\bformat\b/,
+  /\bmkfs\.\w+/,
+];
+
+function matchesAny(command, patterns) {
+  return patterns.some(function (p) { return p.test(command); });
 }
 
 var SUDO_RE = /\bsudo\s/;
 
-async function runBash({ command, onSudoPrompt }) {
-  if (isDangerous(command)) {
+async function runBash({ command, onSudoPrompt, onConfirm }) {
+  if (matchesAny(command, BLOCKED_PATTERNS)) {
     var name = command.trim().split(/\s+/)[0];
     return 'Error: Command blocked for safety: ' + name;
   }
 
-  // Proactively prompt for sudo password if sudo is in the command
+  if (matchesAny(command, CONFIRM_PATTERNS) && onConfirm) {
+    var ok = await onConfirm(command);
+    if (!ok) return '(cancelled by user)';
+  }
+
   if (SUDO_RE.test(command) && onSudoPrompt) {
     var password = await onSudoPrompt();
     if (password) {
@@ -32,16 +51,12 @@ async function runBash({ command, onSudoPrompt }) {
   return new Promise(function (resolve) {
     var proc = spawn('/bin/bash', ['-c', command], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 30000,
+      timeout: 60000,
     });
 
     var stdout = '';
     var stderr = '';
     var allOutput = '';
-    var timer = setTimeout(function () {
-      proc.kill();
-      resolve(allOutput + '\n(Command timed out after 30s)');
-    }, 30000);
 
     function checkOutput(text) {
       allOutput += text;
@@ -66,7 +81,6 @@ async function runBash({ command, onSudoPrompt }) {
     });
 
     proc.on('close', function () {
-      clearTimeout(timer);
       var output = stdout || stderr || '(no output)';
       if (output.length > 50000) output = output.slice(0, 50000) + '\n... (truncated)';
       resolve(output);

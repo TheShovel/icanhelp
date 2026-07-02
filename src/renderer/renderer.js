@@ -5,6 +5,7 @@ const chatInput = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const closeChatBtn = document.getElementById("close-chat");
 const chatSettingsBtn = document.getElementById("chat-settings");
+const cancelBtn = document.getElementById("cancel-btn");
 const chatEffort = document.getElementById("chat-effort");
 const typingIndicator = document.getElementById("typing-indicator");
 const setupPanel = document.getElementById("setup-panel");
@@ -20,6 +21,10 @@ const sudoInput = document.getElementById("sudo-input");
 const sudoSubmit = document.getElementById("sudo-submit");
 const sudoCancel = document.getElementById("sudo-cancel");
 const sudoStatus = document.getElementById("sudo-status");
+const confirmOverlay = document.getElementById("confirm-overlay");
+const confirmCommand = document.getElementById("confirm-command");
+const confirmYes = document.getElementById("confirm-yes");
+const confirmNo = document.getElementById("confirm-no");
 
 document.getElementById("assistant-name").innerHTML = iconSvg("sparkle", 14) + " icanhelp";
 document.getElementById("avatar-inner").innerHTML = iconSvg("sparkle", 28);
@@ -27,6 +32,7 @@ document.getElementById("chat-settings").innerHTML = iconSvg("settings", 16);
 document.getElementById("close-chat").innerHTML = iconSvg("close", 16);
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
+document.getElementById("cancel-btn").innerHTML = iconSvg("close", 16);
 
 sudoSubmit.addEventListener("click", function () {
   var pw = sudoInput.value;
@@ -47,6 +53,16 @@ sudoCancel.addEventListener("click", function () {
 sudoInput.addEventListener("keydown", function (e) {
   if (e.key === "Enter") sudoSubmit.click();
   if (e.key === "Escape") sudoCancel.click();
+});
+
+confirmYes.addEventListener("click", function () {
+  confirmOverlay.classList.add("hidden");
+  window.electronAPI.sendConfirmResponse(true);
+});
+
+confirmNo.addEventListener("click", function () {
+  confirmOverlay.classList.add("hidden");
+  window.electronAPI.sendConfirmResponse(false);
 });
 
 let chatOpen = false;
@@ -226,6 +242,12 @@ closeChatBtn.addEventListener("click", () => {
   togglePanel();
 });
 
+cancelBtn.addEventListener("click", function () {
+  sendBtn.classList.remove("hidden");
+  cancelBtn.classList.add("hidden");
+  window.electronAPI.cancelStream();
+});
+
 chatSettingsBtn.addEventListener("click", () => {
   if (!chatOpen) return;
   chatPanel.classList.add("hidden");
@@ -311,7 +333,14 @@ async function sendMessage() {
   var buffer = "";
   var thinkingBuf = "";
 
+  sendBtn.classList.add("hidden");
+  cancelBtn.classList.remove("hidden");
+
   const cleanup = window.electronAPI.onLLMChunk(function (chunk) {
+    if (chunk.done || chunk.error) {
+      sendBtn.classList.remove("hidden");
+      cancelBtn.classList.add("hidden");
+    }
     if (!msgEl && (chunk.text || chunk.thinking || chunk.error || chunk.done)) {
       hideTyping();
       var el = createAssistantMessage();
@@ -340,6 +369,12 @@ async function sendMessage() {
         }, 600);
       }
       conversation.push({ role: "assistant", content: buffer });
+      return;
+    }
+
+    if (chunk.confirm_prompt) {
+      confirmCommand.textContent = chunk.confirm_prompt.command;
+      confirmOverlay.classList.remove("hidden");
       return;
     }
 

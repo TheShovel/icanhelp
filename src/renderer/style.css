@@ -6,6 +6,10 @@
     box-sizing: border-box;
 }
 
+.hidden {
+    display: none !important;
+}
+
 ::-webkit-scrollbar {
     width: 4px;
     height: 4px;
@@ -803,4 +807,92 @@ body {
     color: #e57373;
     text-align: center;
     min-height: 16px;
+}
+
+#confirm-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+#confirm-overlay.hidden {
+    display: none;
+}
+
+#confirm-dialog {
+    background: rgba(30, 30, 40, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    width: 300px;
+    box-shadow: 0 12px 50px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+#confirm-header {
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #e8e8e8;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#confirm-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#confirm-message {
+    font-size: 12px;
+    color: #ccc;
+    margin: 0;
+}
+
+#confirm-command {
+    margin: 0;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #ffcc80;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+#confirm-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+#confirm-actions .btn-primary {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    margin: 0;
+}
+
+#confirm-actions .btn-secondary {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #ccc;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+
+#confirm-actions .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
 }
