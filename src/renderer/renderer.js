@@ -203,6 +203,25 @@ avatar.addEventListener("click", (e) => {
   togglePanel();
 });
 
+avatar.addEventListener("contextmenu", function (e) {
+  e.preventDefault();
+  window.electronAPI.showContextMenu();
+});
+
+window.electronAPI.onOpenSettings(function () {
+  if (!chatOpen) togglePanel();
+  chatPanel.classList.add("hidden");
+  setupPanel.classList.remove("hidden");
+  window.electronAPI.getConfig().then(function (cfg) {
+    if (cfg) {
+      setupProvider.value = cfg.provider || "openrouter";
+      setupEndpoint.value = cfg.endpoint || "";
+      setupModel.value = cfg.model || "";
+    }
+  });
+  setupStatus.textContent = "Update your settings below.";
+});
+
 closeChatBtn.addEventListener("click", () => {
   togglePanel();
 });

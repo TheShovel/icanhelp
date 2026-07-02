@@ -17,4 +17,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('llm-chunk', handler);
   },
   sendSudoPassword: (password) => ipcRenderer.send('sudo-response', password),
+  showContextMenu: () => ipcRenderer.send('show-context-menu'),
+  onOpenSettings: (callback) => {
+    ipcRenderer.on('open-settings', () => callback());
+  },
 });

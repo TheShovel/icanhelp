@@ -1,8 +1,8 @@
-const { app, BrowserWindow, ipcMain, screen, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, shell, Menu } = require("electron");
 const path = require("path");
 const { marked } = require("marked");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
-const { loadConfig, saveConfig, saveEffort } = require("./store");
+const { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition } = require("./store");
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -11,12 +11,13 @@ let mainWindow;
 function createWindow() {
   const display = screen.getPrimaryDisplay();
   const { width, height } = display.workAreaSize;
+  var savedPos = loadWindowPosition();
 
   mainWindow = new BrowserWindow({
     width: 88,
     height: 88,
-    x: width - 108,
-    y: height - 108,
+    x: savedPos ? savedPos.x : width - 108,
+    y: savedPos ? savedPos.y : height - 108,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -34,6 +35,11 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
 
+  mainWindow.on("moved", function () {
+    var pos = mainWindow.getPosition();
+    saveWindowPosition(pos[0], pos[1]);
+  });
+
   mainWindow.webContents.setWindowOpenHandler(function ({ url }) {
     shell.openExternal(url);
     return { action: "deny" };
@@ -47,17 +53,16 @@ function createWindow() {
   ipcMain.on("drag-window", (event, { deltaX, deltaY }) => {
     const [x, y] = mainWindow.getPosition();
     mainWindow.setPosition(x + deltaX, y + deltaY);
+    saveWindowPosition(x + deltaX, y + deltaY);
   });
 
   ipcMain.on("resize-window", (event, { width, height }) => {
     const [x, y] = mainWindow.getPosition();
     const [currentW, currentH] = mainWindow.getSize();
-    mainWindow.setBounds({
-      x: x + currentW - width,
-      y: y + currentH - height,
-      width,
-      height,
-    });
+    var newX = x + currentW - width;
+    var newY = y + currentH - height;
+    mainWindow.setBounds({ x: newX, y: newY, width, height });
+    saveWindowPosition(newX, newY);
   });
 
   ipcMain.on("start-llm-stream", function (event, payload) {
@@ -234,6 +239,24 @@ function createWindow() {
   if (process.env.ELECTRON_DEV) {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
+
+  ipcMain.on("show-context-menu", function () {
+    var template = [
+      {
+        label: "Settings",
+        click: function () {
+          mainWindow.webContents.send("open-settings");
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Quit",
+        click: function () { app.quit(); },
+      },
+    ];
+    var menu = Menu.buildFromTemplate(template);
+    menu.popup({ window: mainWindow });
+  });
 }
 
 app.whenReady().then(createWindow);

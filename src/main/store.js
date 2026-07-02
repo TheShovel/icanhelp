@@ -67,4 +67,19 @@ function saveEffort(effort) {
   saveConfig(cfg);
 }
 
-module.exports = { loadConfig, saveConfig, saveEffort };
+function saveWindowPosition(x, y) {
+  var cfg = loadConfig() || {};
+  cfg.windowX = x;
+  cfg.windowY = y;
+  saveConfig(cfg);
+}
+
+function loadWindowPosition() {
+  var cfg = loadConfig();
+  if (cfg && typeof cfg.windowX === 'number' && typeof cfg.windowY === 'number') {
+    return { x: cfg.windowX, y: cfg.windowY };
+  }
+  return null;
+}
+
+module.exports = { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition };
