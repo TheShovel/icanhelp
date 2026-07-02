@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>icanhelp</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <div id="app">
+            <div id="chat-panel" class="hidden">
+                <div id="chat-header">
+                    <span id="assistant-name">✨ icanhelp</span>
+                    <button id="close-chat" class="btn-icon">✕</button>
+                </div>
+                <div id="chat-messages">
+                    <div class="message assistant first">
+                        <div class="bubble">
+                            Hi! I'm your AI assistant. Click the orb below to
+                            ask me anything.
+                        </div>
+                    </div>
+                </div>
+                <div id="chat-input-area">
+                    <input
+                        type="text"
+                        id="chat-input"
+                        placeholder="Ask me anything..."
+                    />
+                    <button id="send-btn" class="btn-icon">➤</button>
+                </div>
+            </div>
+
+            <div id="avatar" title="Click to ask me anything">
+                <div id="avatar-glow"></div>
+                <div id="avatar-inner">✨</div>
+            </div>
+        </div>
+        <script src="renderer.js"></script>
+    </body>
+</html>

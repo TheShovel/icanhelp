@@ -1,0 +1,15 @@
+{
+  "name": "icanhelp",
+  "version": "1.0.0",
+  "description": "Linux desktop AI assistant",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "ELECTRON_DEV=true electron ."
+  },
+  "keywords": ["ai", "assistant", "linux", "desktop"],
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}
