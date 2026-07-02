@@ -115,7 +115,6 @@ document.addEventListener("mouseup", () => {
 // --- Chat Management ---
 var chats = [];
 var currentChatId = null;
-var activeCleanups = [];
 
 function generateId() {
   return "chat_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
