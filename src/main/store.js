@@ -61,4 +61,10 @@ function saveConfig(config) {
   fs.chmodSync(CONFIG_FILE, 0o600);
 }
 
-module.exports = { loadConfig, saveConfig };
+function saveEffort(effort) {
+  var cfg = loadConfig() || {};
+  cfg.reasoningEffort = effort;
+  saveConfig(cfg);
+}
+
+module.exports = { loadConfig, saveConfig, saveEffort };

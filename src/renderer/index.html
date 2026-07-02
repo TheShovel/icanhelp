@@ -11,6 +11,13 @@
             <div id="chat-panel" class="hidden">
                 <div id="chat-header">
                     <span id="assistant-name">✨ icanhelp</span>
+                    <select id="chat-effort" title="Reasoning effort">
+                        <option value="">🧠 Auto</option>
+                        <option value="low">🧠 Low</option>
+                        <option value="medium">🧠 Medium</option>
+                        <option value="high">🧠 High</option>
+                    </select>
+                    <button id="chat-settings" class="btn-icon" title="Settings">⚙️</button>
                     <button id="close-chat" class="btn-icon">✕</button>
                 </div>
                 <div id="chat-messages">
@@ -39,6 +46,7 @@
             <div id="setup-panel" class="hidden">
                 <div id="setup-header">
                     <span>Configure LLM Provider</span>
+                    <button id="close-setup" class="btn-icon" title="Back to chat">✕</button>
                 </div>
                 <div id="setup-body">
                     <label>
@@ -71,7 +79,6 @@
                         <select id="setup-model">
                             <option value="">— enter API key to load models —</option>
                         </select>
-                    </label>
                     <button id="setup-save" class="btn-primary">
                         Save &amp; Start
                     </button>

@@ -8,7 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   validateStoredConfig: () => ipcRenderer.invoke('validate-stored-config'),
   fetchModels: (config) => ipcRenderer.invoke('fetch-models', config),
-  startLLMStream: (messages) => ipcRenderer.send('start-llm-stream', messages),
+  saveEffort: (effort) => ipcRenderer.invoke('save-effort', effort),
+  startLLMStream: (messages, effort) => ipcRenderer.send('start-llm-stream', { messages, effort }),
   onLLMChunk: (callback) => {
     const handler = (_event, chunk) => callback(chunk);
     ipcRenderer.on('llm-chunk', handler);

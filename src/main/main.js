@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, screen } = require("electron");
 const path = require("path");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
-const { loadConfig, saveConfig } = require("./store");
+const { loadConfig, saveConfig, saveEffort } = require("./store");
 
 let mainWindow;
 
@@ -47,8 +47,8 @@ function createWindow() {
     });
   });
 
-  ipcMain.on("start-llm-stream", async (event, messages) => {
-    const stream = await streamLLM(messages);
+  ipcMain.on("start-llm-stream", async (event, payload) => {
+    const stream = await streamLLM(payload.messages, payload.effort);
     if (stream === null) {
       event.sender.send("llm-chunk", {
         error:
@@ -81,8 +81,12 @@ function createWindow() {
           if (!choice) continue;
           const delta = choice.delta || {};
           const content = delta.content || "";
+          const reasoning = delta.reasoning_content || "";
           if (content) {
             event.sender.send("llm-chunk", { text: content });
+          }
+          if (reasoning) {
+            event.sender.send("llm-chunk", { thinking: reasoning });
           }
         } catch {
           // skip malformed lines
@@ -119,6 +123,11 @@ function createWindow() {
 
   ipcMain.handle("fetch-models", async (_event, config) => {
     return await fetchModels(config);
+  });
+
+  ipcMain.handle("save-effort", (_event, effort) => {
+    saveEffort(effort);
+    return true;
   });
 
   if (process.env.ELECTRON_DEV) {

@@ -4,6 +4,8 @@ const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const closeChatBtn = document.getElementById("close-chat");
+const chatSettingsBtn = document.getElementById("chat-settings");
+const chatEffort = document.getElementById("chat-effort");
 const typingIndicator = document.getElementById("typing-indicator");
 const setupPanel = document.getElementById("setup-panel");
 const setupProvider = document.getElementById("setup-provider");
@@ -12,6 +14,7 @@ const setupEndpoint = document.getElementById("setup-endpoint");
 const setupModel = document.getElementById("setup-model");
 const setupSave = document.getElementById("setup-save");
 const setupStatus = document.getElementById("setup-status");
+const closeSetupBtn = document.getElementById("close-setup");
 
 let chatOpen = false;
 let isDragging = false;
@@ -171,6 +174,30 @@ closeChatBtn.addEventListener("click", () => {
   togglePanel();
 });
 
+chatSettingsBtn.addEventListener("click", () => {
+  if (!chatOpen) return;
+  chatPanel.classList.add("hidden");
+  setupPanel.classList.remove("hidden");
+  window.electronAPI.getConfig().then(function (cfg) {
+    if (cfg) {
+      setupProvider.value = cfg.provider || "openrouter";
+      setupEndpoint.value = cfg.endpoint || "";
+      setupModel.value = cfg.model || "";
+    }
+  });
+  setupStatus.textContent = "Update your settings below.";
+});
+
+closeSetupBtn.addEventListener("click", () => {
+  setupPanel.classList.add("hidden");
+  if (needsSetup) {
+    chatOpen = false;
+    window.electronAPI.resizeWindow(88, 88);
+  } else {
+    chatPanel.classList.remove("hidden");
+  }
+});
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && chatOpen) {
     togglePanel();
@@ -191,6 +218,14 @@ window.electronAPI.hasConfig().then((has) => {
     return;
   }
   needsSetup = false;
+  window.electronAPI.getConfig().then(function (cfg) {
+    if (cfg && cfg.reasoningEffort) {
+      chatEffort.value = cfg.reasoningEffort;
+    }
+  });
+  chatEffort.addEventListener("change", function () {
+    window.electronAPI.saveEffort(chatEffort.value || undefined);
+  });
   window.electronAPI.validateStoredConfig().then((result) => {
     if (!result.valid) {
       needsSetup = true;
@@ -224,6 +259,8 @@ function sendMessage() {
   let buffer = "";
   let finalized = false;
 
+  var thinkingBuf = "";
+
   const cleanup = window.electronAPI.onLLMChunk((chunk) => {
     if (chunk.error) {
       finalized = true;
@@ -240,19 +277,31 @@ function sendMessage() {
       if (!thinkingBlock.classList.contains("has-thinking")) {
         thinkingBlock.classList.add("hidden");
       } else {
-        setTimeout(() => {
-          thinkingContent.classList.add("collapsed");
+        setTimeout(function () {
+          thinkingBlock.classList.add("collapsed");
         }, 600);
       }
       conversation.push({ role: "assistant", content: buffer });
       return;
     }
 
-    buffer += chunk.text;
-    renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent);
+    if (chunk.thinking) {
+      thinkingBuf += chunk.thinking;
+      thinkingBlock.classList.remove("hidden");
+      thinkingBlock.classList.add("has-thinking");
+      thinkingContent.textContent = thinkingBuf;
+      thinkingBlock.classList.remove("collapsed");
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return;
+    }
+
+    if (chunk.text) {
+      buffer += chunk.text;
+      renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent);
+    }
   });
 
-  window.electronAPI.startLLMStream(conversation);
+  window.electronAPI.startLLMStream(conversation, chatEffort.value || undefined);
 }
 
 function createAssistantMessage() {
@@ -261,16 +310,16 @@ function createAssistantMessage() {
   const bubble = document.createElement("div");
   bubble.className = "bubble";
 
-  const tb = document.createElement("div");
+  var tb = document.createElement("div");
   tb.className = "thinking-block hidden";
-  const th = document.createElement("div");
+  var th = document.createElement("div");
   th.className = "thinking-header";
   th.textContent = "🧠 Thinking";
-  th.addEventListener("click", () => {
-    tc.classList.toggle("collapsed");
+  th.addEventListener("click", function () {
+    tb.classList.toggle("collapsed");
   });
-  const tc = document.createElement("div");
-  tc.className = "thinking-content collapsed";
+  var tc = document.createElement("div");
+  tc.className = "thinking-content";
   tb.appendChild(th);
   tb.appendChild(tc);
 
@@ -287,15 +336,16 @@ function createAssistantMessage() {
 }
 
 function parseBuffer(buffer) {
-  const openTag = "";
-  const openIdx = buffer.indexOf(openTag);
+  var t = "think";
+  var openTag = "<" + t + ">";
+  var closeTag = "</" + t + ">";
+  var openIdx = buffer.indexOf(openTag);
 
   if (openIdx === -1) {
     return { thinking: "", response: buffer, inThinking: false, hasThinking: false };
   }
 
-  const closeTag = "";
-  const closeIdx = buffer.indexOf(closeTag, openIdx + openTag.length);
+  var closeIdx = buffer.indexOf(closeTag, openIdx + openTag.length);
 
   if (closeIdx === -1) {
     return {
@@ -315,13 +365,13 @@ function parseBuffer(buffer) {
 }
 
 function renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent) {
-  const parsed = parseBuffer(buffer);
+  var parsed = parseBuffer(buffer);
 
   if (parsed.hasThinking) {
     thinkingBlock.classList.remove("hidden");
     thinkingBlock.classList.add("has-thinking");
     thinkingContent.textContent = parsed.thinking;
-    thinkingContent.classList.remove("collapsed");
+    thinkingBlock.classList.remove("collapsed");
   }
 
   if (parsed.response) {

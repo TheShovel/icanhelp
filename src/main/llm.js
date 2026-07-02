@@ -53,9 +53,11 @@ function buildConfig() {
   return { ...defaults, ...stored };
 }
 
-async function streamLLM(messages) {
+async function streamLLM(messages, effort) {
   const config = buildConfig();
   if (!config.apiKey) return null;
+
+  var reasoningEffort = effort || config.reasoningEffort || undefined;
 
   const res = await fetch(`${config.endpoint}/chat/completions`, {
     method: 'POST',
@@ -66,6 +68,7 @@ async function streamLLM(messages) {
     body: JSON.stringify({
       model: config.model,
       stream: true,
+      reasoning_effort: reasoningEffort,
       messages: [
         {
           role: 'system',

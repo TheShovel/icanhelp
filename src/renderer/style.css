@@ -131,6 +131,30 @@ body {
     letter-spacing: 0.3px;
 }
 
+#chat-effort {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-size: 11px;
+    color: #aaa;
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+    margin-left: auto;
+    margin-right: 6px;
+}
+
+#chat-effort:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #ccc;
+}
+
+#chat-effort option {
+    background: #222;
+    color: #ccc;
+}
+
 .btn-icon {
     background: none;
     border: none;
@@ -319,10 +343,14 @@ body {
     opacity: 1;
 }
 
-.thinking-content.collapsed {
+.thinking-block.collapsed .thinking-content {
     max-height: 0;
     opacity: 0;
     overflow: hidden;
+}
+
+.thinking-block.collapsed .thinking-header::after {
+    transform: rotate(-90deg);
 }
 
 .response-content {
