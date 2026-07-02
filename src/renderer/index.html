@@ -16,6 +16,19 @@
                     <div class="typing-dot"></div>
                 </div>
                 <div id="chat-input-area">
+                    <button
+                        id="attach-btn"
+                        class="btn-icon"
+                        title="Attach a file"
+                    ></button>
+                    <div id="attachment-preview" class="hidden">
+                        <span id="attachment-name"></span>
+                        <button
+                            id="remove-attachment"
+                            class="btn-icon"
+                            title="Remove attachment"
+                        ></button>
+                    </div>
                     <input
                         type="text"
                         id="chat-input"
@@ -27,17 +40,37 @@
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
-                    <button id="chat-list-btn" class="btn-icon" title="Chat history"></button>
-                    <button id="new-chat-btn" class="btn-icon" title="New chat"></button>
-                    <button id="send-btn" class="btn-icon" title="Send"></button>
-                    <button id="cancel-btn" class="btn-icon hidden" title="Cancel"></button>
+                    <button
+                        id="chat-list-btn"
+                        class="btn-icon"
+                        title="Chat history"
+                    ></button>
+                    <button
+                        id="new-chat-btn"
+                        class="btn-icon"
+                        title="New chat"
+                    ></button>
+                    <button
+                        id="send-btn"
+                        class="btn-icon"
+                        title="Send"
+                    ></button>
+                    <button
+                        id="cancel-btn"
+                        class="btn-icon hidden"
+                        title="Cancel"
+                    ></button>
                 </div>
             </div>
 
             <div id="chat-list-panel" class="hidden">
                 <div id="chat-list-header">
                     <span>Chat History</span>
-                    <button id="close-chat-list" class="btn-icon" title="Close"></button>
+                    <button
+                        id="close-chat-list"
+                        class="btn-icon"
+                        title="Close"
+                    ></button>
                 </div>
                 <div id="chat-list-body"></div>
             </div>
@@ -45,7 +78,11 @@
             <div id="setup-panel" class="hidden">
                 <div id="setup-header">
                     <span>Configure LLM Provider</span>
-                    <button id="close-setup" class="btn-icon" title="Back to chat"></button>
+                    <button
+                        id="close-setup"
+                        class="btn-icon"
+                        title="Back to chat"
+                    ></button>
                 </div>
                 <div id="setup-body">
                     <label>
@@ -76,7 +113,9 @@
                     <label>
                         Model
                         <select id="setup-model">
-                            <option value="">— enter API key to load models —</option>
+                            <option value="">
+                                — enter API key to load models —
+                            </option>
                         </select>
                     </label>
                     <button id="setup-save" class="btn-primary">
@@ -103,8 +142,12 @@
                             placeholder="Password..."
                         />
                         <div id="sudo-actions">
-                            <button id="sudo-cancel" class="btn-secondary">Cancel</button>
-                            <button id="sudo-submit" class="btn-primary">Submit</button>
+                            <button id="sudo-cancel" class="btn-secondary">
+                                Cancel
+                            </button>
+                            <button id="sudo-submit" class="btn-primary">
+                                Submit
+                            </button>
                         </div>
                         <p id="sudo-status"></p>
                     </div>
@@ -120,8 +163,12 @@
                         <p id="confirm-message">Run the following command?</p>
                         <pre id="confirm-command"></pre>
                         <div id="confirm-actions">
-                            <button id="confirm-no" class="btn-secondary">Cancel</button>
-                            <button id="confirm-yes" class="btn-primary">Run</button>
+                            <button id="confirm-no" class="btn-secondary">
+                                Cancel
+                            </button>
+                            <button id="confirm-yes" class="btn-primary">
+                                Run
+                            </button>
                         </div>
                     </div>
                 </div>

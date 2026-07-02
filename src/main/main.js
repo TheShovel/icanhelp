@@ -1,10 +1,31 @@
-const { app, BrowserWindow, ipcMain, screen, shell, Menu, protocol } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  screen,
+  shell,
+  Menu,
+  protocol,
+  dialog,
+} = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { marked } = require("marked");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
-const { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition, loadChats, saveChats } = require("./store");
+const {
+  loadConfig,
+  saveConfig,
+  saveEffort,
+  saveWindowPosition,
+  loadWindowPosition,
+  loadChats,
+  saveChats,
+} = require("./store");
 const { createTray } = require("./tray");
+const {
+  prepareAttachment,
+  supportedAttachmentExtensions,
+} = require("./attachments");
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -130,7 +151,9 @@ function createWindow() {
               event.sender.send("llm-chunk", { text: delta.content });
             }
             if (delta.reasoning_content) {
-              event.sender.send("llm-chunk", { thinking: delta.reasoning_content });
+              event.sender.send("llm-chunk", {
+                thinking: delta.reasoning_content,
+              });
             }
 
             if (delta.tool_calls) {
@@ -144,8 +167,10 @@ function createWindow() {
                 }
                 if (tc.id) toolCalls[idx].id = tc.id;
                 if (tc.function) {
-                  if (tc.function.name) toolCalls[idx].function.name = tc.function.name;
-                  if (tc.function.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                  if (tc.function.name)
+                    toolCalls[idx].function.name = tc.function.name;
+                  if (tc.function.arguments)
+                    toolCalls[idx].function.arguments += tc.function.arguments;
                 }
               }
             }
@@ -189,7 +214,9 @@ function createWindow() {
       for (var tc of toolCalls) {
         if (!tc.id || !tc.function.name) continue;
         var args = {};
-        try { args = JSON.parse(tc.function.arguments); } catch {}
+        try {
+          args = JSON.parse(tc.function.arguments);
+        } catch {}
 
         event.sender.send("llm-chunk", {
           tool_start: { name: tc.function.name, args: args },
@@ -209,7 +236,10 @@ function createWindow() {
           });
         };
 
-        var result = await executeToolCall(tc, { onSudoPrompt: onSudoPrompt, onConfirm: onConfirm });
+        var result = await executeToolCall(tc, {
+          onSudoPrompt: onSudoPrompt,
+          onConfirm: onConfirm,
+        });
         event.sender.send("llm-chunk", {
           tool_end: { name: tc.function.name, output: result },
         });
@@ -238,7 +268,14 @@ function createWindow() {
 
   ipcMain.handle("get-config", () => {
     const cfg = loadConfig();
-    return cfg ? { provider: cfg.provider, model: cfg.model, endpoint: cfg.endpoint, reasoningEffort: cfg.reasoningEffort } : null;
+    return cfg
+      ? {
+          provider: cfg.provider,
+          model: cfg.model,
+          endpoint: cfg.endpoint,
+          reasoningEffort: cfg.reasoningEffort,
+        }
+      : null;
   });
 
   ipcMain.handle("has-config", () => {
@@ -269,11 +306,31 @@ function createWindow() {
     return true;
   });
 
-  ipcMain.handle("load-chats", function () { return loadChats(); });
-  ipcMain.handle("save-chats", function (_, chats) { saveChats(chats); return true; });
+  ipcMain.handle("load-chats", function () {
+    return loadChats();
+  });
+  ipcMain.handle("save-chats", function (_, chats) {
+    saveChats(chats);
+    return true;
+  });
 
   ipcMain.handle("parse-markdown", (_event, text) => {
     return marked.parse(text);
+  });
+
+  ipcMain.handle("select-attachment", async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openFile"],
+      filters: [
+        {
+          name: "Supported files",
+          extensions: supportedAttachmentExtensions(),
+        },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return await prepareAttachment(result.filePaths[0]);
   });
 
   if (process.env.ELECTRON_DEV) {
@@ -297,7 +354,9 @@ function createWindow() {
       { type: "separator" },
       {
         label: "Quit",
-        click: function () { app.quit(); },
+        click: function () {
+          app.quit();
+        },
       },
     ];
     var menu = Menu.buildFromTemplate(template);
@@ -305,16 +364,16 @@ function createWindow() {
   });
 }
 
-var assetsDir = path.join(__dirname, '..', '..', 'assets');
+var assetsDir = path.join(__dirname, "..", "..", "assets");
 
 app.whenReady().then(function () {
-  protocol.handle('asset', function (request) {
+  protocol.handle("asset", function (request) {
     var url = new URL(request.url);
-    var subdir = url.host === 'buddyart' ? 'buddyArt' : url.host;
+    var subdir = url.host === "buddyart" ? "buddyArt" : url.host;
     var filePath = path.join(assetsDir, subdir, url.pathname);
     try {
       return new Response(fs.readFileSync(filePath), {
-        headers: { 'content-type': 'image/png' },
+        headers: { "content-type": "image/png" },
       });
     } catch {
       return new Response(null, { status: 404 });
@@ -327,7 +386,6 @@ app.whenReady().then(function () {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
-
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {

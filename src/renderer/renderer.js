@@ -28,6 +28,10 @@ const confirmCommand = document.getElementById("confirm-command");
 const confirmYes = document.getElementById("confirm-yes");
 const confirmNo = document.getElementById("confirm-no");
 const avatarInner = document.getElementById("avatar-inner");
+const attachBtn = document.getElementById("attach-btn");
+const attachmentPreview = document.getElementById("attachment-preview");
+const attachmentName = document.getElementById("attachment-name");
+const removeAttachment = document.getElementById("remove-attachment");
 
 avatarInner.src = window.electronAPI.buddyArt("idle");
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
@@ -36,10 +40,118 @@ document.getElementById("cancel-btn").innerHTML = iconSvg("close", 16);
 document.getElementById("new-chat-btn").innerHTML = iconSvg("sparkle", 16);
 document.getElementById("chat-list-btn").innerHTML = iconSvg("folder", 16);
 document.getElementById("close-chat-list").innerHTML = iconSvg("close", 16);
+attachBtn.innerHTML = iconSvg("paperclip", 16);
+removeAttachment.innerHTML = iconSvg("close", 14);
+
+let currentAttachment = null;
+let attachmentToken = 0;
+
+function renderAttachment() {
+  attachmentPreview.classList.remove("loading", "ready", "error");
+
+  if (!currentAttachment) {
+    attachmentPreview.classList.add("hidden");
+    attachmentName.textContent = "";
+    attachmentPreview.title = "";
+    return;
+  }
+
+  attachmentPreview.classList.remove("hidden");
+  if (currentAttachment.status) {
+    attachmentPreview.classList.add(currentAttachment.status);
+  }
+  attachmentName.textContent =
+    currentAttachment.label || currentAttachment.name;
+  attachmentPreview.title =
+    currentAttachment.error || currentAttachment.name || "";
+}
+
+function clearAttachment() {
+  currentAttachment = null;
+  renderAttachment();
+}
+
+function consumeAttachment(text) {
+  if (!currentAttachment) return { display: text, attachmentData: null };
+
+  if (currentAttachment.status === "loading") {
+    currentAttachment.label = "Still reading...";
+    renderAttachment();
+    return { display: null, attachmentData: null };
+  }
+
+  if (currentAttachment.status === "error") {
+    if (!text) return { display: null, attachmentData: null };
+    clearAttachment();
+    return { display: text, attachmentData: null };
+  }
+
+  const ocr =
+    (currentAttachment.text || "").trim() || "No readable text found.";
+  const attachmentData = {
+    name: currentAttachment.name,
+    type: currentAttachment.type,
+    text: ocr,
+  };
+
+  var display = text || "📎 " + currentAttachment.name;
+  clearAttachment();
+  return { display: display, attachmentData: attachmentData };
+}
+
+function expandAttachment(msg) {
+  if (!msg.attachment || !msg.attachment.text) return msg;
+  var label =
+    msg.attachment.type === "image" ? "Image OCR content" : "File content";
+  var fullContent =
+    "[" + label + " from " + msg.attachment.name + ":]\n" + msg.attachment.text;
+  if (msg.content && msg.content !== "📎 " + msg.attachment.name) {
+    fullContent = fullContent + "\n\nUser message: " + msg.content;
+  }
+  return { role: msg.role, content: fullContent };
+}
+
+attachBtn.addEventListener("click", async function () {
+  const token = ++attachmentToken;
+  attachBtn.disabled = true;
+  currentAttachment = { label: "Reading file...", status: "loading" };
+  renderAttachment();
+
+  try {
+    const attachment = await window.electronAPI.selectAttachment();
+    if (token !== attachmentToken) return;
+    if (!attachment) {
+      clearAttachment();
+      return;
+    }
+    currentAttachment = Object.assign({ status: "ready" }, attachment);
+    renderAttachment();
+    chatInput.focus();
+  } catch (e) {
+    if (token !== attachmentToken) return;
+    currentAttachment = {
+      label: "Attachment failed",
+      status: "error",
+      error: e.message || "Could not read attachment.",
+    };
+    renderAttachment();
+  } finally {
+    if (token === attachmentToken) attachBtn.disabled = false;
+  }
+});
+
+removeAttachment.addEventListener("click", function () {
+  attachmentToken++;
+  attachBtn.disabled = false;
+  clearAttachment();
+});
 
 sudoSubmit.addEventListener("click", function () {
   var pw = sudoInput.value;
-  if (!pw) { sudoStatus.textContent = "Password required."; return; }
+  if (!pw) {
+    sudoStatus.textContent = "Password required.";
+    return;
+  }
   sudoOverlay.classList.add("hidden");
   window.electronAPI.sendSudoPassword(pw);
   sudoInput.value = "";
@@ -116,7 +228,9 @@ function generateId() {
 }
 
 function getCurrentChat() {
-  return chats.find(function (c) { return c.id === currentChatId; });
+  return chats.find(function (c) {
+    return c.id === currentChatId;
+  });
 }
 
 function saveChatsToStore() {
@@ -134,7 +248,9 @@ function saveChatsToStore() {
 
 function renderChatList() {
   chatListBody.innerHTML = "";
-  var sorted = chats.slice().sort(function (a, b) { return b.updatedAt - a.updatedAt; });
+  var sorted = chats.slice().sort(function (a, b) {
+    return b.updatedAt - a.updatedAt;
+  });
   sorted.forEach(function (chat) {
     var item = document.createElement("div");
     item.className = "chat-list-item";
@@ -158,7 +274,9 @@ function renderChatList() {
     delBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       if (chats.length <= 1) return;
-      chats = chats.filter(function (c) { return c.id !== chat.id; });
+      chats = chats.filter(function (c) {
+        return c.id !== chat.id;
+      });
       if (currentChatId === chat.id) {
         switchToChat(chats[0].id);
       }
@@ -168,7 +286,9 @@ function renderChatList() {
 
     item.appendChild(nameSpan);
     item.appendChild(delBtn);
-    item.addEventListener("click", function () { switchToChat(chat.id); });
+    item.addEventListener("click", function () {
+      switchToChat(chat.id);
+    });
     chatListBody.appendChild(item);
   });
 }
@@ -193,7 +313,9 @@ function switchToChat(chatId) {
   sendBtn.classList.remove("hidden");
   cancelBtn.classList.add("hidden");
 
-  chatMessages.querySelectorAll(".message").forEach(function (el) { el.remove(); });
+  chatMessages.querySelectorAll(".message").forEach(function (el) {
+    el.remove();
+  });
 
   var chat = getCurrentChat();
   if (chat) {
@@ -226,7 +348,9 @@ window.electronAPI.loadChats().then(function (loaded) {
   if (chats.length === 0) {
     currentChatId = createNewChat();
   } else {
-    chats.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+    chats.sort(function (a, b) {
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
     currentChatId = chats[0].id;
     for (var m of chats[0].messages || []) {
       addMessage(m.content, m.role);
@@ -260,7 +384,9 @@ function closeChatList() {
   sendBtn.classList.remove("hidden");
 }
 
-document.getElementById("close-chat-list").addEventListener("click", closeChatList);
+document
+  .getElementById("close-chat-list")
+  .addEventListener("click", closeChatList);
 
 const providerDefaults = {
   openrouter: {
@@ -294,7 +420,8 @@ setupProvider.addEventListener("change", () => {
   if (preset) {
     setupEndpoint.value = preset.endpoint;
   }
-  setupModel.innerHTML = '<option value="">— enter API key to load models —</option>';
+  setupModel.innerHTML =
+    '<option value="">— enter API key to load models —</option>';
   tryFetchModels();
 });
 
@@ -369,7 +496,8 @@ async function populateModels(cfg) {
     const models = await window.electronAPI.fetchModels(cfg);
     setupModel.innerHTML = '<option value="">— select a model —</option>';
     if (models.length === 0) {
-      setupStatus.textContent = "No models returned. Check the endpoint and key.";
+      setupStatus.textContent =
+        "No models returned. Check the endpoint and key.";
       return;
     }
     for (const m of models) {
@@ -468,7 +596,8 @@ window.electronAPI.hasConfig().then((has) => {
   window.electronAPI.validateStoredConfig().then((result) => {
     if (!result.valid) {
       needsSetup = true;
-      setupStatus.textContent = "Stored config is invalid: " + result.error + " — update it below.";
+      setupStatus.textContent =
+        "Stored config is invalid: " + result.error + " — update it below.";
       window.electronAPI.getConfig().then((cfg) => {
         if (cfg) {
           setupProvider.value = cfg.provider || "openrouter";
@@ -481,20 +610,31 @@ window.electronAPI.hasConfig().then((has) => {
 });
 
 async function sendMessage() {
-  var text = chatInput.value.trim();
-  if (!text) return;
+  var userText = chatInput.value.trim();
+  if (!userText && !currentAttachment) return;
+
+  var result = consumeAttachment(userText);
+  if (!result.display) return;
+
+  var display = result.display;
+  var attachmentData = result.attachmentData;
 
   ensureCurrentChat();
-  await addMessage(text, "user");
+  await addMessage(display, "user");
   chatInput.value = "";
 
   var chat = getCurrentChat();
+  var userMsg = { role: "user", content: display };
+  if (attachmentData) userMsg.attachment = attachmentData;
   if (chat) {
-    chat.messages.push({ role: "user", content: text });
+    chat.messages.push(userMsg);
     chat.updatedAt = Date.now();
     saveChatsToStore();
   }
-  var conversation = chat ? chat.messages.slice() : [{ role: "user", content: text }];
+
+  var conversation = chat
+    ? chat.messages.map(expandAttachment)
+    : [expandAttachment(userMsg)];
   showTyping();
 
   var msgEl = null;
@@ -561,7 +701,9 @@ async function sendMessage() {
       sudoStatus.textContent = "";
       sudoInput.value = "";
       sudoOverlay.classList.remove("hidden");
-      setTimeout(function () { sudoInput.focus(); }, 100);
+      setTimeout(function () {
+        sudoInput.focus();
+      }, 100);
       return;
     }
 
@@ -581,7 +723,8 @@ async function sendMessage() {
       } else {
         setAvatarState("bash");
       }
-      var cmd = chunk.tool_start.args.command || JSON.stringify(chunk.tool_start.args);
+      var cmd =
+        chunk.tool_start.args.command || JSON.stringify(chunk.tool_start.args);
       var toolBlock = document.createElement("div");
       toolBlock.className = "tool-block";
       var toolHeader = document.createElement("div");
@@ -642,11 +785,20 @@ async function sendMessage() {
     if (chunk.text) {
       setAvatarState("talking");
       buffer += chunk.text;
-      renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent).then(function () {});
+      renderStreamedContent(
+        bubble,
+        buffer,
+        thinkingBlock,
+        thinkingContent,
+        responseContent,
+      ).then(function () {});
     }
   });
 
-  window.electronAPI.startLLMStream(conversation, chatEffort.value || undefined);
+  window.electronAPI.startLLMStream(
+    conversation,
+    chatEffort.value || undefined,
+  );
 }
 
 function createAssistantMessage() {
@@ -687,7 +839,12 @@ function parseBuffer(buffer) {
   var openIdx = buffer.indexOf(openTag);
 
   if (openIdx === -1) {
-    return { thinking: "", response: buffer, inThinking: false, hasThinking: false };
+    return {
+      thinking: "",
+      response: buffer,
+      inThinking: false,
+      hasThinking: false,
+    };
   }
 
   var closeIdx = buffer.indexOf(closeTag, openIdx + openTag.length);
@@ -703,13 +860,20 @@ function parseBuffer(buffer) {
 
   return {
     thinking: buffer.slice(openIdx + openTag.length, closeIdx),
-    response: buffer.slice(0, openIdx) + buffer.slice(closeIdx + closeTag.length),
+    response:
+      buffer.slice(0, openIdx) + buffer.slice(closeIdx + closeTag.length),
     inThinking: false,
     hasThinking: true,
   };
 }
 
-async function renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent) {
+async function renderStreamedContent(
+  bubble,
+  buffer,
+  thinkingBlock,
+  thinkingContent,
+  responseContent,
+) {
   var parsed = parseBuffer(buffer);
 
   if (parsed.hasThinking) {

@@ -1,5 +1,6 @@
-const { runBash } = require('./bash');
-const { readFile, writeFile, listDirectory } = require('./fs');
+const { runBash } = require("./bash");
+const { readFile, writeFile, listDirectory } = require("./fs");
+const { ocrImage } = require("../ocr");
 
 async function searchWeb({ query, resultSize }) {
   try {
@@ -7,7 +8,7 @@ async function searchWeb({ query, resultSize }) {
       "https://raspy-lab-e617.niccata24.workers.dev/?q=" +
         encodeURIComponent(query) +
         "&limit=" +
-        (resultSize || 5)
+        (resultSize || 5),
     );
     var data = await res.json();
     return JSON.stringify(data, null, 2);
@@ -18,74 +19,108 @@ async function searchWeb({ query, resultSize }) {
 
 var tools = [
   {
-    type: 'function',
+    type: "function",
     function: {
-      name: 'search_web',
-      description: 'Search the web for current information. Returns a JSON array of results with title, URL, and snippet.',
+      name: "search_web",
+      description:
+        "Search the web for current information. Returns a JSON array of results with title, URL, and snippet.",
       parameters: {
-        type: 'object',
+        type: "object",
         properties: {
-          query: { type: 'string', description: 'The search query' },
-          resultSize: { type: 'number', description: 'Number of results to return (default 5)', default: 5 },
+          query: { type: "string", description: "The search query" },
+          resultSize: {
+            type: "number",
+            description: "Number of results to return (default 5)",
+            default: 5,
+          },
         },
-        required: ['query'],
+        required: ["query"],
       },
     },
   },
   {
-    type: 'function',
+    type: "function",
     function: {
-      name: 'run_bash',
-      description: 'Run a bash command on the Linux system. Use this to execute programs, install packages, run scripts, or get system info.',
+      name: "run_bash",
+      description:
+        "Run a bash command on the Linux system. Use this to execute programs, install packages, run scripts, or get system info.",
       parameters: {
-        type: 'object',
+        type: "object",
         properties: {
-          command: { type: 'string', description: 'The bash command to execute' },
+          command: {
+            type: "string",
+            description: "The bash command to execute",
+          },
         },
-        required: ['command'],
+        required: ["command"],
       },
     },
   },
   {
-    type: 'function',
+    type: "function",
     function: {
-      name: 'read_file',
-      description: 'Read the contents of a file from the filesystem.',
+      name: "read_file",
+      description: "Read the contents of a file from the filesystem.",
       parameters: {
-        type: 'object',
+        type: "object",
         properties: {
-          path: { type: 'string', description: 'Absolute path to the file' },
+          path: { type: "string", description: "Absolute path to the file" },
         },
-        required: ['path'],
+        required: ["path"],
       },
     },
   },
   {
-    type: 'function',
+    type: "function",
     function: {
-      name: 'write_file',
-      description: 'Write content to a file. Creates parent directories if needed. Overwrites existing files.',
+      name: "write_file",
+      description:
+        "Write content to a file. Creates parent directories if needed. Overwrites existing files.",
       parameters: {
-        type: 'object',
+        type: "object",
         properties: {
-          path: { type: 'string', description: 'Absolute path to the file' },
-          content: { type: 'string', description: 'Content to write to the file' },
+          path: { type: "string", description: "Absolute path to the file" },
+          content: {
+            type: "string",
+            description: "Content to write to the file",
+          },
         },
-        required: ['path', 'content'],
+        required: ["path", "content"],
       },
     },
   },
   {
-    type: 'function',
+    type: "function",
     function: {
-      name: 'list_directory',
-      description: 'List files and directories in a folder.',
+      name: "list_directory",
+      description: "List files and directories in a folder.",
       parameters: {
-        type: 'object',
+        type: "object",
         properties: {
-          path: { type: 'string', description: 'Absolute path to the directory' },
+          path: {
+            type: "string",
+            description: "Absolute path to the directory",
+          },
         },
-        required: ['path'],
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ocr_image",
+      description:
+        "Extract text from an image file using local OCR. Use this to read text from screenshots, photos, or scanned documents.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Absolute path to the image file",
+          },
+        },
+        required: ["path"],
       },
     },
   },
@@ -97,16 +132,18 @@ var handlers = {
   read_file: readFile,
   write_file: writeFile,
   list_directory: listDirectory,
+  ocr_image: ocrImage,
 };
 
 async function executeToolCall(toolCall, opts) {
   var fn = handlers[toolCall.function.name];
-  if (!fn) return JSON.stringify({ error: 'Unknown tool: ' + toolCall.function.name });
+  if (!fn)
+    return JSON.stringify({ error: "Unknown tool: " + toolCall.function.name });
   var args = {};
   try {
     args = JSON.parse(toolCall.function.arguments);
   } catch (e) {
-    return JSON.stringify({ error: 'Invalid arguments: ' + e.message });
+    return JSON.stringify({ error: "Invalid arguments: " + e.message });
   }
   if (opts) Object.assign(args, opts);
   var result = await fn(args);

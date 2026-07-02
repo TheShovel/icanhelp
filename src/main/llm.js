@@ -1,19 +1,26 @@
-const { loadConfig } = require('./store');
-const { tools, executeToolCall } = require('./tools/registry');
+const { loadConfig } = require("./store");
+const { tools, executeToolCall } = require("./tools/registry");
 
 const defaults = {
-  provider: 'openrouter',
-  model: 'gpt-4o-mini',
-  endpoint: 'https://openrouter.ai/api/v1',
+  provider: "openrouter",
+  model: "gpt-4o-mini",
+  endpoint: "https://openrouter.ai/api/v1",
 };
 
 async function validateConfig(config) {
-  if (config.provider === 'ollama') {
+  if (config.provider === "ollama") {
     try {
-      const res = await fetch(`${config.endpoint}/tags`, { signal: AbortSignal.timeout(5000) });
-      return res.ok ? { valid: true } : { valid: false, error: `Ollama returned status ${res.status}` };
+      const res = await fetch(`${config.endpoint}/tags`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      return res.ok
+        ? { valid: true }
+        : { valid: false, error: `Ollama returned status ${res.status}` };
     } catch (e) {
-      return { valid: false, error: `Cannot reach Ollama at ${config.endpoint}` };
+      return {
+        valid: false,
+        error: `Cannot reach Ollama at ${config.endpoint}`,
+      };
     }
   }
 
@@ -24,11 +31,14 @@ async function validateConfig(config) {
     });
     if (res.ok) return { valid: true };
     if (res.status === 401 || res.status === 403) {
-      return { valid: false, error: 'API key is invalid or unauthorized' };
+      return { valid: false, error: "API key is invalid or unauthorized" };
     }
     return { valid: false, error: `Endpoint returned status ${res.status}` };
   } catch (e) {
-    return { valid: false, error: `Cannot reach ${config.endpoint} — check the URL` };
+    return {
+      valid: false,
+      error: `Cannot reach ${config.endpoint} — check the URL`,
+    };
   }
 }
 
@@ -43,7 +53,10 @@ async function fetchModels(config) {
     if (!res.ok) return [];
     const data = await res.json();
     const models = data.data || [];
-    return models.map((m) => m.id || m.name).filter(Boolean).sort();
+    return models
+      .map((m) => m.id || m.name)
+      .filter(Boolean)
+      .sort();
   } catch {
     return [];
   }
@@ -65,20 +78,22 @@ async function streamLLM(messages, effort, signal) {
     tools: tools,
     messages: [
       {
-        role: 'system',
+        role: "system",
         content:
-          'You are icanhelp, an AI desktop assistant for Linux. ' +
-          'You run as a transparent overlay on the user\'s screen and help them with tasks.\n\n' +
-          'CAPABILITIES:\n' +
-          '- Execute bash commands via the run_bash tool\n' +
-          '- Read, write, and list files via the file tools\n' +
-          '- Search the web via the search_web tool\n' +
-          '- Answer questions and solve problems\n\n' +
-          'RULES:\n' +
-          '- Never use emojis or emoticons in your responses. Use plain text only.\n' +
-          '- Keep responses concise and practical.\n' +
-          '- When a task requires running a command, use the appropriate tool.\n' +
-          '- Explain what you\'re doing briefly before using a tool.',
+          "You are icanhelp, an AI desktop assistant for Linux. " +
+          "You run as a transparent overlay on the user's screen and help them with tasks.\n\n" +
+          "CAPABILITIES:\n" +
+          "- Execute bash commands via the run_bash tool\n" +
+          "- Read, write, and list files via the file tools\n" +
+          "- Extract text from images via the ocr_image tool\n" +
+          "- Search the web via the search_web tool\n" +
+          "- Answer questions and solve problems\n" +
+          "- When a user attaches an image, its text content is auto-extracted and included in their message\n\n" +
+          "RULES:\n" +
+          "- Never use emojis or emoticons in your responses. Use plain text only.\n" +
+          "- Keep responses concise and practical.\n" +
+          "- When a task requires running a command, use the appropriate tool.\n" +
+          "- Explain what you're doing briefly before using a tool.",
       },
       ...messages,
     ],
@@ -86,9 +101,9 @@ async function streamLLM(messages, effort, signal) {
   if (reasoningEffort) body.reasoning_effort = reasoningEffort;
 
   var opts = {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${config.apiKey}`,
     },
     body: JSON.stringify(body),
