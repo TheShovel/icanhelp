@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, screen, shell, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, shell, Menu, protocol } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { marked } = require("marked");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
 const { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition, loadChats, saveChats } = require("./store");
@@ -298,7 +299,21 @@ function createWindow() {
   });
 }
 
+var assetsDir = path.join(__dirname, '..', '..', 'assets');
+
 app.whenReady().then(function () {
+  protocol.handle('asset', function (request) {
+    var url = new URL(request.url);
+    var subdir = url.host === 'buddyart' ? 'buddyArt' : url.host;
+    var filePath = path.join(assetsDir, subdir, url.pathname);
+    try {
+      return new Response(fs.readFileSync(filePath), {
+        headers: { 'content-type': 'image/png' },
+      });
+    } catch {
+      return new Response(null, { status: 404 });
+    }
+  });
   createWindow();
   createTray(mainWindow);
 });

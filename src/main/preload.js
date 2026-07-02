@@ -1,6 +1,11 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+function buddyArt(name) {
+  return 'asset://buddyArt/' + name + '.png';
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
+  buddyArt: buddyArt,
   dragWindow: (deltaX, deltaY) => ipcRenderer.send('drag-window', { deltaX, deltaY }),
   resizeWindow: (width, height) => ipcRenderer.send('resize-window', { width, height }),
   hasConfig: () => ipcRenderer.invoke('has-config'),

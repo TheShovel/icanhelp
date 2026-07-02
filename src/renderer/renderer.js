@@ -29,9 +29,10 @@ const confirmOverlay = document.getElementById("confirm-overlay");
 const confirmCommand = document.getElementById("confirm-command");
 const confirmYes = document.getElementById("confirm-yes");
 const confirmNo = document.getElementById("confirm-no");
+const avatarInner = document.getElementById("avatar-inner");
 
 document.getElementById("assistant-name").innerHTML = iconSvg("sparkle", 14) + " icanhelp";
-document.getElementById("avatar-inner").innerHTML = iconSvg("sparkle", 28);
+avatarInner.src = window.electronAPI.buddyArt("idle");
 document.getElementById("chat-settings").innerHTML = iconSvg("settings", 16);
 document.getElementById("close-chat").innerHTML = iconSvg("close", 16);
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
@@ -74,13 +75,21 @@ confirmNo.addEventListener("click", function () {
 
 let chatOpen = false;
 let isDragging = false;
+let didDrag = false;
 let dragStartX = 0;
 let dragStartY = 0;
 let conversation = [];
 let needsSetup = true;
 
+function setAvatarState(state) {
+  var img = avatarInner;
+  var src = window.electronAPI.buddyArt(state);
+  if (img.src !== src) img.src = src;
+}
+
 avatar.addEventListener("mousedown", (e) => {
   isDragging = true;
+  didDrag = false;
   dragStartX = e.screenX;
   dragStartY = e.screenY;
   avatar.style.cursor = "grabbing";
@@ -88,6 +97,7 @@ avatar.addEventListener("mousedown", (e) => {
 
 document.addEventListener("mousemove", (e) => {
   if (!isDragging) return;
+  didDrag = true;
   const deltaX = e.screenX - dragStartX;
   const deltaY = e.screenY - dragStartY;
   dragStartX = e.screenX;
@@ -381,7 +391,7 @@ async function populateModels(cfg) {
 }
 
 avatar.addEventListener("click", (e) => {
-  if (isDragging) return;
+  if (didDrag) return;
   togglePanel();
 });
 
@@ -411,6 +421,7 @@ closeChatBtn.addEventListener("click", () => {
 cancelBtn.addEventListener("click", function () {
   sendBtn.classList.remove("hidden");
   cancelBtn.classList.add("hidden");
+  setAvatarState("idle");
   window.electronAPI.cancelStream();
 });
 
@@ -530,6 +541,7 @@ async function sendMessage() {
 
     if (chunk.error) {
       cleanup();
+      setAvatarState("idle");
       responseContent.textContent = "Error: " + chunk.error;
       msgEl.classList.remove("streaming");
       return;
@@ -537,6 +549,7 @@ async function sendMessage() {
 
     if (chunk.done) {
       cleanup();
+      setAvatarState("idle");
       msgEl.classList.remove("streaming");
       if (!thinkingBlock.classList.contains("has-thinking")) {
         thinkingBlock.classList.add("hidden");
@@ -577,6 +590,12 @@ async function sendMessage() {
         thinkingContent = el.querySelector(".thinking-content");
         thinkingBlock = el.querySelector(".thinking-block");
         responseContent = el.querySelector(".response-content");
+      }
+      var toolName = chunk.tool_start.name;
+      if (toolName === "search_web") {
+        setAvatarState("search");
+      } else {
+        setAvatarState("bash");
       }
       var cmd = chunk.tool_start.args.command || JSON.stringify(chunk.tool_start.args);
       var toolBlock = document.createElement("div");
@@ -627,6 +646,7 @@ async function sendMessage() {
     }
 
     if (chunk.thinking) {
+      setAvatarState("thinking");
       thinkingBuf += chunk.thinking;
       thinkingBlock.classList.remove("hidden");
       thinkingBlock.classList.add("has-thinking");
@@ -636,6 +656,7 @@ async function sendMessage() {
     }
 
     if (chunk.text) {
+      setAvatarState("talking");
       buffer += chunk.text;
       renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent).then(function () {});
     }
@@ -725,10 +746,12 @@ async function renderStreamedContent(bubble, buffer, thinkingBlock, thinkingCont
 function showTyping() {
   typingIndicator.classList.remove("hidden");
   chatMessages.scrollTop = chatMessages.scrollHeight;
+  setAvatarState("thinking");
 }
 
 function hideTyping() {
   typingIndicator.classList.add("hidden");
+  setAvatarState("idle");
 }
 
 async function addMessage(text, role) {

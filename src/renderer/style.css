@@ -50,9 +50,8 @@ body {
     position: absolute;
     bottom: 16px;
     right: 16px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
+    width: 72px;
+    height: 72px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -70,26 +69,11 @@ body {
     transform: scale(0.95);
 }
 
-#avatar-glow {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.45);
-    transition: box-shadow 0.3s ease;
-}
-
-#avatar:hover #avatar-glow {
-    box-shadow: 0 6px 30px rgba(102, 126, 234, 0.7);
-}
-
 #avatar-inner {
-    position: relative;
-    font-size: 24px;
-    line-height: 1;
-    z-index: 1;
+    width: 72px;
+    height: 72px;
     animation: float 3s ease-in-out infinite;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    -webkit-user-drag: none;
 }
 
 @keyframes float {

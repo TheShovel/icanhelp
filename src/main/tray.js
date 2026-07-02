@@ -1,11 +1,10 @@
 const { Tray, Menu, app, nativeImage } = require('electron');
 const path = require('path');
-const fs = require('fs');
 
 var tray = null;
 
 function createTray(mainWindow) {
-  var iconPath = path.join(__dirname, '..', '..', 'assets', 'icon.png');
+  var iconPath = path.join(__dirname, '..', '..', 'assets', 'buddyArt', 'idle.png');
   var icon;
 
   try {
@@ -16,14 +15,7 @@ function createTray(mainWindow) {
   }
 
   if (!icon) {
-    var rgbaPath = path.join(__dirname, '..', '..', 'assets', 'icon.rgba');
-    try {
-      var rgba = fs.readFileSync(rgbaPath);
-      icon = nativeImage.createFromBuffer(rgba, { width: 16, height: 16 });
-    } catch {
-      // Fallback: tiny 1x1 transparent
-      icon = nativeImage.createEmpty();
-    }
+    icon = nativeImage.createEmpty();
   }
 
   tray = new Tray(icon);
