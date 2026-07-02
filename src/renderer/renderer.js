@@ -122,7 +122,7 @@ function saveChatsToStore() {
       name: c.name || "Chat",
       messages: c.messages,
       createdAt: c.createdAt,
-      updatedAt: Date.now(),
+      updatedAt: c.updatedAt || Date.now(),
     };
   });
   window.electronAPI.saveChats(toSave);
@@ -186,14 +186,19 @@ function switchToChat(chatId) {
   if (chatId === currentChatId) return;
   currentChatId = chatId;
 
+  sendBtn.classList.remove("hidden");
+  cancelBtn.classList.add("hidden");
+
   chatMessages.querySelectorAll(".message").forEach(function (el) { el.remove(); });
 
-  // Load chat messages
   var chat = getCurrentChat();
   if (chat) {
     for (var m of chat.messages) {
       addMessage(m.content, m.role);
     }
+    requestAnimationFrame(function () {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
   }
 
   renderChatList();
@@ -222,6 +227,9 @@ window.electronAPI.loadChats().then(function (loaded) {
     for (var m of chats[0].messages || []) {
       addMessage(m.content, m.role);
     }
+    requestAnimationFrame(function () {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
   }
   sendBtn.classList.remove("hidden");
   renderChatList();
@@ -299,7 +307,10 @@ function togglePanel() {
     } else {
       chatPanel.classList.remove("hidden");
       setupPanel.classList.add("hidden");
-      setTimeout(() => chatInput.focus(), 150);
+      setTimeout(function () {
+        chatInput.focus();
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }, 150);
     }
   } else {
     chatPanel.classList.add("hidden");
