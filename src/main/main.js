@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, screen, shell, Menu } = require("electron")
 const path = require("path");
 const { marked } = require("marked");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
-const { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition } = require("./store");
+const { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition, loadChats, saveChats } = require("./store");
 const { createTray } = require("./tray");
 
 marked.setOptions({ breaks: true, gfm: true });
@@ -267,6 +267,9 @@ function createWindow() {
     saveEffort(effort);
     return true;
   });
+
+  ipcMain.handle("load-chats", function () { return loadChats(); });
+  ipcMain.handle("save-chats", function (_, chats) { saveChats(chats); return true; });
 
   ipcMain.handle("parse-markdown", (_event, text) => {
     return marked.parse(text);

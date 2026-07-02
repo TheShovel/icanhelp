@@ -82,4 +82,15 @@ function loadWindowPosition() {
   return null;
 }
 
-module.exports = { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition };
+function loadChats() {
+  var cfg = loadConfig();
+  return (cfg && cfg.chats) || [];
+}
+
+function saveChats(chats) {
+  var cfg = loadConfig() || {};
+  cfg.chats = chats;
+  saveConfig(cfg);
+}
+
+module.exports = { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition, loadChats, saveChats };

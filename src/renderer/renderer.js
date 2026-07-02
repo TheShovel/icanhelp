@@ -5,6 +5,10 @@ const chatInput = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const closeChatBtn = document.getElementById("close-chat");
 const chatSettingsBtn = document.getElementById("chat-settings");
+const chatListBtn = document.getElementById("chat-list-btn");
+const chatListPanel = document.getElementById("chat-list-panel");
+const chatListBody = document.getElementById("chat-list-body");
+const newChatBtn = document.getElementById("new-chat-btn");
 const cancelBtn = document.getElementById("cancel-btn");
 const chatEffort = document.getElementById("chat-effort");
 const typingIndicator = document.getElementById("typing-indicator");
@@ -33,6 +37,9 @@ document.getElementById("close-chat").innerHTML = iconSvg("close", 16);
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
 document.getElementById("cancel-btn").innerHTML = iconSvg("close", 16);
+document.getElementById("chat-list-btn").innerHTML = iconSvg("folder", 16);
+document.getElementById("new-chat-btn").innerHTML = iconSvg("sparkle", 16);
+document.getElementById("close-chat-list").innerHTML = iconSvg("close", 16);
 
 sudoSubmit.addEventListener("click", function () {
   var pw = sudoInput.value;
@@ -94,6 +101,154 @@ document.addEventListener("mouseup", () => {
     avatar.style.cursor = "pointer";
   }
 });
+
+// --- Chat Management ---
+var chats = [];
+var currentChatId = null;
+var activeCleanups = [];
+
+function generateId() {
+  return "chat_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+}
+
+function getCurrentChat() {
+  return chats.find(function (c) { return c.id === currentChatId; });
+}
+
+function saveChatsToStore() {
+  var toSave = chats.map(function (c) {
+    return {
+      id: c.id,
+      name: c.name || "Chat",
+      messages: c.messages,
+      createdAt: c.createdAt,
+      updatedAt: Date.now(),
+    };
+  });
+  window.electronAPI.saveChats(toSave);
+}
+
+function renderChatList() {
+  chatListBody.innerHTML = "";
+  var sorted = chats.slice().sort(function (a, b) { return b.updatedAt - a.updatedAt; });
+  sorted.forEach(function (chat) {
+    var item = document.createElement("div");
+    item.className = "chat-list-item";
+    if (chat.id === currentChatId) item.classList.add("active");
+
+    var nameSpan = document.createElement("span");
+    nameSpan.className = "chat-list-name";
+    var preview = "";
+    if (chat.messages.length > 0) {
+      var last = chat.messages[chat.messages.length - 1];
+      preview = last.content.slice(0, 40);
+      if (last.content.length > 40) preview += "…";
+    }
+    nameSpan.textContent = chat.name + (preview ? ": " + preview : "");
+
+    var delBtn = document.createElement("button");
+    delBtn.className = "chat-list-del";
+    delBtn.innerHTML = iconSvg("close", 12);
+    delBtn.title = "Delete";
+
+    delBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (chats.length <= 1) return;
+      chats = chats.filter(function (c) { return c.id !== chat.id; });
+      if (currentChatId === chat.id) {
+        switchToChat(chats[0].id);
+      }
+      renderChatList();
+      saveChatsToStore();
+    });
+
+    item.appendChild(nameSpan);
+    item.appendChild(delBtn);
+    item.addEventListener("click", function () { switchToChat(chat.id); });
+    chatListBody.appendChild(item);
+  });
+}
+
+function createNewChat() {
+  var chat = {
+    id: generateId(),
+    name: "Chat " + (chats.length + 1),
+    messages: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  chats.push(chat);
+  saveChatsToStore();
+  return chat.id;
+}
+
+function switchToChat(chatId) {
+  if (chatId === currentChatId) return;
+  currentChatId = chatId;
+
+  chatMessages.querySelectorAll(".message").forEach(function (el) { el.remove(); });
+
+  // Load chat messages
+  var chat = getCurrentChat();
+  if (chat) {
+    for (var m of chat.messages) {
+      addMessage(m.content, m.role);
+    }
+  }
+
+  renderChatList();
+  chatListPanel.classList.add("hidden");
+}
+
+function ensureCurrentChat() {
+  if (!currentChatId) {
+    if (chats.length === 0) {
+      currentChatId = createNewChat();
+    } else {
+      currentChatId = chats[0].id;
+    }
+  }
+}
+
+window.electronAPI.loadChats().then(function (loaded) {
+  chats = (loaded || []).map(function (c) {
+    return { updatedAt: 0, messages: [], name: "Chat", ...c };
+  });
+  if (chats.length === 0) {
+    currentChatId = createNewChat();
+  } else {
+    chats.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+    currentChatId = chats[0].id;
+    for (var m of chats[0].messages || []) {
+      addMessage(m.content, m.role);
+    }
+  }
+  sendBtn.classList.remove("hidden");
+  renderChatList();
+});
+
+chatListBtn.addEventListener("click", function () {
+  ensureCurrentChat();
+  renderChatList();
+  chatListPanel.classList.toggle("hidden");
+  if (!chatListPanel.classList.contains("hidden")) {
+    sendBtn.classList.add("hidden");
+  } else {
+    sendBtn.classList.remove("hidden");
+  }
+});
+
+newChatBtn.addEventListener("click", function () {
+  var id = createNewChat();
+  switchToChat(id);
+});
+
+function closeChatList() {
+  chatListPanel.classList.add("hidden");
+  sendBtn.classList.remove("hidden");
+}
+
+document.getElementById("close-chat-list").addEventListener("click", closeChatList);
 
 const providerDefaults = {
   openrouter: {
@@ -273,8 +428,12 @@ closeSetupBtn.addEventListener("click", () => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && chatOpen) {
-    togglePanel();
+  if (e.key === "Escape") {
+    if (!chatListPanel.classList.contains("hidden")) {
+      closeChatList();
+      return;
+    }
+    if (chatOpen) togglePanel();
   }
 });
 
@@ -319,10 +478,17 @@ async function sendMessage() {
   var text = chatInput.value.trim();
   if (!text) return;
 
+  ensureCurrentChat();
   await addMessage(text, "user");
   chatInput.value = "";
 
-  conversation.push({ role: "user", content: text });
+  var chat = getCurrentChat();
+  if (chat) {
+    chat.messages.push({ role: "user", content: text });
+    chat.updatedAt = Date.now();
+    saveChatsToStore();
+  }
+  var conversation = chat ? chat.messages.slice() : [{ role: "user", content: text }];
   showTyping();
 
   var msgEl = null;
@@ -368,7 +534,12 @@ async function sendMessage() {
           thinkingBlock.classList.add("collapsed");
         }, 600);
       }
-      conversation.push({ role: "assistant", content: buffer });
+      var chat = getCurrentChat();
+      if (chat) {
+        chat.messages.push({ role: "assistant", content: buffer });
+        chat.updatedAt = Date.now();
+        saveChatsToStore();
+      }
       return;
     }
 

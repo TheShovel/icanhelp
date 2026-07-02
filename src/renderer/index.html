@@ -17,17 +17,11 @@
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
+                    <button id="chat-list-btn" class="btn-icon" title="Chat history"></button>
                     <button id="chat-settings" class="btn-icon" title="Settings"></button>
                     <button id="close-chat" class="btn-icon" title="Close"></button>
                 </div>
-                <div id="chat-messages">
-                    <div class="message assistant">
-                        <div class="bubble">
-                            Hi, I'm icanhelp. Ask me anything or tell me what
-                            to do.
-                        </div>
-                    </div>
-                </div>
+                <div id="chat-messages"></div>
                 <div id="typing-indicator" class="hidden">
                     <div class="typing-dot"></div>
                     <div class="typing-dot"></div>
@@ -39,9 +33,18 @@
                         id="chat-input"
                         placeholder="Ask me anything..."
                     />
+                    <button id="new-chat-btn" class="btn-icon" title="New chat"></button>
                     <button id="send-btn" class="btn-icon" title="Send"></button>
                     <button id="cancel-btn" class="btn-icon hidden" title="Cancel"></button>
                 </div>
+            </div>
+
+            <div id="chat-list-panel" class="hidden">
+                <div id="chat-list-header">
+                    <span>Chat History</span>
+                    <button id="close-chat-list" class="btn-icon" title="Close"></button>
+                </div>
+                <div id="chat-list-body"></div>
             </div>
 
             <div id="setup-panel" class="hidden">
