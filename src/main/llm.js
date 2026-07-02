@@ -31,6 +31,23 @@ async function validateConfig(config) {
   }
 }
 
+async function fetchModels(config) {
+  try {
+    const headers = {};
+    if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
+    const res = await fetch(`${config.endpoint}/models`, {
+      headers,
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const models = data.data || [];
+    return models.map((m) => m.id || m.name).filter(Boolean).sort();
+  } catch {
+    return [];
+  }
+}
+
 async function askLLM(messages) {
   const stored = loadConfig();
   const config = { ...defaults, ...stored };
@@ -67,4 +84,4 @@ async function askLLM(messages) {
   return data.choices[0].message.content;
 }
 
-module.exports = { askLLM, validateConfig };
+module.exports = { askLLM, validateConfig, fetchModels };

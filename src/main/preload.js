@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   validateStoredConfig: () => ipcRenderer.invoke('validate-stored-config'),
+  fetchModels: (config) => ipcRenderer.invoke('fetch-models', config),
 });

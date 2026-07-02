@@ -47,6 +47,7 @@
                             <option value="openrouter">OpenRouter</option>
                             <option value="openai">OpenAI</option>
                             <option value="ollama">Ollama (local)</option>
+                            <option value="opencode">OpenCode</option>
                         </select>
                     </label>
                     <label>
@@ -67,11 +68,9 @@
                     </label>
                     <label>
                         Model
-                        <input
-                            type="text"
-                            id="setup-model"
-                            placeholder="gpt-4o-mini"
-                        />
+                        <select id="setup-model">
+                            <option value="">— enter API key to load models —</option>
+                        </select>
                     </label>
                     <button id="setup-save" class="btn-primary">
                         Save &amp; Start

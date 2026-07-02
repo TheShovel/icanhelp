@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen } = require("electron");
 const path = require("path");
-const { askLLM, validateConfig } = require("./llm");
+const { askLLM, validateConfig, fetchModels } = require("./llm");
 const { loadConfig, saveConfig } = require("./store");
 
 let mainWindow;
@@ -79,6 +79,10 @@ function createWindow() {
     const cfg = loadConfig();
     if (!cfg) return { valid: false, error: "No config found" };
     return await validateConfig(cfg);
+  });
+
+  ipcMain.handle("fetch-models", async (_event, config) => {
+    return await fetchModels(config);
   });
 
   if (process.env.ELECTRON_DEV) {

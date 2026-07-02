@@ -56,15 +56,31 @@ const providerDefaults = {
     endpoint: "http://localhost:11434/v1",
     model: "llama3.2",
   },
+  opencode: {
+    endpoint: "https://opencode.ai/zen/go/v1",
+    model: "",
+  },
 };
+
+function tryFetchModels() {
+  const key = setupKey.value.trim();
+  const ep = setupEndpoint.value.trim();
+  if (!key || !ep) return;
+  setupStatus.textContent = "Fetching models...";
+  populateModels({ apiKey: key, endpoint: ep });
+}
 
 setupProvider.addEventListener("change", () => {
   const preset = providerDefaults[setupProvider.value];
   if (preset) {
     setupEndpoint.value = preset.endpoint;
-    setupModel.value = preset.model;
   }
+  setupModel.innerHTML = '<option value="">— enter API key to load models —</option>';
+  tryFetchModels();
 });
+
+setupKey.addEventListener("blur", tryFetchModels);
+setupEndpoint.addEventListener("blur", tryFetchModels);
 
 function togglePanel() {
   chatOpen = !chatOpen;
@@ -102,7 +118,7 @@ setupSave.addEventListener("click", async () => {
     return;
   }
   if (!config.model) {
-    setupStatus.textContent = "Model name is required.";
+    setupStatus.textContent = "Select a model.";
     return;
   }
 
@@ -125,6 +141,26 @@ setupSave.addEventListener("click", async () => {
     setupSave.disabled = false;
   }
 });
+
+async function populateModels(cfg) {
+  try {
+    const models = await window.electronAPI.fetchModels(cfg);
+    setupModel.innerHTML = '<option value="">— select a model —</option>';
+    if (models.length === 0) {
+      setupStatus.textContent = "No models returned. Check the endpoint and key.";
+      return;
+    }
+    for (const m of models) {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = m;
+      setupModel.appendChild(opt);
+    }
+    setupStatus.textContent = `Found ${models.length} models.`;
+  } catch (err) {
+    setupStatus.textContent = "Failed to fetch models: " + err.message;
+  }
+}
 
 avatar.addEventListener("click", (e) => {
   if (isDragging) return;
