@@ -5,12 +5,20 @@ const chatInput = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const closeChatBtn = document.getElementById("close-chat");
 const typingIndicator = document.getElementById("typing-indicator");
+const setupPanel = document.getElementById("setup-panel");
+const setupProvider = document.getElementById("setup-provider");
+const setupKey = document.getElementById("setup-key");
+const setupEndpoint = document.getElementById("setup-endpoint");
+const setupModel = document.getElementById("setup-model");
+const setupSave = document.getElementById("setup-save");
+const setupStatus = document.getElementById("setup-status");
 
 let chatOpen = false;
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
 let conversation = [];
+let needsSetup = true;
 
 avatar.addEventListener("mousedown", (e) => {
   isDragging = true;
@@ -35,30 +43,101 @@ document.addEventListener("mouseup", () => {
   }
 });
 
-function toggleChat() {
+const providerDefaults = {
+  openrouter: {
+    endpoint: "https://openrouter.ai/api/v1",
+    model: "gpt-4o-mini",
+  },
+  openai: {
+    endpoint: "https://api.openai.com/v1",
+    model: "gpt-4o-mini",
+  },
+  ollama: {
+    endpoint: "http://localhost:11434/v1",
+    model: "llama3.2",
+  },
+};
+
+setupProvider.addEventListener("change", () => {
+  const preset = providerDefaults[setupProvider.value];
+  if (preset) {
+    setupEndpoint.value = preset.endpoint;
+    setupModel.value = preset.model;
+  }
+});
+
+function togglePanel() {
   chatOpen = !chatOpen;
   if (chatOpen) {
-    chatPanel.classList.remove("hidden");
     window.electronAPI.resizeWindow(400, 550);
-    setTimeout(() => chatInput.focus(), 150);
+    if (needsSetup) {
+      setupPanel.classList.remove("hidden");
+      chatPanel.classList.add("hidden");
+    } else {
+      chatPanel.classList.remove("hidden");
+      setupPanel.classList.add("hidden");
+      setTimeout(() => chatInput.focus(), 150);
+    }
   } else {
     chatPanel.classList.add("hidden");
+    setupPanel.classList.add("hidden");
     window.electronAPI.resizeWindow(88, 88);
   }
 }
 
+setupSave.addEventListener("click", async () => {
+  const config = {
+    provider: setupProvider.value,
+    apiKey: setupKey.value.trim(),
+    endpoint: setupEndpoint.value.trim(),
+    model: setupModel.value.trim(),
+  };
+
+  if (!config.apiKey) {
+    setupStatus.textContent = "API key is required.";
+    return;
+  }
+  if (!config.endpoint) {
+    setupStatus.textContent = "Endpoint URL is required.";
+    return;
+  }
+  if (!config.model) {
+    setupStatus.textContent = "Model name is required.";
+    return;
+  }
+
+  setupSave.disabled = true;
+  setupStatus.textContent = "Saving...";
+
+  try {
+    await window.electronAPI.saveConfig(config);
+    needsSetup = false;
+    setupStatus.textContent = "Saved! Restart the chat.";
+    setTimeout(() => {
+      setupPanel.classList.add("hidden");
+      chatPanel.classList.remove("hidden");
+      chatOpen = true;
+      setTimeout(() => chatInput.focus(), 150);
+    }, 600);
+  } catch (err) {
+    setupStatus.textContent = "Error: " + err.message;
+  } finally {
+    setupSave.disabled = false;
+  }
+});
+
 avatar.addEventListener("click", (e) => {
   if (isDragging) return;
-  toggleChat();
+  togglePanel();
 });
 
 closeChatBtn.addEventListener("click", () => {
-  toggleChat();
+  togglePanel();
 });
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && chatOpen) {
-    toggleChat();
+    togglePanel();
   }
 });
 
@@ -66,8 +145,29 @@ chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     e.stopPropagation();
     chatInput.blur();
-    toggleChat();
+    togglePanel();
   }
+});
+
+window.electronAPI.hasConfig().then((has) => {
+  if (!has) {
+    needsSetup = true;
+    return;
+  }
+  window.electronAPI.validateStoredConfig().then((result) => {
+    if (!result.valid) {
+      needsSetup = true;
+      setupStatus.textContent = "Stored config is invalid: " + result.error + " — update it below.";
+      const stored = window.electronAPI.getConfig();
+      stored.then((cfg) => {
+        if (cfg) {
+          setupProvider.value = cfg.provider || "openrouter";
+          setupEndpoint.value = cfg.endpoint || "";
+          setupModel.value = cfg.model || "";
+        }
+      });
+    }
+  });
 });
 
 function sendMessage() {

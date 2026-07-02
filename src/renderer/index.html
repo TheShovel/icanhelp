@@ -36,6 +36,50 @@
                 </div>
             </div>
 
+            <div id="setup-panel" class="hidden">
+                <div id="setup-header">
+                    <span>Configure LLM Provider</span>
+                </div>
+                <div id="setup-body">
+                    <label>
+                        Provider
+                        <select id="setup-provider">
+                            <option value="openrouter">OpenRouter</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="ollama">Ollama (local)</option>
+                        </select>
+                    </label>
+                    <label>
+                        API Key
+                        <input
+                            type="password"
+                            id="setup-key"
+                            placeholder="sk-or-v1-..."
+                        />
+                    </label>
+                    <label>
+                        Endpoint URL
+                        <input
+                            type="text"
+                            id="setup-endpoint"
+                            placeholder="https://openrouter.ai/api/v1"
+                        />
+                    </label>
+                    <label>
+                        Model
+                        <input
+                            type="text"
+                            id="setup-model"
+                            placeholder="gpt-4o-mini"
+                        />
+                    </label>
+                    <button id="setup-save" class="btn-primary">
+                        Save &amp; Start
+                    </button>
+                    <p id="setup-status"></p>
+                </div>
+            </div>
+
             <div id="avatar" title="Click to ask me anything">
                 <div id="avatar-glow"></div>
                 <div id="avatar-inner">✨</div>

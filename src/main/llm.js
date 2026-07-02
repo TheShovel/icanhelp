@@ -1,0 +1,70 @@
+const { loadConfig } = require('./store');
+
+const defaults = {
+  provider: 'openrouter',
+  model: 'gpt-4o-mini',
+  endpoint: 'https://openrouter.ai/api/v1',
+};
+
+async function validateConfig(config) {
+  if (config.provider === 'ollama') {
+    try {
+      const res = await fetch(`${config.endpoint}/tags`, { signal: AbortSignal.timeout(5000) });
+      return res.ok ? { valid: true } : { valid: false, error: `Ollama returned status ${res.status}` };
+    } catch (e) {
+      return { valid: false, error: `Cannot reach Ollama at ${config.endpoint}` };
+    }
+  }
+
+  try {
+    const res = await fetch(`${config.endpoint}/models`, {
+      headers: { Authorization: `Bearer ${config.apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) return { valid: true };
+    if (res.status === 401 || res.status === 403) {
+      return { valid: false, error: 'API key is invalid or unauthorized' };
+    }
+    return { valid: false, error: `Endpoint returned status ${res.status}` };
+  } catch (e) {
+    return { valid: false, error: `Cannot reach ${config.endpoint} — check the URL` };
+  }
+}
+
+async function askLLM(messages) {
+  const stored = loadConfig();
+  const config = { ...defaults, ...stored };
+
+  if (!config.apiKey) {
+    return null;
+  }
+
+  const response = await fetch(`${config.endpoint}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are icanhelp, a helpful AI assistant running on a Linux desktop. You help the user with tasks, answer questions, and automate things. Keep responses concise and practical.',
+        },
+        ...messages,
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`LLM request failed (${response.status}): ${error}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
+
+module.exports = { askLLM, validateConfig };

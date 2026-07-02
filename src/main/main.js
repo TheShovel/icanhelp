@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, screen } = require("electron");
 const path = require("path");
-const { askLLM } = require("./llm");
+const { askLLM, validateConfig } = require("./llm");
+const { loadConfig, saveConfig } = require("./store");
 
 let mainWindow;
 
@@ -47,7 +48,37 @@ function createWindow() {
   });
 
   ipcMain.handle("ask-llm", async (_event, messages) => {
-    return await askLLM(messages);
+    const result = await askLLM(messages);
+    if (result === null) {
+      throw new Error(
+        "No API key configured. Open the assistant and use the setup screen to configure your LLM provider.",
+      );
+    }
+    return result;
+  });
+
+  ipcMain.handle("get-config", () => {
+    const cfg = loadConfig();
+    return cfg ? { provider: cfg.provider, model: cfg.model, endpoint: cfg.endpoint } : null;
+  });
+
+  ipcMain.handle("has-config", () => {
+    return loadConfig() !== null;
+  });
+
+  ipcMain.handle("save-config", async (_event, config) => {
+    const result = await validateConfig(config);
+    if (!result.valid) {
+      throw new Error(result.error);
+    }
+    saveConfig(config);
+    return true;
+  });
+
+  ipcMain.handle("validate-stored-config", async () => {
+    const cfg = loadConfig();
+    if (!cfg) return { valid: false, error: "No config found" };
+    return await validateConfig(cfg);
   });
 
   if (process.env.ELECTRON_DEV) {
