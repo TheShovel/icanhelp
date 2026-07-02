@@ -10,34 +10,11 @@ let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
 
-function enableClickThrough() {
-  if (!chatOpen && !isDragging) {
-    window.electronAPI.setIgnoreMouseEvents(true, { forward: true });
-  }
-}
-
-function disableClickThrough() {
-  window.electronAPI.setIgnoreMouseEvents(false);
-}
-
-enableClickThrough();
-
-avatar.addEventListener("mouseenter", () => {
-  disableClickThrough();
-});
-
-avatar.addEventListener("mouseleave", () => {
-  if (!isDragging) {
-    enableClickThrough();
-  }
-});
-
 avatar.addEventListener("mousedown", (e) => {
   isDragging = true;
   dragStartX = e.screenX;
   dragStartY = e.screenY;
   avatar.style.cursor = "grabbing";
-  disableClickThrough();
 });
 
 document.addEventListener("mousemove", (e) => {
@@ -49,22 +26,10 @@ document.addEventListener("mousemove", (e) => {
   window.electronAPI.dragWindow(deltaX, deltaY);
 });
 
-document.addEventListener("mouseup", (e) => {
+document.addEventListener("mouseup", () => {
   if (isDragging) {
     isDragging = false;
     avatar.style.cursor = "pointer";
-
-    if (!chatOpen) {
-      const rect = avatar.getBoundingClientRect();
-      const isOverAvatar =
-        e.clientX >= rect.left &&
-        e.clientX <= rect.right &&
-        e.clientY >= rect.top &&
-        e.clientY <= rect.bottom;
-      if (!isOverAvatar) {
-        enableClickThrough();
-      }
-    }
   }
 });
 
@@ -72,11 +37,11 @@ function toggleChat() {
   chatOpen = !chatOpen;
   if (chatOpen) {
     chatPanel.classList.remove("hidden");
-    disableClickThrough();
+    window.electronAPI.resizeWindow(400, 550);
     setTimeout(() => chatInput.focus(), 150);
   } else {
     chatPanel.classList.add("hidden");
-    enableClickThrough();
+    window.electronAPI.resizeWindow(88, 88);
   }
 }
 

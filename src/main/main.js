@@ -8,10 +8,10 @@ function createWindow() {
   const { width, height } = display.workAreaSize;
 
   mainWindow = new BrowserWindow({
-    width: 400,
-    height: 550,
-    x: width - 420,
-    y: height - 570,
+    width: 88,
+    height: 88,
+    x: width - 108,
+    y: height - 108,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -29,19 +29,20 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
 
-  mainWindow.setIgnoreMouseEvents(true, { forward: true });
-
   ipcMain.on("drag-window", (event, { deltaX, deltaY }) => {
     const [x, y] = mainWindow.getPosition();
     mainWindow.setPosition(x + deltaX, y + deltaY);
   });
 
-  ipcMain.on("set-ignore-mouse-events", (event, ignore, options) => {
-    mainWindow.setIgnoreMouseEvents(ignore, options || {});
-  });
-
-  ipcMain.handle("get-window-position", () => {
-    return mainWindow.getPosition();
+  ipcMain.on("resize-window", (event, { width, height }) => {
+    const [x, y] = mainWindow.getPosition();
+    const [currentW, currentH] = mainWindow.getSize();
+    mainWindow.setBounds({
+      x: x + currentW - width,
+      y: y + currentH - height,
+      width,
+      height,
+    });
   });
 
   if (process.env.ELECTRON_DEV) {
