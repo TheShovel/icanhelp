@@ -242,28 +242,35 @@ window.electronAPI.hasConfig().then((has) => {
 });
 
 function sendMessage() {
-  const text = chatInput.value.trim();
+  var text = chatInput.value.trim();
   if (!text) return;
 
   addMessage(text, "user");
   chatInput.value = "";
 
   conversation.push({ role: "user", content: text });
+  showTyping();
 
-  const msgEl = createAssistantMessage();
-  const bubble = msgEl.querySelector(".bubble");
-  const thinkingContent = msgEl.querySelector(".thinking-content");
-  const thinkingBlock = msgEl.querySelector(".thinking-block");
-  const responseContent = msgEl.querySelector(".response-content");
-
-  let buffer = "";
-  let finalized = false;
-
+  var msgEl = null;
+  var bubble = null;
+  var thinkingContent = null;
+  var thinkingBlock = null;
+  var responseContent = null;
+  var buffer = "";
   var thinkingBuf = "";
 
-  const cleanup = window.electronAPI.onLLMChunk((chunk) => {
+  const cleanup = window.electronAPI.onLLMChunk(function (chunk) {
+    if (!msgEl) {
+      hideTyping();
+      var el = createAssistantMessage();
+      msgEl = el;
+      bubble = el.querySelector(".bubble");
+      thinkingContent = el.querySelector(".thinking-content");
+      thinkingBlock = el.querySelector(".thinking-block");
+      responseContent = el.querySelector(".response-content");
+    }
+
     if (chunk.error) {
-      finalized = true;
       cleanup();
       responseContent.textContent = "Error: " + chunk.error;
       msgEl.classList.remove("streaming");
@@ -271,7 +278,6 @@ function sendMessage() {
     }
 
     if (chunk.done) {
-      finalized = true;
       cleanup();
       msgEl.classList.remove("streaming");
       if (!thinkingBlock.classList.contains("has-thinking")) {
@@ -292,7 +298,6 @@ function sendMessage() {
       thinkingContent.textContent = thinkingBuf;
       thinkingBlock.classList.remove("collapsed");
       chatMessages.scrollTop = chatMessages.scrollHeight;
-      return;
     }
 
     if (chunk.text) {

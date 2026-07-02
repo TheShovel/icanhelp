@@ -99,7 +99,7 @@ function createWindow() {
 
   ipcMain.handle("get-config", () => {
     const cfg = loadConfig();
-    return cfg ? { provider: cfg.provider, model: cfg.model, endpoint: cfg.endpoint } : null;
+    return cfg ? { provider: cfg.provider, model: cfg.model, endpoint: cfg.endpoint, reasoningEffort: cfg.reasoningEffort } : null;
   });
 
   ipcMain.handle("has-config", () => {

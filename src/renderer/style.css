@@ -343,6 +343,19 @@ body {
     opacity: 1;
 }
 
+.thinking-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+.thinking-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.thinking-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+}
+
 .thinking-block.collapsed .thinking-content {
     max-height: 0;
     opacity: 0;
