@@ -195,7 +195,6 @@ body {
 }
 
 /* ---- Headers ---- */
-#chat-header,
 #setup-header,
 #chat-list-header {
     display: flex;
@@ -205,12 +204,6 @@ body {
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     background: var(--bg-header);
-}
-
-#assistant-name {
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--fg);
 }
 
 /* ---- Effort Select ---- */
@@ -224,8 +217,6 @@ body {
     outline: none;
     cursor: pointer;
     font-family: inherit;
-    margin-left: auto;
-    margin-right: 6px;
 }
 
 #chat-effort:hover { border-color: var(--fg-placeholder); }

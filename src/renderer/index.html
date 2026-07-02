@@ -9,18 +9,6 @@
     <body>
         <div id="app">
             <div id="chat-panel" class="hidden">
-                <div id="chat-header">
-                    <span id="assistant-name" class="with-icon"></span>
-                    <select id="chat-effort" title="Reasoning effort">
-                        <option value="">Auto</option>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                    </select>
-                    <button id="chat-list-btn" class="btn-icon" title="Chat history"></button>
-                    <button id="chat-settings" class="btn-icon" title="Settings"></button>
-                    <button id="close-chat" class="btn-icon" title="Close"></button>
-                </div>
                 <div id="chat-messages"></div>
                 <div id="typing-indicator" class="hidden">
                     <div class="typing-dot"></div>
@@ -33,6 +21,13 @@
                         id="chat-input"
                         placeholder="Ask me anything..."
                     />
+                    <select id="chat-effort" title="Reasoning effort">
+                        <option value="">Auto</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                    <button id="chat-list-btn" class="btn-icon" title="Chat history"></button>
                     <button id="new-chat-btn" class="btn-icon" title="New chat"></button>
                     <button id="send-btn" class="btn-icon" title="Send"></button>
                     <button id="cancel-btn" class="btn-icon hidden" title="Cancel"></button>

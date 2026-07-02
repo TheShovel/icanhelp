@@ -283,6 +283,12 @@ function createWindow() {
   ipcMain.on("show-context-menu", function () {
     var template = [
       {
+        label: "Chat History",
+        click: function () {
+          mainWindow.webContents.send("open-chat-list");
+        },
+      },
+      {
         label: "Settings",
         click: function () {
           mainWindow.webContents.send("open-settings");

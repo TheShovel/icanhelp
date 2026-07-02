@@ -3,8 +3,6 @@ const chatPanel = document.getElementById("chat-panel");
 const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
-const closeChatBtn = document.getElementById("close-chat");
-const chatSettingsBtn = document.getElementById("chat-settings");
 const chatListBtn = document.getElementById("chat-list-btn");
 const chatListPanel = document.getElementById("chat-list-panel");
 const chatListBody = document.getElementById("chat-list-body");
@@ -31,15 +29,12 @@ const confirmYes = document.getElementById("confirm-yes");
 const confirmNo = document.getElementById("confirm-no");
 const avatarInner = document.getElementById("avatar-inner");
 
-document.getElementById("assistant-name").innerHTML = iconSvg("sparkle", 14) + " icanhelp";
 avatarInner.src = window.electronAPI.buddyArt("idle");
-document.getElementById("chat-settings").innerHTML = iconSvg("settings", 16);
-document.getElementById("close-chat").innerHTML = iconSvg("close", 16);
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
 document.getElementById("cancel-btn").innerHTML = iconSvg("close", 16);
-document.getElementById("chat-list-btn").innerHTML = iconSvg("folder", 16);
 document.getElementById("new-chat-btn").innerHTML = iconSvg("sparkle", 16);
+document.getElementById("chat-list-btn").innerHTML = iconSvg("folder", 16);
 document.getElementById("close-chat-list").innerHTML = iconSvg("close", 16);
 
 sudoSubmit.addEventListener("click", function () {
@@ -413,8 +408,12 @@ window.electronAPI.onOpenSettings(function () {
   setupStatus.textContent = "Update your settings below.";
 });
 
-closeChatBtn.addEventListener("click", () => {
-  togglePanel();
+window.electronAPI.onOpenChatList(function () {
+  if (!chatOpen) togglePanel();
+  ensureCurrentChat();
+  renderChatList();
+  chatListPanel.classList.remove("hidden");
+  sendBtn.classList.add("hidden");
 });
 
 cancelBtn.addEventListener("click", function () {
@@ -422,20 +421,6 @@ cancelBtn.addEventListener("click", function () {
   cancelBtn.classList.add("hidden");
   setAvatarState("idle");
   window.electronAPI.cancelStream();
-});
-
-chatSettingsBtn.addEventListener("click", () => {
-  if (!chatOpen) return;
-  chatPanel.classList.add("hidden");
-  setupPanel.classList.remove("hidden");
-  window.electronAPI.getConfig().then(function (cfg) {
-    if (cfg) {
-      setupProvider.value = cfg.provider || "openrouter";
-      setupEndpoint.value = cfg.endpoint || "";
-      setupModel.value = cfg.model || "";
-    }
-  });
-  setupStatus.textContent = "Update your settings below.";
 });
 
 closeSetupBtn.addEventListener("click", () => {

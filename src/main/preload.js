@@ -30,4 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onOpenSettings: (callback) => {
     ipcRenderer.on('open-settings', () => callback());
   },
+  onOpenChatList: (callback) => {
+    ipcRenderer.on('open-chat-list', () => callback());
+  },
 });
