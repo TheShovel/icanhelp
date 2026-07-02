@@ -48,15 +48,16 @@ async function fetchModels(config) {
   }
 }
 
-async function askLLM(messages) {
+function buildConfig() {
   const stored = loadConfig();
-  const config = { ...defaults, ...stored };
+  return { ...defaults, ...stored };
+}
 
-  if (!config.apiKey) {
-    return null;
-  }
+async function streamLLM(messages) {
+  const config = buildConfig();
+  if (!config.apiKey) return null;
 
-  const response = await fetch(`${config.endpoint}/chat/completions`, {
+  const res = await fetch(`${config.endpoint}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -64,6 +65,7 @@ async function askLLM(messages) {
     },
     body: JSON.stringify({
       model: config.model,
+      stream: true,
       messages: [
         {
           role: 'system',
@@ -75,13 +77,12 @@ async function askLLM(messages) {
     }),
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`LLM request failed (${response.status}): ${error}`);
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`LLM request failed (${res.status}): ${error}`);
   }
 
-  const data = await response.json();
-  return data.choices[0].message.content;
+  return res.body;
 }
 
-module.exports = { askLLM, validateConfig, fetchModels };
+module.exports = { streamLLM, validateConfig, fetchModels };

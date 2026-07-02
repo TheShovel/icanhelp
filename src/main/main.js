@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen } = require("electron");
 const path = require("path");
-const { askLLM, validateConfig, fetchModels } = require("./llm");
+const { streamLLM, validateConfig, fetchModels } = require("./llm");
 const { loadConfig, saveConfig } = require("./store");
 
 let mainWindow;
@@ -47,14 +47,50 @@ function createWindow() {
     });
   });
 
-  ipcMain.handle("ask-llm", async (_event, messages) => {
-    const result = await askLLM(messages);
-    if (result === null) {
-      throw new Error(
-        "No API key configured. Open the assistant and use the setup screen to configure your LLM provider.",
-      );
+  ipcMain.on("start-llm-stream", async (event, messages) => {
+    const stream = await streamLLM(messages);
+    if (stream === null) {
+      event.sender.send("llm-chunk", {
+        error:
+          "No API key configured. Open the assistant and use the setup screen to configure your LLM provider.",
+      });
+      return;
     }
-    return result;
+
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data: ")) continue;
+        const payload = trimmed.slice(6);
+        if (payload === "[DONE]") continue;
+
+        try {
+          const parsed = JSON.parse(payload);
+          const choice = parsed.choices?.[0];
+          if (!choice) continue;
+          const delta = choice.delta || {};
+          const content = delta.content || "";
+          if (content) {
+            event.sender.send("llm-chunk", { text: content });
+          }
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+
+    event.sender.send("llm-chunk", { done: true });
   });
 
   ipcMain.handle("get-config", () => {

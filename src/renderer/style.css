@@ -270,6 +270,65 @@ body {
     background: rgba(102, 126, 234, 0.12);
 }
 
+.message.streaming .bubble {
+    border-left: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+.thinking-block {
+    margin-bottom: 6px;
+    border-left: 2px solid rgba(255, 200, 50, 0.3);
+    padding-left: 10px;
+}
+
+.thinking-block.hidden {
+    display: none;
+}
+
+.thinking-header {
+    font-size: 12px;
+    color: #b8860b;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.thinking-header:hover {
+    color: #d4a017;
+}
+
+.thinking-header::after {
+    content: "▼";
+    font-size: 9px;
+    transition: transform 0.2s;
+}
+
+.thinking-content.collapsed + .thinking-header::after {
+    transform: rotate(-90deg);
+}
+
+.thinking-content {
+    font-size: 12px;
+    color: #999;
+    line-height: 1.5;
+    max-height: 300px;
+    overflow-y: auto;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    opacity: 1;
+}
+
+.thinking-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.response-content {
+    white-space: pre-wrap;
+}
+
 .message .bubble pre {
     margin: 8px 0;
     padding: 10px 12px;

@@ -190,12 +190,12 @@ window.electronAPI.hasConfig().then((has) => {
     needsSetup = true;
     return;
   }
+  needsSetup = false;
   window.electronAPI.validateStoredConfig().then((result) => {
     if (!result.valid) {
       needsSetup = true;
       setupStatus.textContent = "Stored config is invalid: " + result.error + " — update it below.";
-      const stored = window.electronAPI.getConfig();
-      stored.then((cfg) => {
+      window.electronAPI.getConfig().then((cfg) => {
         if (cfg) {
           setupProvider.value = cfg.provider || "openrouter";
           setupEndpoint.value = cfg.endpoint || "";
@@ -214,19 +214,121 @@ function sendMessage() {
   chatInput.value = "";
 
   conversation.push({ role: "user", content: text });
-  showTyping();
 
-  window.electronAPI
-    .askLLM(conversation)
-    .then((response) => {
-      hideTyping();
-      conversation.push({ role: "assistant", content: response });
-      addMessage(response, "assistant");
-    })
-    .catch((err) => {
-      hideTyping();
-      addMessage("Error: " + err.message, "assistant");
-    });
+  const msgEl = createAssistantMessage();
+  const bubble = msgEl.querySelector(".bubble");
+  const thinkingContent = msgEl.querySelector(".thinking-content");
+  const thinkingBlock = msgEl.querySelector(".thinking-block");
+  const responseContent = msgEl.querySelector(".response-content");
+
+  let buffer = "";
+  let finalized = false;
+
+  const cleanup = window.electronAPI.onLLMChunk((chunk) => {
+    if (chunk.error) {
+      finalized = true;
+      cleanup();
+      responseContent.textContent = "Error: " + chunk.error;
+      msgEl.classList.remove("streaming");
+      return;
+    }
+
+    if (chunk.done) {
+      finalized = true;
+      cleanup();
+      msgEl.classList.remove("streaming");
+      if (!thinkingBlock.classList.contains("has-thinking")) {
+        thinkingBlock.classList.add("hidden");
+      } else {
+        setTimeout(() => {
+          thinkingContent.classList.add("collapsed");
+        }, 600);
+      }
+      conversation.push({ role: "assistant", content: buffer });
+      return;
+    }
+
+    buffer += chunk.text;
+    renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent);
+  });
+
+  window.electronAPI.startLLMStream(conversation);
+}
+
+function createAssistantMessage() {
+  const div = document.createElement("div");
+  div.className = "message assistant streaming";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+
+  const tb = document.createElement("div");
+  tb.className = "thinking-block hidden";
+  const th = document.createElement("div");
+  th.className = "thinking-header";
+  th.textContent = "🧠 Thinking";
+  th.addEventListener("click", () => {
+    tc.classList.toggle("collapsed");
+  });
+  const tc = document.createElement("div");
+  tc.className = "thinking-content collapsed";
+  tb.appendChild(th);
+  tb.appendChild(tc);
+
+  const rc = document.createElement("div");
+  rc.className = "response-content";
+
+  bubble.appendChild(tb);
+  bubble.appendChild(rc);
+  div.appendChild(bubble);
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  return div;
+}
+
+function parseBuffer(buffer) {
+  const openTag = "";
+  const openIdx = buffer.indexOf(openTag);
+
+  if (openIdx === -1) {
+    return { thinking: "", response: buffer, inThinking: false, hasThinking: false };
+  }
+
+  const closeTag = "";
+  const closeIdx = buffer.indexOf(closeTag, openIdx + openTag.length);
+
+  if (closeIdx === -1) {
+    return {
+      thinking: buffer.slice(openIdx + openTag.length),
+      response: buffer.slice(0, openIdx),
+      inThinking: true,
+      hasThinking: true,
+    };
+  }
+
+  return {
+    thinking: buffer.slice(openIdx + openTag.length, closeIdx),
+    response: buffer.slice(0, openIdx) + buffer.slice(closeIdx + closeTag.length),
+    inThinking: false,
+    hasThinking: true,
+  };
+}
+
+function renderStreamedContent(bubble, buffer, thinkingBlock, thinkingContent, responseContent) {
+  const parsed = parseBuffer(buffer);
+
+  if (parsed.hasThinking) {
+    thinkingBlock.classList.remove("hidden");
+    thinkingBlock.classList.add("has-thinking");
+    thinkingContent.textContent = parsed.thinking;
+    thinkingContent.classList.remove("collapsed");
+  }
+
+  if (parsed.response) {
+    responseContent.textContent = parsed.response;
+  }
+
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function showTyping() {
