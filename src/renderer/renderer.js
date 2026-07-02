@@ -15,6 +15,11 @@ const setupModel = document.getElementById("setup-model");
 const setupSave = document.getElementById("setup-save");
 const setupStatus = document.getElementById("setup-status");
 const closeSetupBtn = document.getElementById("close-setup");
+const sudoOverlay = document.getElementById("sudo-overlay");
+const sudoInput = document.getElementById("sudo-input");
+const sudoSubmit = document.getElementById("sudo-submit");
+const sudoCancel = document.getElementById("sudo-cancel");
+const sudoStatus = document.getElementById("sudo-status");
 
 document.getElementById("assistant-name").innerHTML = iconSvg("sparkle", 14) + " icanhelp";
 document.getElementById("avatar-inner").innerHTML = iconSvg("sparkle", 28);
@@ -22,6 +27,27 @@ document.getElementById("chat-settings").innerHTML = iconSvg("settings", 16);
 document.getElementById("close-chat").innerHTML = iconSvg("close", 16);
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
+
+sudoSubmit.addEventListener("click", function () {
+  var pw = sudoInput.value;
+  if (!pw) { sudoStatus.textContent = "Password required."; return; }
+  sudoOverlay.classList.add("hidden");
+  window.electronAPI.sendSudoPassword(pw);
+  sudoInput.value = "";
+  sudoStatus.textContent = "";
+});
+
+sudoCancel.addEventListener("click", function () {
+  sudoOverlay.classList.add("hidden");
+  window.electronAPI.sendSudoPassword("");
+  sudoInput.value = "";
+  sudoStatus.textContent = "";
+});
+
+sudoInput.addEventListener("keydown", function (e) {
+  if (e.key === "Enter") sudoSubmit.click();
+  if (e.key === "Escape") sudoCancel.click();
+});
 
 let chatOpen = false;
 let isDragging = false;
@@ -295,6 +321,14 @@ async function sendMessage() {
         }, 600);
       }
       conversation.push({ role: "assistant", content: buffer });
+      return;
+    }
+
+    if (chunk.sudo_prompt) {
+      sudoStatus.textContent = "";
+      sudoInput.value = "";
+      sudoOverlay.classList.remove("hidden");
+      setTimeout(function () { sudoInput.focus(); }, 100);
       return;
     }
 

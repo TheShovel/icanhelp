@@ -708,3 +708,99 @@ body {
     text-align: center;
     min-height: 18px;
 }
+
+#sudo-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+#sudo-overlay.hidden {
+    display: none;
+}
+
+#sudo-dialog {
+    background: rgba(30, 30, 40, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    width: 280px;
+    box-shadow: 0 12px 50px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+#sudo-header {
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #c8c8d0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#sudo-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#sudo-message {
+    font-size: 12px;
+    color: #999;
+    margin: 0;
+}
+
+#sudo-input {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #e0e0e0;
+    outline: none;
+    font-family: inherit;
+}
+
+#sudo-input:focus {
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+#sudo-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+#sudo-actions .btn-primary {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    margin: 0;
+}
+
+#sudo-actions .btn-secondary {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #ccc;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+
+#sudo-actions .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+#sudo-status {
+    font-size: 11px;
+    color: #e57373;
+    text-align: center;
+    min-height: 16px;
+}

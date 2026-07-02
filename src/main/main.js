@@ -140,16 +140,34 @@ function createWindow() {
       }
     }
 
+    var pendingSudo = null;
+
+    ipcMain.on("sudo-response", function (_, pw) {
+      if (pendingSudo) {
+        pendingSudo(pw);
+        pendingSudo = null;
+      }
+    });
+
     if (toolCalls.length > 0) {
       var { executeToolCall } = require("./tools/registry");
       for (var tc of toolCalls) {
         if (!tc.id || !tc.function.name) continue;
         var args = {};
         try { args = JSON.parse(tc.function.arguments); } catch {}
+
         event.sender.send("llm-chunk", {
           tool_start: { name: tc.function.name, args: args },
         });
-        var result = await executeToolCall(tc);
+
+        var onSudoPrompt = async function () {
+          event.sender.send("llm-chunk", { sudo_prompt: {} });
+          return await new Promise(function (resolve) {
+            pendingSudo = resolve;
+          });
+        };
+
+        var result = await executeToolCall(tc, { onSudoPrompt: onSudoPrompt });
         event.sender.send("llm-chunk", {
           tool_end: { name: tc.function.name, output: result },
         });

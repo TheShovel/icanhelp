@@ -99,7 +99,7 @@ var handlers = {
   list_directory: listDirectory,
 };
 
-async function executeToolCall(toolCall) {
+async function executeToolCall(toolCall, opts) {
   var fn = handlers[toolCall.function.name];
   if (!fn) return JSON.stringify({ error: 'Unknown tool: ' + toolCall.function.name });
   var args = {};
@@ -108,6 +108,7 @@ async function executeToolCall(toolCall) {
   } catch (e) {
     return JSON.stringify({ error: 'Invalid arguments: ' + e.message });
   }
+  if (opts) Object.assign(args, opts);
   var result = await fn(args);
   return String(result);
 }
