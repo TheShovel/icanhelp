@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen } = require("electron");
 const path = require("path");
+const { askLLM } = require("./llm");
 
 let mainWindow;
 
@@ -43,6 +44,10 @@ function createWindow() {
       width,
       height,
     });
+  });
+
+  ipcMain.handle("ask-llm", async (_event, messages) => {
+    return await askLLM(messages);
   });
 
   if (process.env.ELECTRON_DEV) {

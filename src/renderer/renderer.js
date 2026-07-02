@@ -4,11 +4,13 @@ const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const closeChatBtn = document.getElementById("close-chat");
+const typingIndicator = document.getElementById("typing-indicator");
 
 let chatOpen = false;
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
+let conversation = [];
 
 avatar.addEventListener("mousedown", (e) => {
   isDragging = true;
@@ -75,12 +77,29 @@ function sendMessage() {
   addMessage(text, "user");
   chatInput.value = "";
 
-  setTimeout(() => {
-    addMessage(
-      "Thanks for your message! Real AI responses coming in Phase 3.",
-      "assistant",
-    );
-  }, 400);
+  conversation.push({ role: "user", content: text });
+  showTyping();
+
+  window.electronAPI
+    .askLLM(conversation)
+    .then((response) => {
+      hideTyping();
+      conversation.push({ role: "assistant", content: response });
+      addMessage(response, "assistant");
+    })
+    .catch((err) => {
+      hideTyping();
+      addMessage("Error: " + err.message, "assistant");
+    });
+}
+
+function showTyping() {
+  typingIndicator.classList.remove("hidden");
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function hideTyping() {
+  typingIndicator.classList.add("hidden");
 }
 
 function addMessage(text, role) {
@@ -88,10 +107,37 @@ function addMessage(text, role) {
   div.className = `message ${role}`;
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.textContent = text;
+  renderContent(bubble, text);
   div.appendChild(bubble);
   chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  requestAnimationFrame(() => {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+}
+
+function renderContent(el, text) {
+  const parts = text.split(/(```[\s\S]*?```)/);
+  for (const part of parts) {
+    if (part.startsWith("```") && part.endsWith("```")) {
+      const code = part.slice(3, -3);
+      const langMatch = code.match(/^(\w+)\n/);
+      const lang = langMatch ? langMatch[1] : "";
+      const codeText = langMatch ? code.slice(lang.length + 1) : code;
+      const pre = document.createElement("pre");
+      const codeEl = document.createElement("code");
+      codeEl.textContent = codeText;
+      if (lang) codeEl.className = `lang-${lang}`;
+      pre.appendChild(codeEl);
+      el.appendChild(pre);
+    } else if (part) {
+      const lines = part.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (i > 0) el.appendChild(document.createElement("br"));
+        const textNode = document.createTextNode(lines[i]);
+        el.appendChild(textNode);
+      }
+    }
+  }
 }
 
 sendBtn.addEventListener("click", sendMessage);

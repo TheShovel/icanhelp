@@ -270,34 +270,56 @@ body {
     background: rgba(102, 126, 234, 0.12);
 }
 
-.typing-indicator {
+.message .bubble pre {
+    margin: 8px 0;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+.message .bubble pre code {
+    font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #c8c8d8;
+    background: none;
+    padding: 0;
+}
+
+#typing-indicator {
     display: flex;
-    gap: 4px;
-    padding: 10px 14px;
+    gap: 5px;
+    padding: 6px 16px 10px;
     align-items: center;
 }
 
-.typing-indicator span {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.4);
-    animation: typing 1.2s ease-in-out infinite;
+#typing-indicator.hidden {
+    display: none;
 }
 
-.typing-indicator span:nth-child(2) {
+.typing-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    animation: typingBounce 1.3s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) {
     animation-delay: 0.2s;
 }
-.typing-indicator span:nth-child(3) {
+
+.typing-dot:nth-child(3) {
     animation-delay: 0.4s;
 }
 
-@keyframes typing {
+@keyframes typingBounce {
     0%,
     60%,
     100% {
         transform: translateY(0);
-        opacity: 0.4;
+        opacity: 0.35;
     }
     30% {
         transform: translateY(-6px);
