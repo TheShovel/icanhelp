@@ -21,6 +21,11 @@ const {
   loadWindowPosition,
   loadChats,
   saveChats,
+  loadThemes,
+  saveTheme,
+  deleteTheme,
+  loadActiveTheme,
+  saveActiveTheme,
 } = require("./store");
 const { createTray } = require("./tray");
 const {
@@ -73,6 +78,17 @@ function createWindow() {
   setTimeout(function () {
     loadPipeline();
   }, 500);
+
+  mainWindow.webContents.on("did-finish-load", function () {
+    var activeName = loadActiveTheme();
+    if (activeName) {
+      var themes = loadThemes();
+      var theme = themes[activeName];
+      if (theme && theme.properties) {
+        mainWindow.webContents.send("apply-theme", theme.properties);
+      }
+    }
+  });
 
   mainWindow.on("moved", function () {
     var pos = mainWindow.getPosition();
@@ -263,6 +279,49 @@ function createWindow() {
             onSudoPrompt: onSudoPrompt,
             onConfirm: onConfirm,
           });
+
+          if (tc.function.name === "set_theme") {
+            try {
+              var themeArgs = JSON.parse(tc.function.arguments);
+              if (themeArgs.properties) {
+                mainWindow.webContents.send(
+                  "apply-theme",
+                  themeArgs.properties,
+                );
+                if (themeArgs.name) {
+                  saveTheme(themeArgs.name, themeArgs.properties);
+                  mainWindow.webContents.send("themes-changed");
+                }
+              }
+            } catch (e) {}
+          }
+
+          if (tc.function.name === "delete_theme") {
+            try {
+              var d = JSON.parse(tc.function.arguments);
+              deleteTheme(d.name);
+              mainWindow.webContents.send("themes-changed");
+            } catch (e) {}
+          }
+
+          if (tc.function.name === "apply_theme") {
+            try {
+              var a = JSON.parse(tc.function.arguments);
+              var themes = loadThemes();
+              var theme = themes[a.name];
+              if (theme && theme.properties) {
+                saveActiveTheme(a.name);
+                mainWindow.webContents.send("apply-theme", theme.properties);
+                mainWindow.webContents.send("themes-changed");
+              }
+            } catch (e) {}
+          }
+
+          if (tc.function.name === "list_themes") {
+            var allThemes = loadThemes();
+            result = JSON.stringify({ themes: Object.keys(allThemes) });
+          }
+
           event.sender.send("llm-chunk", {
             tool_end: { name: tc.function.name, output: result },
           });
@@ -342,6 +401,46 @@ function createWindow() {
   });
   ipcMain.handle("save-chats", function (_, chats) {
     saveChats(chats);
+    return true;
+  });
+
+  ipcMain.handle("load-themes", function () {
+    return loadThemes();
+  });
+
+  ipcMain.handle("save-theme", function (_, name, properties) {
+    saveTheme(name, properties);
+    return true;
+  });
+
+  ipcMain.handle("delete-theme", function (_, name) {
+    deleteTheme(name);
+    mainWindow.webContents.send("themes-changed");
+    return true;
+  });
+
+  ipcMain.handle("load-active-theme", function () {
+    var name = loadActiveTheme();
+    if (!name) return null;
+    var themes = loadThemes();
+    var theme = themes[name];
+    return theme ? { name: name, properties: theme.properties } : null;
+  });
+
+  ipcMain.handle("apply-theme", function (_, name) {
+    var themes = loadThemes();
+    var theme = themes[name];
+    if (theme && theme.properties) {
+      saveActiveTheme(name);
+      mainWindow.webContents.send("apply-theme", theme.properties);
+      mainWindow.webContents.send("themes-changed");
+      return true;
+    }
+    return false;
+  });
+
+  ipcMain.handle("reset-active-theme", function () {
+    saveActiveTheme(null);
     return true;
   });
 

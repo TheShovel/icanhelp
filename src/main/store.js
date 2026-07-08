@@ -107,6 +107,37 @@ function saveChats(chats) {
   saveConfig(cfg);
 }
 
+function loadThemes() {
+  var cfg = loadConfig();
+  return (cfg && cfg.themes) || {};
+}
+
+function saveTheme(name, properties) {
+  var cfg = loadConfig() || {};
+  if (!cfg.themes) cfg.themes = {};
+  cfg.themes[name] = { properties: properties };
+  saveConfig(cfg);
+}
+
+function deleteTheme(name) {
+  var cfg = loadConfig();
+  if (!cfg || !cfg.themes) return;
+  delete cfg.themes[name];
+  if (cfg.activeTheme === name) delete cfg.activeTheme;
+  saveConfig(cfg);
+}
+
+function loadActiveTheme() {
+  var cfg = loadConfig();
+  return (cfg && cfg.activeTheme) || null;
+}
+
+function saveActiveTheme(name) {
+  var cfg = loadConfig() || {};
+  cfg.activeTheme = name || undefined;
+  saveConfig(cfg);
+}
+
 module.exports = {
   loadConfig,
   saveConfig,
@@ -116,4 +147,9 @@ module.exports = {
   loadWindowPosition,
   loadChats,
   saveChats,
+  loadThemes,
+  saveTheme,
+  deleteTheme,
+  loadActiveTheme,
+  saveActiveTheme,
 };

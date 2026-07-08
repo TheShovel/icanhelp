@@ -46,4 +46,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () =>
       ipcRenderer.removeListener("vision-download-progress", handler);
   },
+  onApplyTheme: (callback) => {
+    const handler = (_event, properties) => callback(properties);
+    ipcRenderer.on("apply-theme", handler);
+    return () => ipcRenderer.removeListener("apply-theme", handler);
+  },
+  onThemesChanged: (callback) => {
+    ipcRenderer.on("themes-changed", () => callback());
+    return () => ipcRenderer.removeListener("themes-changed", callback);
+  },
+  loadThemes: () => ipcRenderer.invoke("load-themes"),
+  deleteTheme: (name) => ipcRenderer.invoke("delete-theme", name),
+  applyTheme: (name) => ipcRenderer.invoke("apply-theme", name),
+  loadActiveTheme: () => ipcRenderer.invoke("load-active-theme"),
+  resetActiveTheme: () => ipcRenderer.invoke("reset-active-theme"),
 });

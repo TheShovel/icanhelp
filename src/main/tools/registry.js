@@ -17,6 +17,29 @@ async function searchWeb({ query, resultSize }) {
   }
 }
 
+async function setTheme({ properties, name }) {
+  if (!properties || typeof properties !== "object") {
+    return JSON.stringify({ error: "properties object required" });
+  }
+  var count = 0;
+  for (var key in properties) {
+    if (properties.hasOwnProperty(key)) count++;
+  }
+  var result = { ok: true, changed: count };
+  if (name) result.saved = name;
+  return JSON.stringify(result);
+}
+
+function listThemesStub() {
+  return JSON.stringify({ themes: {} });
+}
+function deleteThemeStub() {
+  return JSON.stringify({ ok: true });
+}
+function applyThemeStub() {
+  return JSON.stringify({ ok: true });
+}
+
 var tools = [
   {
     type: "function",
@@ -124,6 +147,61 @@ var tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "set_theme",
+      description:
+        'Change the app\'s CSS theme. Pass a properties object of CSS variables (--bg-panel, --bg-body, --bg-header, --bg-input, --fg, --fg-dim, --fg-muted, --accent, --border, --user-bubble-bg, --user-bubble-fg). Optionally pass a name to save the theme. Example: { properties: { "--bg-panel": "#1e1e2e" } } or { name: "Dark", properties: {...} }',
+      parameters: {
+        type: "object",
+        properties: {
+          properties: {
+            type: "object",
+            description: "CSS variable/value pairs",
+          },
+          name: { type: "string", description: "Optional name to save as" },
+        },
+        required: ["properties"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_themes",
+      description: "List saved theme names.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_theme",
+      description: "Apply a saved theme by name and set it as default.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Theme name" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_theme",
+      description: "Delete a saved theme.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Theme name" },
+        },
+        required: ["name"],
+      },
+    },
+  },
 ];
 
 var handlers = {
@@ -133,6 +211,10 @@ var handlers = {
   write_file: writeFile,
   list_directory: listDirectory,
   ocr_image: ocrImage,
+  set_theme: setTheme,
+  list_themes: listThemesStub,
+  delete_theme: deleteThemeStub,
+  apply_theme: applyThemeStub,
 };
 
 async function executeToolCall(toolCall, opts) {

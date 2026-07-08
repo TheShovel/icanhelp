@@ -17,6 +17,9 @@ const setupModel = document.getElementById("setup-model");
 const setupSave = document.getElementById("setup-save");
 const setupStatus = document.getElementById("setup-status");
 const closeSetupBtn = document.getElementById("close-setup");
+const settingsMenuPanel = document.getElementById("settings-menu-panel");
+const themePanel = document.getElementById("theme-panel");
+const resetThemeBtn = document.getElementById("theme-reset");
 const sudoOverlay = document.getElementById("sudo-overlay");
 const sudoInput = document.getElementById("sudo-input");
 const sudoSubmit = document.getElementById("sudo-submit");
@@ -27,6 +30,7 @@ const confirmCommand = document.getElementById("confirm-command");
 const confirmYes = document.getElementById("confirm-yes");
 const confirmNo = document.getElementById("confirm-no");
 const avatarInner = document.getElementById("avatar-inner");
+const attachMenu = document.getElementById("attach-menu");
 const attachBtn = document.getElementById("attach-btn");
 const attachmentPreview = document.getElementById("attachment-preview");
 const attachmentName = document.getElementById("attachment-name");
@@ -34,6 +38,8 @@ const removeAttachment = document.getElementById("remove-attachment");
 
 avatarInner.src = window.electronAPI.buddyArt("idle");
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
+document.getElementById("close-settings-menu").innerHTML = iconSvg("close", 16);
+document.getElementById("close-theme").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
 document.getElementById("cancel-btn").innerHTML = iconSvg("close", 16);
 document.getElementById("burger-btn").innerHTML = iconSvg("menu", 18);
@@ -131,7 +137,35 @@ function expandAttachment(msg) {
   return { role: msg.role, content: parts.join("\n\n") };
 }
 
-attachBtn.addEventListener("click", async function () {
+attachBtn.addEventListener("click", function (e) {
+  e.stopPropagation();
+  attachMenu.classList.toggle("hidden");
+});
+
+document.addEventListener("click", function (e) {
+  if (
+    !attachMenu.classList.contains("hidden") &&
+    !attachBtn.contains(e.target) &&
+    !attachMenu.contains(e.target)
+  ) {
+    attachMenu.classList.add("hidden");
+  }
+});
+
+attachMenu.addEventListener("click", async function (e) {
+  var item = e.target.closest(".attach-menu-item");
+  if (!item) return;
+  var action = item.dataset.action;
+  attachMenu.classList.add("hidden");
+
+  if (action === "file") {
+    await pickFileAttachment();
+  } else if (action === "screenshot") {
+    await takeScreenshotAttachment();
+  }
+});
+
+async function pickFileAttachment() {
   const token = ++attachmentToken;
   attachBtn.disabled = true;
   currentAttachment = { label: "Reading file...", status: "loading" };
@@ -160,7 +194,38 @@ attachBtn.addEventListener("click", async function () {
   } finally {
     if (token === attachmentToken) attachBtn.disabled = false;
   }
-});
+}
+
+async function takeScreenshotAttachment() {
+  const token = ++attachmentToken;
+  attachBtn.disabled = true;
+  currentAttachment = { label: "Taking screenshot...", status: "loading" };
+  renderAttachment();
+
+  try {
+    const attachment = await window.electronAPI.takeScreenshot();
+    if (token !== attachmentToken) return;
+    if (!attachment) {
+      clearAttachment();
+      return;
+    }
+    currentAttachment = Object.assign({ status: "ready" }, attachment);
+    renderAttachment();
+    attachBtn.classList.add("hidden");
+    chatInput.focus();
+  } catch (e) {
+    if (token !== attachmentToken) return;
+    currentAttachment = {
+      label: "Screenshot failed",
+      status: "error",
+      error: e.message || "Could not take screenshot.",
+    };
+    renderAttachment();
+    attachBtn.classList.remove("hidden");
+  } finally {
+    if (token === attachmentToken) attachBtn.disabled = false;
+  }
+}
 
 removeAttachment.addEventListener("click", function () {
   attachmentToken++;
@@ -565,15 +630,9 @@ avatar.addEventListener("contextmenu", function (e) {
 window.electronAPI.onOpenSettings(function () {
   if (!chatOpen) togglePanel();
   chatPanel.classList.add("hidden");
-  setupPanel.classList.remove("hidden");
-  window.electronAPI.getConfig().then(function (cfg) {
-    if (cfg) {
-      setupProvider.value = cfg.provider || "openrouter";
-      setupEndpoint.value = cfg.endpoint || "";
-      setupModel.value = cfg.model || "";
-    }
-  });
-  setupStatus.textContent = "Update your settings below.";
+  setupPanel.classList.add("hidden");
+  themePanel.classList.add("hidden");
+  settingsMenuPanel.classList.remove("hidden");
 });
 
 window.electronAPI.onOpenChatList(function () {
@@ -632,15 +691,9 @@ burgerMenu.addEventListener("click", function (e) {
   } else if (action === "settings") {
     if (!chatOpen) togglePanel();
     chatPanel.classList.add("hidden");
-    setupPanel.classList.remove("hidden");
-    window.electronAPI.getConfig().then(function (cfg) {
-      if (cfg) {
-        setupProvider.value = cfg.provider || "openrouter";
-        setupEndpoint.value = cfg.endpoint || "";
-        setupModel.value = cfg.model || "";
-      }
-    });
-    setupStatus.textContent = "Update your settings below.";
+    setupPanel.classList.add("hidden");
+    themePanel.classList.add("hidden");
+    settingsMenuPanel.classList.remove("hidden");
   } else if (action === "quit") {
     window.electronAPI.quitApp();
   }
@@ -654,6 +707,106 @@ document.addEventListener("click", function (e) {
   ) {
     burgerMenu.classList.add("hidden");
   }
+});
+
+document
+  .getElementById("settings-menu-body")
+  .addEventListener("click", function (e) {
+    var item = e.target.closest(".settings-menu-item");
+    if (!item) return;
+    var action = item.dataset.action;
+
+    if (action === "provider") {
+      settingsMenuPanel.classList.add("hidden");
+      setupPanel.classList.remove("hidden");
+      window.electronAPI.getConfig().then(function (cfg) {
+        if (cfg) {
+          setupProvider.value = cfg.provider || "openrouter";
+          setupEndpoint.value = cfg.endpoint || "";
+          setupModel.value = cfg.model || "";
+        }
+      });
+      setupStatus.textContent = "Update your provider settings below.";
+    } else if (action === "theme") {
+      settingsMenuPanel.classList.add("hidden");
+      themePanel.classList.remove("hidden");
+      renderThemeList();
+    }
+  });
+
+document
+  .getElementById("close-settings-menu")
+  .addEventListener("click", function () {
+    settingsMenuPanel.classList.add("hidden");
+    chatPanel.classList.remove("hidden");
+  });
+
+document.getElementById("close-theme").addEventListener("click", function () {
+  themePanel.classList.add("hidden");
+  settingsMenuPanel.classList.remove("hidden");
+});
+
+var themeListEl = document.getElementById("theme-list");
+
+function renderThemeList() {
+  if (!themeListEl) return;
+  themeListEl.innerHTML = "";
+  window.electronAPI.loadThemes().then(function (themes) {
+    var names = Object.keys(themes).sort();
+    window.electronAPI.loadActiveTheme().then(function (active) {
+      var activeName = active ? active.name : null;
+      if (names.length === 0) {
+        themeListEl.innerHTML =
+          '<div class="theme-item-empty">No saved themes yet. Ask the AI to create one.</div>';
+        return;
+      }
+      for (var i = 0; i < names.length; i++) {
+        var item = document.createElement("div");
+        item.className = "theme-item";
+        item.dataset.name = names[i];
+        if (names[i] === activeName) item.classList.add("active");
+
+        var nameSpan = document.createElement("span");
+        nameSpan.className = "theme-item-name";
+        nameSpan.textContent = names[i];
+        item.appendChild(nameSpan);
+
+        var delBtn = document.createElement("button");
+        delBtn.className = "theme-item-del";
+        delBtn.innerHTML = iconSvg("close", 12);
+        delBtn.title = "Delete";
+        delBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var item = this.closest(".theme-item");
+          var n = item.dataset.name;
+          if (n) {
+            window.electronAPI.deleteTheme(n).then(function () {
+              item.remove();
+              if (!themeListEl.querySelector(".theme-item")) {
+                themeListEl.innerHTML =
+                  '<div class="theme-item-empty">No saved themes yet.</div>';
+              }
+            });
+          }
+        });
+        item.appendChild(delBtn);
+
+        item.addEventListener("click", function () {
+          var n = this.dataset.name;
+          if (n) {
+            window.electronAPI.applyTheme(n);
+          }
+        });
+
+        themeListEl.appendChild(item);
+      }
+    });
+  });
+}
+
+resetThemeBtn.addEventListener("click", function () {
+  document.documentElement.removeAttribute("style");
+  window.electronAPI.resetActiveTheme();
 });
 
 closeSetupBtn.addEventListener("click", () => {
@@ -670,6 +823,16 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!chatListPanel.classList.contains("hidden")) {
       closeChatList();
+      return;
+    }
+    if (!themePanel.classList.contains("hidden")) {
+      themePanel.classList.add("hidden");
+      settingsMenuPanel.classList.remove("hidden");
+      return;
+    }
+    if (!settingsMenuPanel.classList.contains("hidden")) {
+      settingsMenuPanel.classList.add("hidden");
+      chatPanel.classList.remove("hidden");
       return;
     }
     if (chatOpen) togglePanel();
@@ -1091,6 +1254,16 @@ window.electronAPI.onVisionProgress(function (info) {
     }, 2000);
   } else {
     visionProgressLabel.textContent = "Loading vision model...";
+  }
+});
+
+window.electronAPI.onApplyTheme(function (properties) {
+  if (!properties || typeof properties !== "object") return;
+  var root = document.documentElement;
+  for (var key in properties) {
+    if (properties.hasOwnProperty(key)) {
+      root.style.setProperty(key, properties[key]);
+    }
   }
 });
 

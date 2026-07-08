@@ -80,6 +80,14 @@
                         title="Cancel"
                     ></button>
                 </div>
+                <div id="attach-menu" class="hidden">
+                    <button class="attach-menu-item" data-action="file">
+                        File from computer
+                    </button>
+                    <button class="attach-menu-item" data-action="screenshot">
+                        Screenshot
+                    </button>
+                </div>
             </div>
 
             <div id="chat-list-panel" class="hidden">
@@ -92,6 +100,51 @@
                     ></button>
                 </div>
                 <div id="chat-list-body"></div>
+            </div>
+
+            <div id="settings-menu-panel" class="hidden">
+                <div id="settings-menu-header">
+                    <span>Settings</span>
+                    <button
+                        id="close-settings-menu"
+                        class="btn-icon"
+                        title="Back"
+                    ></button>
+                </div>
+                <div id="settings-menu-body">
+                    <button class="settings-menu-item" data-action="provider">
+                        <span>Provider</span>
+                        <span class="settings-menu-hint"
+                            >LLM API configuration</span
+                        >
+                    </button>
+                    <button class="settings-menu-item" data-action="theme">
+                        <span>Theme</span>
+                        <span class="settings-menu-hint"
+                            >Customize appearance</span
+                        >
+                    </button>
+                </div>
+            </div>
+
+            <div id="theme-panel" class="hidden">
+                <div id="theme-header">
+                    <span>Theme</span>
+                    <button
+                        id="close-theme"
+                        class="btn-icon"
+                        title="Back to settings"
+                    ></button>
+                </div>
+                <div id="theme-body">
+                    <p id="theme-status">
+                        Select a saved theme or ask the AI to create one.
+                    </p>
+                    <div id="theme-list"></div>
+                    <button id="theme-reset" class="btn-primary">
+                        Reset to Default
+                    </button>
+                </div>
             </div>
 
             <div id="setup-panel" class="hidden">
