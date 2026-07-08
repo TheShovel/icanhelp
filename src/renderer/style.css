@@ -164,17 +164,68 @@ body {
 #avatar-inner {
     width: 72px;
     height: 72px;
-    animation: float 3s ease-in-out infinite;
     -webkit-user-drag: none;
+    transition: transform 0.3s ease;
 }
 
-@keyframes float {
+#avatar.avatar-talking #avatar-inner {
+    animation: pulse 0.6s ease-in-out infinite;
+}
+
+#avatar.avatar-thinking #avatar-inner {
+    animation: tilt 1.2s ease-in-out infinite;
+}
+
+#avatar.avatar-bash #avatar-inner {
+    animation: shake 0.4s ease-in-out infinite;
+}
+
+#avatar.avatar-search #avatar-inner {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes pulse {
     0%,
     100% {
-        transform: translateY(0);
+        transform: scale(1);
     }
     50% {
-        transform: translateY(-3px);
+        transform: scale(1.1);
+    }
+}
+
+@keyframes tilt {
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+    25% {
+        transform: rotate(-5deg);
+    }
+    75% {
+        transform: rotate(5deg);
+    }
+}
+
+@keyframes shake {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-3px);
+    }
+    75% {
+        transform: translateX(3px);
+    }
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
     }
 }
 
@@ -491,6 +542,7 @@ body {
     overflow-wrap: break-word;
     word-break: break-word;
     min-width: 0;
+    overflow: hidden;
 }
 
 .message.user .bubble {
@@ -651,6 +703,9 @@ body {
     line-height: 1.5;
     max-height: 300px;
     overflow-y: auto;
+    overflow-x: hidden;
+    word-break: break-word;
+    overflow-wrap: break-word;
     transition:
         max-height 0.2s ease,
         opacity 0.2s ease;
@@ -672,6 +727,7 @@ body {
     overflow-wrap: break-word;
     word-break: break-word;
     min-width: 0;
+    overflow: hidden;
 }
 
 /* ---- Tool Blocks ---- */
@@ -729,9 +785,9 @@ body {
     font-size: 12px;
     line-height: 1.5;
     color: var(--tool-text-fg);
-    overflow-x: auto;
-    max-width: 100%;
+    white-space: pre-wrap;
     word-break: break-word;
+    overflow: hidden;
 }
 
 .tool-output {
@@ -744,9 +800,8 @@ body {
     line-height: 1.5;
     color: var(--fg-dim);
     white-space: pre-wrap;
-    overflow-x: auto;
-    max-width: 100%;
     word-break: break-word;
+    overflow: hidden;
 }
 
 /* ---- Markdown Content ---- */
@@ -755,8 +810,9 @@ body {
     padding: 10px 12px;
     background: var(--bg-code);
     border-radius: 6px;
-    overflow-x: auto;
-    max-width: 100%;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow: hidden;
 }
 
 .message .bubble pre code {
@@ -814,6 +870,8 @@ body {
     padding: 4px 10px;
     border-left: 3px solid var(--border);
     color: var(--fg-muted);
+    word-break: break-word;
+    overflow: hidden;
 }
 
 .message .bubble a {
@@ -842,6 +900,8 @@ body {
     border: 1px solid var(--border);
     padding: 4px 8px;
     text-align: left;
+    word-break: break-word;
+    overflow: hidden;
 }
 
 .message .bubble th {

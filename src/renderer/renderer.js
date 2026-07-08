@@ -213,6 +213,8 @@ function setAvatarState(state) {
   var img = avatarInner;
   var src = window.electronAPI.buddyArt(state);
   if (img.src !== src) img.src = src;
+  avatar.className = "";
+  if (state && state !== "idle") avatar.classList.add("avatar-" + state);
 }
 
 avatar.addEventListener("mousedown", (e) => {
