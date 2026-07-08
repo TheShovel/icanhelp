@@ -37,4 +37,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("open-chat-list", () => callback());
   },
   selectAttachment: () => ipcRenderer.invoke("select-attachment"),
+  quitApp: () => ipcRenderer.send("quit-app"),
+  onVisionProgress: (callback) => {
+    const handler = (_event, info) => callback(info);
+    ipcRenderer.on("vision-download-progress", handler);
+    return () =>
+      ipcRenderer.removeListener("vision-download-progress", handler);
+  },
 });

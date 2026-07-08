@@ -111,7 +111,7 @@ var tools = [
     function: {
       name: "ocr_image",
       description:
-        "Extract text from an image file using local OCR. Use this to read text from screenshots, photos, or scanned documents.",
+        "Analyze an image file using local OCR and vision. Extracts both text found in the image and a visual description of the scene (objects, people, setting). Use this to understand screenshots, photos, or scanned documents.",
       parameters: {
         type: "object",
         properties: {
@@ -146,8 +146,12 @@ async function executeToolCall(toolCall, opts) {
     return JSON.stringify({ error: "Invalid arguments: " + e.message });
   }
   if (opts) Object.assign(args, opts);
-  var result = await fn(args);
-  return String(result);
+  try {
+    var result = await fn(args);
+    return String(result);
+  } catch (e) {
+    return JSON.stringify({ error: e.message });
+  }
 }
 
 module.exports = { tools, executeToolCall };

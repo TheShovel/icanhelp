@@ -85,14 +85,13 @@ async function streamLLM(messages, effort, signal) {
           "CAPABILITIES:\n" +
           "- Execute bash commands via the run_bash tool\n" +
           "- Read, write, and list files via the file tools\n" +
-          "- Extract text from images via the ocr_image tool\n" +
+          "- Analyze NEW images via the ocr_image tool (extracts text and describes visual content)\n" +
           "- Search the web via the search_web tool\n" +
-          "- Answer questions and solve problems\n" +
-          "- When a user attaches an image, its text content is auto-extracted and included in their message\n\n" +
+          "- Answer questions and solve problems\n\n" +
           "RULES:\n" +
           "- Never use emojis or emoticons in your responses. Use plain text only.\n" +
           "- Keep responses concise and practical.\n" +
-          "- When a task requires running a command, use the appropriate tool.\n" +
+          "- When a user attaches an image, its text and visual description are ALREADY auto-extracted and included in the message under [Attached file]. Do NOT call ocr_image on it again. Only use ocr_image for NEW image paths the user explicitly asks you to inspect.\n" +
           "- Explain what you're doing briefly before using a tool.",
       },
       ...messages,

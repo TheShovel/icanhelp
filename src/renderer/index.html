@@ -9,6 +9,33 @@
     <body>
         <div id="app">
             <div id="chat-panel" class="hidden">
+                <div id="chat-panel-header">
+                    <span id="chat-panel-title">Chat</span>
+                    <button
+                        id="burger-btn"
+                        class="btn-icon"
+                        title="Menu"
+                    ></button>
+                </div>
+                <div id="burger-menu" class="hidden">
+                    <button class="burger-item" data-action="new-chat"></button>
+                    <button
+                        class="burger-item"
+                        data-action="chat-history"
+                    ></button>
+                    <button class="burger-item" data-action="settings"></button>
+                    <div class="burger-separator"></div>
+                    <button class="burger-item" data-action="quit"></button>
+                </div>
+                <div id="vision-progress" class="hidden">
+                    <div id="vision-progress-bar">
+                        <div id="vision-progress-fill"></div>
+                    </div>
+                    <span id="vision-progress-label"
+                        >Downloading vision model...</span
+                    >
+                    <span id="vision-progress-pct"></span>
+                </div>
                 <div id="chat-messages"></div>
                 <div id="typing-indicator" class="hidden">
                     <div class="typing-dot"></div>
@@ -40,16 +67,7 @@
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
-                    <button
-                        id="chat-list-btn"
-                        class="btn-icon"
-                        title="Chat history"
-                    ></button>
-                    <button
-                        id="new-chat-btn"
-                        class="btn-icon"
-                        title="New chat"
-                    ></button>
+
                     <button
                         id="send-btn"
                         class="btn-icon"

@@ -23,6 +23,11 @@ const {
 } = require("./store");
 const { createTray } = require("./tray");
 const {
+  setProgressCallback,
+  loadPipeline,
+  shutdownVision,
+} = require("./vision");
+const {
   prepareAttachment,
   supportedAttachmentExtensions,
 } = require("./attachments");
@@ -57,6 +62,16 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+
+  setProgressCallback(function (info) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("vision-download-progress", info);
+    }
+  });
+
+  setTimeout(function () {
+    loadPipeline();
+  }, 500);
 
   mainWindow.on("moved", function () {
     var pos = mainWindow.getPosition();
@@ -99,7 +114,15 @@ function createWindow() {
 
   ipcMain.on("start-llm-stream", function (event, payload) {
     currentAbort = new AbortController();
-    runLLMLoop(event, payload.messages, payload.effort, currentAbort.signal);
+    runLLMLoop(
+      event,
+      payload.messages,
+      payload.effort,
+      currentAbort.signal,
+    ).catch(function (err) {
+      event.sender.send("llm-chunk", { error: err.message });
+      event.sender.send("llm-chunk", { done: true });
+    });
   });
 
   async function runLLMLoop(event, messages, effort, signal) {
@@ -174,10 +197,6 @@ function createWindow() {
                 }
               }
             }
-
-            if (finish === "tool_calls") {
-              // tool calls complete — execution happens after the loop
-            }
           } catch {
             // skip malformed lines
           }
@@ -210,57 +229,63 @@ function createWindow() {
     });
 
     if (toolCalls.length > 0) {
-      var { executeToolCall } = require("./tools/registry");
-      for (var tc of toolCalls) {
-        if (!tc.id || !tc.function.name) continue;
-        var args = {};
-        try {
-          args = JSON.parse(tc.function.arguments);
-        } catch {}
+      try {
+        var { executeToolCall } = require("./tools/registry");
+        for (var tc of toolCalls) {
+          if (!tc.id || !tc.function.name) continue;
+          var args = {};
+          try {
+            args = JSON.parse(tc.function.arguments);
+          } catch {}
 
-        event.sender.send("llm-chunk", {
-          tool_start: { name: tc.function.name, args: args },
-        });
-
-        var onSudoPrompt = async function () {
-          event.sender.send("llm-chunk", { sudo_prompt: {} });
-          return await new Promise(function (resolve) {
-            pendingSudo = resolve;
+          event.sender.send("llm-chunk", {
+            tool_start: { name: tc.function.name, args: args },
           });
-        };
 
-        var onConfirm = async function (cmd) {
-          event.sender.send("llm-chunk", { confirm_prompt: { command: cmd } });
-          return await new Promise(function (resolve) {
-            pendingConfirm = resolve;
+          var onSudoPrompt = async function () {
+            event.sender.send("llm-chunk", { sudo_prompt: {} });
+            return await new Promise(function (resolve) {
+              pendingSudo = resolve;
+            });
+          };
+
+          var onConfirm = async function (cmd) {
+            event.sender.send("llm-chunk", {
+              confirm_prompt: { command: cmd },
+            });
+            return await new Promise(function (resolve) {
+              pendingConfirm = resolve;
+            });
+          };
+
+          var result = await executeToolCall(tc, {
+            onSudoPrompt: onSudoPrompt,
+            onConfirm: onConfirm,
           });
-        };
-
-        var result = await executeToolCall(tc, {
-          onSudoPrompt: onSudoPrompt,
-          onConfirm: onConfirm,
-        });
-        event.sender.send("llm-chunk", {
-          tool_end: { name: tc.function.name, output: result },
-        });
-        messages.push({
-          role: "assistant",
-          content: null,
-          tool_calls: [
-            {
-              id: tc.id,
-              type: "function",
-              function: {
-                name: tc.function.name,
-                arguments: tc.function.arguments,
+          event.sender.send("llm-chunk", {
+            tool_end: { name: tc.function.name, output: result },
+          });
+          messages.push({
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: tc.id,
+                type: "function",
+                function: {
+                  name: tc.function.name,
+                  arguments: tc.function.arguments,
+                },
               },
-            },
-          ],
-        });
-        messages.push({ role: "tool", tool_call_id: tc.id, content: result });
+            ],
+          });
+          messages.push({ role: "tool", tool_call_id: tc.id, content: result });
+        }
+        await runLLMLoop(event, messages, effort, signal);
+      } catch (e) {
+        event.sender.send("llm-chunk", { error: "Tool error: " + e.message });
+        event.sender.send("llm-chunk", { done: true });
       }
-      // loop for next response
-      await runLLMLoop(event, messages, effort, signal);
     } else {
       event.sender.send("llm-chunk", { done: true });
     }
@@ -337,6 +362,8 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
+  ipcMain.on("quit-app", () => app.quit());
+
   ipcMain.on("show-context-menu", function () {
     var template = [
       {
@@ -381,6 +408,10 @@ app.whenReady().then(function () {
   });
   createWindow();
   createTray(mainWindow);
+});
+
+app.on("before-quit", function () {
+  shutdownVision();
 });
 
 app.on("window-all-closed", () => {

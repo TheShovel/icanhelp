@@ -223,6 +223,121 @@ body {
     background: var(--bg-header);
 }
 
+/* ---- Chat Panel Header ---- */
+#chat-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+#chat-panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+}
+
+#burger-btn {
+    position: relative;
+    z-index: 25;
+}
+
+/* ---- Burger Menu ---- */
+#burger-menu {
+    position: absolute;
+    top: 44px;
+    right: 10px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 4px;
+    min-width: 180px;
+    z-index: 30;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.15s ease;
+}
+
+#burger-menu.hidden {
+    display: none;
+}
+
+.burger-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    color: var(--fg);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 5px;
+    text-align: left;
+    font-family: inherit;
+}
+
+.burger-item:hover {
+    background: var(--bg-hover);
+}
+
+.burger-item svg {
+    flex-shrink: 0;
+    stroke: currentColor;
+}
+
+.burger-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 8px;
+}
+
+/* ---- Vision Download Progress ---- */
+#vision-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-header);
+}
+
+#vision-progress.hidden {
+    display: none;
+}
+
+#vision-progress-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-input);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+#vision-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.15s ease;
+}
+
+#vision-progress-label {
+    font-size: 11px;
+    color: var(--fg-dim);
+    white-space: nowrap;
+}
+
+#vision-progress-pct {
+    font-size: 11px;
+    color: var(--fg-muted);
+    min-width: 32px;
+    text-align: right;
+}
+
 /* ---- Effort Select ---- */
 #chat-effort {
     background: var(--bg-input);
@@ -299,6 +414,7 @@ body {
 
 .message {
     display: flex;
+    flex-direction: column;
     max-width: 85%;
     min-width: 0;
     animation: fadeIn 0.15s ease;
@@ -317,9 +433,21 @@ body {
 
 .message.user {
     align-self: flex-end;
+    align-items: flex-end;
 }
 .message.assistant {
     align-self: flex-start;
+    align-items: flex-start;
+}
+
+.message-attachment-label {
+    max-width: 100%;
+    margin: 0 4px 4px;
+    color: var(--fg-muted);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .message .bubble {

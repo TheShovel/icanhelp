@@ -3,10 +3,8 @@ const chatPanel = document.getElementById("chat-panel");
 const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
-const chatListBtn = document.getElementById("chat-list-btn");
 const chatListPanel = document.getElementById("chat-list-panel");
 const chatListBody = document.getElementById("chat-list-body");
-const newChatBtn = document.getElementById("new-chat-btn");
 const cancelBtn = document.getElementById("cancel-btn");
 const chatEffort = document.getElementById("chat-effort");
 const typingIndicator = document.getElementById("typing-indicator");
@@ -37,8 +35,7 @@ avatarInner.src = window.electronAPI.buddyArt("idle");
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
 document.getElementById("cancel-btn").innerHTML = iconSvg("close", 16);
-document.getElementById("new-chat-btn").innerHTML = iconSvg("sparkle", 16);
-document.getElementById("chat-list-btn").innerHTML = iconSvg("folder", 16);
+document.getElementById("burger-btn").innerHTML = iconSvg("menu", 18);
 document.getElementById("close-chat-list").innerHTML = iconSvg("close", 16);
 attachBtn.innerHTML = iconSvg("paperclip", 16);
 removeAttachment.innerHTML = iconSvg("close", 14);
@@ -90,6 +87,7 @@ function consumeAttachment(text) {
     (currentAttachment.text || "").trim() || "No readable text found.";
   const attachmentData = {
     name: currentAttachment.name,
+    path: currentAttachment.path,
     type: currentAttachment.type,
     text: ocr,
   };
@@ -100,15 +98,34 @@ function consumeAttachment(text) {
 }
 
 function expandAttachment(msg) {
-  if (!msg.attachment || !msg.attachment.text) return msg;
+  if (!msg.attachment) return msg;
+
   var label =
     msg.attachment.type === "image" ? "Image OCR content" : "File content";
-  var fullContent =
-    "[" + label + " from " + msg.attachment.name + ":]\n" + msg.attachment.text;
-  if (msg.content && msg.content !== "📎 " + msg.attachment.name) {
-    fullContent = fullContent + "\n\nUser message: " + msg.content;
+  var parts = [
+    "[Attached file - already analyzed]",
+    "Name: " + msg.attachment.name,
+  ];
+
+  if (msg.attachment.path) {
+    parts.push("Absolute path: " + msg.attachment.path);
+    parts.push(
+      "This attachment metadata is hidden from the user. Use this exact path if you need to inspect the file. Do not search for the file path, and do not mention the path unless the user asks for it.",
+    );
   }
-  return { role: msg.role, content: fullContent };
+
+  parts.push(
+    "[" +
+      label +
+      "]\n" +
+      (msg.attachment.text || "No readable content extracted."),
+  );
+
+  if (msg.content && msg.content !== "📎 " + msg.attachment.name) {
+    parts.push("User message: " + msg.content);
+  }
+
+  return { role: msg.role, content: parts.join("\n\n") };
 }
 
 attachBtn.addEventListener("click", async function () {
@@ -320,7 +337,7 @@ function switchToChat(chatId) {
   var chat = getCurrentChat();
   if (chat) {
     for (var m of chat.messages) {
-      addMessage(m.content, m.role);
+      addMessage(m.content, m.role, m.attachment);
     }
     requestAnimationFrame(function () {
       chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -353,7 +370,7 @@ window.electronAPI.loadChats().then(function (loaded) {
     });
     currentChatId = chats[0].id;
     for (var m of chats[0].messages || []) {
-      addMessage(m.content, m.role);
+      addMessage(m.content, m.role, m.attachment);
     }
     requestAnimationFrame(function () {
       chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -361,22 +378,6 @@ window.electronAPI.loadChats().then(function (loaded) {
   }
   sendBtn.classList.remove("hidden");
   renderChatList();
-});
-
-chatListBtn.addEventListener("click", function () {
-  ensureCurrentChat();
-  renderChatList();
-  chatListPanel.classList.toggle("hidden");
-  if (!chatListPanel.classList.contains("hidden")) {
-    sendBtn.classList.add("hidden");
-  } else {
-    sendBtn.classList.remove("hidden");
-  }
-});
-
-newChatBtn.addEventListener("click", function () {
-  var id = createNewChat();
-  switchToChat(id);
 });
 
 function closeChatList() {
@@ -551,6 +552,71 @@ cancelBtn.addEventListener("click", function () {
   window.electronAPI.cancelStream();
 });
 
+const burgerBtn = document.getElementById("burger-btn");
+const burgerMenu = document.getElementById("burger-menu");
+
+var menuItems = [
+  { action: "new-chat", label: "New Chat", icon: "sparkle" },
+  { action: "chat-history", label: "Chat History", icon: "folder" },
+  { action: "settings", label: "Settings", icon: "settings" },
+];
+document.querySelectorAll(".burger-item[data-action]").forEach(function (el) {
+  var info = menuItems.find(function (m) {
+    return m.action === el.dataset.action;
+  });
+  if (info) {
+    el.innerHTML = iconSvg(info.icon, 16) + " " + info.label;
+  } else if (el.dataset.action === "quit") {
+    el.innerHTML = "Quit";
+  }
+});
+
+burgerBtn.addEventListener("click", function (e) {
+  e.stopPropagation();
+  burgerMenu.classList.toggle("hidden");
+});
+
+burgerMenu.addEventListener("click", function (e) {
+  var item = e.target.closest(".burger-item");
+  if (!item) return;
+  var action = item.dataset.action;
+  burgerMenu.classList.add("hidden");
+
+  if (action === "new-chat") {
+    var id = createNewChat();
+    switchToChat(id);
+  } else if (action === "chat-history") {
+    ensureCurrentChat();
+    renderChatList();
+    chatListPanel.classList.remove("hidden");
+    sendBtn.classList.add("hidden");
+  } else if (action === "settings") {
+    if (!chatOpen) togglePanel();
+    chatPanel.classList.add("hidden");
+    setupPanel.classList.remove("hidden");
+    window.electronAPI.getConfig().then(function (cfg) {
+      if (cfg) {
+        setupProvider.value = cfg.provider || "openrouter";
+        setupEndpoint.value = cfg.endpoint || "";
+        setupModel.value = cfg.model || "";
+      }
+    });
+    setupStatus.textContent = "Update your settings below.";
+  } else if (action === "quit") {
+    window.electronAPI.quitApp();
+  }
+});
+
+document.addEventListener("click", function (e) {
+  if (
+    !burgerMenu.classList.contains("hidden") &&
+    !burgerBtn.contains(e.target) &&
+    !burgerMenu.contains(e.target)
+  ) {
+    burgerMenu.classList.add("hidden");
+  }
+});
+
 closeSetupBtn.addEventListener("click", () => {
   setupPanel.classList.add("hidden");
   if (needsSetup) {
@@ -620,7 +686,7 @@ async function sendMessage() {
   var attachmentData = result.attachmentData;
 
   ensureCurrentChat();
-  await addMessage(display, "user");
+  await addMessage(display, "user", attachmentData);
   chatInput.value = "";
 
   var chat = getCurrentChat();
@@ -902,9 +968,17 @@ function hideTyping() {
   setAvatarState("idle");
 }
 
-async function addMessage(text, role) {
+async function addMessage(text, role, attachment) {
   const div = document.createElement("div");
   div.className = `message ${role}`;
+
+  if (attachment && attachment.name) {
+    const attachmentLabel = document.createElement("div");
+    attachmentLabel.className = "message-attachment-label";
+    attachmentLabel.textContent = "Attached: " + attachment.name;
+    div.appendChild(attachmentLabel);
+  }
+
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   await renderContent(bubble, text);
@@ -922,6 +996,47 @@ async function renderContent(el, text) {
     el.textContent = text;
   }
 }
+
+var visionProgress = document.getElementById("vision-progress");
+var visionProgressLabel = document.getElementById("vision-progress-label");
+var visionProgressPct = document.getElementById("vision-progress-pct");
+var visionProgressFill = document.getElementById("vision-progress-fill");
+var visionProgressTimer = null;
+
+window.electronAPI.onVisionProgress(function (info) {
+  if (!info) return;
+
+  if (visionProgressTimer) {
+    clearTimeout(visionProgressTimer);
+    visionProgressTimer = null;
+  }
+
+  visionProgress.classList.remove("hidden");
+
+  var pct = info.percent;
+  if (pct != null) {
+    visionProgressFill.style.width = Math.min(100, Math.max(0, pct)) + "%";
+    visionProgressPct.textContent = pct + "%";
+  }
+
+  var status = info.status;
+  if (status === "error") {
+    visionProgressLabel.textContent = "Vision model failed to load";
+  } else if (
+    (pct != null && pct >= 100) ||
+    status === "done" ||
+    status === "ready"
+  ) {
+    visionProgressFill.style.width = "100%";
+    visionProgressPct.textContent = "100%";
+    visionProgressLabel.textContent = "Vision model ready";
+    visionProgressTimer = setTimeout(function () {
+      visionProgress.classList.add("hidden");
+    }, 2000);
+  } else {
+    visionProgressLabel.textContent = "Loading vision model...";
+  }
+});
 
 sendBtn.addEventListener("click", sendMessage);
 chatInput.addEventListener("keydown", (e) => {
