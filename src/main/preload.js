@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("open-chat-list", () => callback());
   },
   selectAttachment: () => ipcRenderer.invoke("select-attachment"),
+  takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
   openFile: (filePath) => ipcRenderer.invoke("open-file", filePath),
   quitApp: () => ipcRenderer.send("quit-app"),
   onVisionProgress: (callback) => {

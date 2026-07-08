@@ -64,8 +64,13 @@ function renderAttachment() {
   if (currentAttachment.status) {
     attachmentPreview.classList.add(currentAttachment.status);
   }
-  attachmentName.textContent =
-    currentAttachment.label || currentAttachment.name;
+
+  if (currentAttachment.status === "error" && currentAttachment.error) {
+    attachmentName.textContent = currentAttachment.error;
+  } else {
+    attachmentName.textContent =
+      currentAttachment.label || currentAttachment.name;
+  }
   attachmentPreview.title =
     currentAttachment.error || currentAttachment.name || "";
 }
@@ -185,9 +190,9 @@ async function pickFileAttachment() {
   } catch (e) {
     if (token !== attachmentToken) return;
     currentAttachment = {
-      label: "Attachment failed",
+      label: "File error",
       status: "error",
-      error: e.message || "Could not read attachment.",
+      error: e.message || "Could not read file.",
     };
     renderAttachment();
     attachBtn.classList.remove("hidden");
@@ -216,7 +221,7 @@ async function takeScreenshotAttachment() {
   } catch (e) {
     if (token !== attachmentToken) return;
     currentAttachment = {
-      label: "Screenshot failed",
+      label: "Screenshot error",
       status: "error",
       error: e.message || "Could not take screenshot.",
     };
@@ -721,7 +726,7 @@ document
       setupPanel.classList.remove("hidden");
       window.electronAPI.getConfig().then(function (cfg) {
         if (cfg) {
-          setupProvider.value = cfg.provider || "openrouter";
+          setupProvider.value = cfg.provider || "opencode";
           setupEndpoint.value = cfg.endpoint || "";
           setupModel.value = cfg.model || "";
         }
@@ -877,7 +882,7 @@ window.electronAPI.hasConfig().then((has) => {
         "Stored config is invalid: " + result.error + " — update it below.";
       window.electronAPI.getConfig().then((cfg) => {
         if (cfg) {
-          setupProvider.value = cfg.provider || "openrouter";
+          setupProvider.value = cfg.provider || "opencode";
           setupEndpoint.value = cfg.endpoint || "";
           setupModel.value = cfg.model || "";
         }

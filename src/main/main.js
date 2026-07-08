@@ -10,6 +10,8 @@ const {
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
+const { execFile } = require("child_process");
 const { marked } = require("marked");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
 const {
@@ -41,6 +43,15 @@ const {
 marked.setOptions({ breaks: true, gfm: true });
 
 let mainWindow;
+let pendingSudo = null;
+let pendingConfirm = null;
+
+function requestSudoPassword(event) {
+  event.sender.send("llm-chunk", { sudo_prompt: {} });
+  return new Promise(function (resolve) {
+    pendingSudo = resolve;
+  });
+}
 
 function createWindow() {
   const display = screen.getPrimaryDisplay();
@@ -68,6 +79,14 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+  var pendingConfirm = null;
+
+  ipcMain.on("confirm-response", function (_, ok) {
+    if (pendingConfirm) {
+      pendingConfirm(ok);
+      pendingConfirm = null;
+    }
+  });
 
   setProgressCallback(function (info) {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -228,22 +247,7 @@ function createWindow() {
       return;
     }
 
-    var pendingSudo = null;
     var pendingConfirm = null;
-
-    ipcMain.on("sudo-response", function (_, pw) {
-      if (pendingSudo) {
-        pendingSudo(pw);
-        pendingSudo = null;
-      }
-    });
-
-    ipcMain.on("confirm-response", function (_, ok) {
-      if (pendingConfirm) {
-        pendingConfirm(ok);
-        pendingConfirm = null;
-      }
-    });
 
     if (toolCalls.length > 0) {
       try {
@@ -260,10 +264,7 @@ function createWindow() {
           });
 
           var onSudoPrompt = async function () {
-            event.sender.send("llm-chunk", { sudo_prompt: {} });
-            return await new Promise(function (resolve) {
-              pendingSudo = resolve;
-            });
+            return await requestSudoPassword(event);
           };
 
           var onConfirm = async function (cmd) {
@@ -471,6 +472,121 @@ function createWindow() {
 
   ipcMain.handle("open-file", async (_event, filePath) => {
     return await shell.openPath(filePath);
+  });
+
+  function execCommand(cmd, args) {
+    return new Promise(function (resolve, reject) {
+      execFile(
+        cmd,
+        args,
+        {
+          timeout: 3000,
+          env: Object.assign({}, process.env),
+        },
+        function (err) {
+          if (err) reject(err);
+          else resolve();
+        },
+      );
+    });
+  }
+
+  function detectDistro() {
+    try {
+      var content = fs.readFileSync("/etc/os-release", "utf8");
+      var id = "";
+      var idLike = "";
+      content.split("\n").forEach(function (line) {
+        if (line.startsWith("ID=")) id = line.slice(3).replace(/"/g, "");
+        if (line.startsWith("ID_LIKE="))
+          idLike = line.slice(8).replace(/"/g, "");
+      });
+      var combined = id + " " + idLike;
+      if (/arch/i.test(combined)) return "arch";
+      if (/debian|ubuntu/i.test(combined)) return "debian";
+      return id || "unknown";
+    } catch (e) {
+      return "unknown";
+    }
+  }
+
+  function installCommand(distro, pkg) {
+    if (distro === "arch") return "sudo pacman -S --noconfirm " + pkg;
+    if (distro === "debian") return "sudo apt-get install -y " + pkg;
+    return null;
+  }
+
+  function execSudoCommand(cmd, args, password) {
+    return new Promise(function (resolve, reject) {
+      var child = require("child_process").spawn("sudo", ["-S"].concat(args), {
+        stdio: ["pipe", "ignore", "ignore"],
+      });
+      child.stdin.write(password + "\n");
+      child.stdin.end();
+      child.on("close", function (code) {
+        if (code === 0) resolve();
+        else reject(new Error("sudo exited with code " + code));
+      });
+      child.on("error", reject);
+    });
+  }
+
+  ipcMain.handle("take-screenshot", async (event) => {
+    var tmpDir = path.join(os.tmpdir(), "icanhelp");
+    fs.mkdirSync(tmpDir, { recursive: true });
+    var dest = path.join(tmpDir, "screenshot_" + Date.now() + ".png");
+
+    var tools = [
+      { cmd: "spectacle", args: ["-b", "-n", "-o", dest] },
+      { cmd: "gnome-screenshot", args: ["-f", dest] },
+      { cmd: "grim", args: [dest], wayland: true },
+      { cmd: "import", args: ["-silent", "-window", "root", dest] },
+      { cmd: "maim", args: [dest] },
+      { cmd: "scrot", args: [dest] },
+    ];
+
+    var triedGrim = false;
+    for (var i = 0; i < tools.length; i++) {
+      try {
+        await execCommand(tools[i].cmd, tools[i].args);
+        if (fs.existsSync(dest) && fs.statSync(dest).size > 100) {
+          return await prepareAttachment(dest);
+        }
+        if (tools[i].wayland && !triedGrim) {
+          triedGrim = true;
+          try {
+            fs.unlinkSync(dest);
+          } catch (e) {}
+          var outputs = require("child_process")
+            .execSync("grim -o", { env: process.env, timeout: 3000 })
+            .toString()
+            .trim()
+            .split("\n");
+          if (outputs.length > 0 && outputs[0]) {
+            await execCommand("grim", ["-o", outputs[0], dest]);
+            if (fs.existsSync(dest) && fs.statSync(dest).size > 100) {
+              return await prepareAttachment(dest);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    var script = [
+      "import mss",
+      "with mss.mss() as sct:",
+      "    sct.shot(output=" + JSON.stringify(dest) + ")",
+    ].join("\n");
+    try {
+      await execCommand("python3", ["-c", script]);
+      if (fs.existsSync(dest) && fs.statSync(dest).size > 100) {
+        return await prepareAttachment(dest);
+      }
+    } catch (e) {}
+
+    throw new Error(
+      "No screenshot tool found. Install grim, gnome-screenshot, imagemagick, maim, or scrot.",
+    );
   });
 
   ipcMain.on("show-context-menu", function () {

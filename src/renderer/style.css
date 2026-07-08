@@ -642,6 +642,14 @@ body {
 
 #attachment-preview.error {
     border-color: var(--danger);
+    background: rgba(192, 28, 40, 0.08);
+    max-width: 300px;
+}
+
+#attachment-preview.error #attachment-name {
+    white-space: normal;
+    word-break: break-word;
+    color: var(--danger);
 }
 
 #attachment-name {
@@ -1402,13 +1410,20 @@ body {
     cursor: pointer;
     transition: background 0.1s;
 }
-.theme-item:hover { background: var(--bg-list-item-hover); }
-.theme-item.active { background: var(--bg-list-item-active); }
+.theme-item:hover {
+    background: var(--bg-list-item-hover);
+}
+.theme-item.active {
+    background: var(--bg-list-item-active);
+}
 .theme-item-name {
     font-size: 13px;
     color: var(--fg);
 }
-.theme-item.active .theme-item-name { color: var(--accent); font-weight: 600; }
+.theme-item.active .theme-item-name {
+    color: var(--accent);
+    font-weight: 600;
+}
 .theme-item-del {
     background: none;
     border: none;
@@ -1417,11 +1432,20 @@ body {
     padding: 2px;
     border-radius: 4px;
     opacity: 0;
-    transition: opacity 0.1s, color 0.1s;
+    transition:
+        opacity 0.1s,
+        color 0.1s;
 }
-.theme-item:hover .theme-item-del { opacity: 1; }
-.theme-item-del:hover { color: var(--danger); }
-.theme-item-del svg { display: block; stroke: currentColor; }
+.theme-item:hover .theme-item-del {
+    opacity: 1;
+}
+.theme-item-del:hover {
+    color: var(--danger);
+}
+.theme-item-del svg {
+    display: block;
+    stroke: currentColor;
+}
 .theme-item-empty {
     font-size: 12px;
     color: var(--fg-muted);
@@ -1439,10 +1463,12 @@ body {
     padding: 4px;
     min-width: 160px;
     z-index: 30;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     animation: slideUp 0.12s ease;
 }
-#attach-menu.hidden { display: none; }
+#attach-menu.hidden {
+    display: none;
+}
 .attach-menu-item {
     display: flex;
     align-items: center;
@@ -1458,4 +1484,6 @@ body {
     text-align: left;
     font-family: inherit;
 }
-.attach-menu-item:hover { background: var(--bg-hover); }
+.attach-menu-item:hover {
+    background: var(--bg-hover);
+}
