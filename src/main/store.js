@@ -1,40 +1,44 @@
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 
-const CONFIG_DIR = path.join(os.homedir(), '.config', 'icanhelp');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'config.enc');
+const CONFIG_DIR = path.join(os.homedir(), ".config", "icanhelp");
+const CONFIG_FILE = path.join(CONFIG_DIR, "config.enc");
 
 function machineKey() {
   try {
-    return fs.readFileSync('/etc/machine-id', 'utf-8').trim();
+    return fs.readFileSync("/etc/machine-id", "utf-8").trim();
   } catch {
     return os.hostname();
   }
 }
 
 function deriveKey() {
-  return crypto.createHash('sha256').update(machineKey()).digest();
+  return crypto.createHash("sha256").update(machineKey()).digest();
 }
 
 function encrypt(text) {
   const key = deriveKey();
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  let enc = cipher.update(text, 'utf8', 'hex');
-  enc += cipher.final('hex');
-  const tag = cipher.getAuthTag().toString('hex');
-  return JSON.stringify({ iv: iv.toString('hex'), tag, data: enc });
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  let enc = cipher.update(text, "utf8", "hex");
+  enc += cipher.final("hex");
+  const tag = cipher.getAuthTag().toString("hex");
+  return JSON.stringify({ iv: iv.toString("hex"), tag, data: enc });
 }
 
 function decrypt(encoded) {
   const { iv, tag, data } = JSON.parse(encoded);
   const key = deriveKey();
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'hex'));
-  decipher.setAuthTag(Buffer.from(tag, 'hex'));
-  let dec = decipher.update(data, 'hex', 'utf8');
-  dec += decipher.final('utf8');
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    key,
+    Buffer.from(iv, "hex"),
+  );
+  decipher.setAuthTag(Buffer.from(tag, "hex"));
+  let dec = decipher.update(data, "hex", "utf8");
+  dec += decipher.final("utf8");
   return dec;
 }
 
@@ -47,7 +51,7 @@ function ensureDir() {
 function loadConfig() {
   try {
     if (!fs.existsSync(CONFIG_FILE)) return null;
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
     return JSON.parse(decrypt(raw));
   } catch {
     return null;
@@ -67,6 +71,12 @@ function saveEffort(effort) {
   saveConfig(cfg);
 }
 
+function saveModel(model) {
+  var cfg = loadConfig() || {};
+  cfg.model = model;
+  saveConfig(cfg);
+}
+
 function saveWindowPosition(x, y) {
   var cfg = loadConfig() || {};
   cfg.windowX = x;
@@ -76,7 +86,11 @@ function saveWindowPosition(x, y) {
 
 function loadWindowPosition() {
   var cfg = loadConfig();
-  if (cfg && typeof cfg.windowX === 'number' && typeof cfg.windowY === 'number') {
+  if (
+    cfg &&
+    typeof cfg.windowX === "number" &&
+    typeof cfg.windowY === "number"
+  ) {
     return { x: cfg.windowX, y: cfg.windowY };
   }
   return null;
@@ -93,4 +107,13 @@ function saveChats(chats) {
   saveConfig(cfg);
 }
 
-module.exports = { loadConfig, saveConfig, saveEffort, saveWindowPosition, loadWindowPosition, loadChats, saveChats };
+module.exports = {
+  loadConfig,
+  saveConfig,
+  saveEffort,
+  saveModel,
+  saveWindowPosition,
+  loadWindowPosition,
+  loadChats,
+  saveChats,
+};

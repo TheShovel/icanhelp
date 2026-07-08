@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   validateStoredConfig: () => ipcRenderer.invoke("validate-stored-config"),
   fetchModels: (config) => ipcRenderer.invoke("fetch-models", config),
   saveEffort: (effort) => ipcRenderer.invoke("save-effort", effort),
+  saveModel: (model) => ipcRenderer.invoke("save-model", model),
   parseMarkdown: (text) => ipcRenderer.invoke("parse-markdown", text),
   startLLMStream: (messages, effort) =>
     ipcRenderer.send("start-llm-stream", { messages, effort }),
@@ -37,6 +38,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("open-chat-list", () => callback());
   },
   selectAttachment: () => ipcRenderer.invoke("select-attachment"),
+  openFile: (filePath) => ipcRenderer.invoke("open-file", filePath),
   quitApp: () => ipcRenderer.send("quit-app"),
   onVisionProgress: (callback) => {
     const handler = (_event, info) => callback(info);

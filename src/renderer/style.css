@@ -228,6 +228,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 6px;
     padding: 10px 14px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
@@ -237,6 +238,11 @@ body {
     font-size: 13px;
     font-weight: 600;
     color: var(--fg);
+    margin-right: auto;
+}
+
+#chat-model {
+    max-width: 160px;
 }
 
 #burger-btn {
@@ -338,22 +344,32 @@ body {
     text-align: right;
 }
 
-/* ---- Effort Select ---- */
+/* ---- Header Controls ---- */
+#chat-model,
 #chat-effort {
     background: var(--bg-input);
     border: 1px solid var(--border-strong);
     border-radius: 5px;
-    padding: 2px 6px;
+    padding: 3px 6px;
     font-size: 11px;
     color: var(--fg-dim);
     outline: none;
     cursor: pointer;
     font-family: inherit;
+    max-width: 160px;
 }
 
+#chat-model:hover,
 #chat-effort:hover {
     border-color: var(--fg-placeholder);
 }
+
+#chat-model:focus,
+#chat-effort:focus {
+    border-color: var(--border-focus);
+}
+
+#chat-model option,
 #chat-effort option {
     background: var(--bg-input);
     color: var(--fg);
@@ -441,13 +457,29 @@ body {
 }
 
 .message-attachment-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     max-width: 100%;
-    margin: 0 4px 4px;
-    color: var(--fg-muted);
+    margin: 0 4px 6px;
+    padding: 3px 8px;
+    color: var(--fg-dim);
     font-size: 11px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    cursor: default;
+    transition:
+        border-color 0.1s,
+        background 0.1s;
+}
+
+.message-attachment-label:hover {
+    border-color: var(--accent);
+    background: var(--bg-list-item-active);
 }
 
 .message .bubble {
@@ -501,6 +533,7 @@ body {
 
 #chat-input {
     flex: 1;
+    min-width: 0;
     background: var(--bg-input);
     border: 1px solid var(--border-strong);
     border-radius: 8px;
@@ -546,8 +579,9 @@ body {
     border: 1px solid var(--border-strong);
     border-radius: 6px;
     padding: 3px 6px 3px 8px;
-    max-width: 140px;
-    flex-shrink: 0;
+    max-width: 110px;
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 #attachment-preview.hidden {

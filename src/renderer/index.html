@@ -11,6 +11,13 @@
             <div id="chat-panel" class="hidden">
                 <div id="chat-panel-header">
                     <span id="chat-panel-title">Chat</span>
+                    <select id="chat-model" title="Model"></select>
+                    <select id="chat-effort" title="Reasoning effort">
+                        <option value="">Auto</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
                     <button
                         id="burger-btn"
                         class="btn-icon"
@@ -61,12 +68,6 @@
                         id="chat-input"
                         placeholder="Ask me anything..."
                     />
-                    <select id="chat-effort" title="Reasoning effort">
-                        <option value="">Auto</option>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                    </select>
 
                     <button
                         id="send-btn"

@@ -7,6 +7,7 @@ const chatListPanel = document.getElementById("chat-list-panel");
 const chatListBody = document.getElementById("chat-list-body");
 const cancelBtn = document.getElementById("cancel-btn");
 const chatEffort = document.getElementById("chat-effort");
+const chatModel = document.getElementById("chat-model");
 const typingIndicator = document.getElementById("typing-indicator");
 const setupPanel = document.getElementById("setup-panel");
 const setupProvider = document.getElementById("setup-provider");
@@ -66,6 +67,8 @@ function renderAttachment() {
 function clearAttachment() {
   currentAttachment = null;
   renderAttachment();
+  attachBtn.classList.remove("hidden");
+  attachBtn.disabled = false;
 }
 
 function consumeAttachment(text) {
@@ -143,6 +146,7 @@ attachBtn.addEventListener("click", async function () {
     }
     currentAttachment = Object.assign({ status: "ready" }, attachment);
     renderAttachment();
+    attachBtn.classList.add("hidden");
     chatInput.focus();
   } catch (e) {
     if (token !== attachmentToken) return;
@@ -152,6 +156,7 @@ attachBtn.addEventListener("click", async function () {
       error: e.message || "Could not read attachment.",
     };
     renderAttachment();
+    attachBtn.classList.remove("hidden");
   } finally {
     if (token === attachmentToken) attachBtn.disabled = false;
   }
@@ -159,7 +164,6 @@ attachBtn.addEventListener("click", async function () {
 
 removeAttachment.addEventListener("click", function () {
   attachmentToken++;
-  attachBtn.disabled = false;
   clearAttachment();
 });
 
@@ -513,6 +517,39 @@ async function populateModels(cfg) {
   }
 }
 
+var chatModelsLoaded = false;
+
+function populateChatModel(current) {
+  chatModel.innerHTML = "";
+  if (current) {
+    var opt = document.createElement("option");
+    opt.value = current;
+    opt.textContent = current;
+    opt.selected = true;
+    chatModel.appendChild(opt);
+  }
+}
+
+async function loadChatModels() {
+  if (chatModelsLoaded) return;
+  var cfg = await window.electronAPI.getConfig();
+  if (!cfg) return;
+  try {
+    var models = await window.electronAPI.fetchModels(cfg);
+    if (models.length === 0) return;
+    chatModelsLoaded = true;
+    var current = chatModel.value;
+    chatModel.innerHTML = "";
+    for (var i = 0; i < models.length; i++) {
+      var opt = document.createElement("option");
+      opt.value = models[i];
+      opt.textContent = models[i];
+      if (models[i] === current) opt.selected = true;
+      chatModel.appendChild(opt);
+    }
+  } catch (e) {}
+}
+
 avatar.addEventListener("click", (e) => {
   if (didDrag) return;
   togglePanel();
@@ -652,12 +689,21 @@ window.electronAPI.hasConfig().then((has) => {
   }
   needsSetup = false;
   window.electronAPI.getConfig().then(function (cfg) {
+    if (cfg && cfg.model) {
+      populateChatModel(cfg.model);
+    }
     if (cfg && cfg.reasoningEffort) {
       chatEffort.value = cfg.reasoningEffort;
     }
   });
   chatEffort.addEventListener("change", function () {
     window.electronAPI.saveEffort(chatEffort.value || undefined);
+  });
+  chatModel.addEventListener("change", function () {
+    window.electronAPI.saveModel(chatModel.value);
+  });
+  chatModel.addEventListener("focus", function () {
+    loadChatModels();
   });
   window.electronAPI.validateStoredConfig().then((result) => {
     if (!result.valid) {
@@ -973,9 +1019,17 @@ async function addMessage(text, role, attachment) {
   div.className = `message ${role}`;
 
   if (attachment && attachment.name) {
-    const attachmentLabel = document.createElement("div");
+    var attachmentLabel = document.createElement("div");
     attachmentLabel.className = "message-attachment-label";
-    attachmentLabel.textContent = "Attached: " + attachment.name;
+    attachmentLabel.innerHTML =
+      iconSvg("paperclip", 12) + " " + attachment.name;
+    attachmentLabel.title = attachment.path || attachment.name;
+    if (attachment.path) {
+      attachmentLabel.style.cursor = "pointer";
+      attachmentLabel.addEventListener("click", function () {
+        window.electronAPI.openFile(attachment.path);
+      });
+    }
     div.appendChild(attachmentLabel);
   }
 

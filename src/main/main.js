@@ -16,6 +16,7 @@ const {
   loadConfig,
   saveConfig,
   saveEffort,
+  saveModel,
   saveWindowPosition,
   loadWindowPosition,
   loadChats,
@@ -331,6 +332,11 @@ function createWindow() {
     return true;
   });
 
+  ipcMain.handle("save-model", (_event, model) => {
+    saveModel(model);
+    return true;
+  });
+
   ipcMain.handle("load-chats", function () {
     return loadChats();
   });
@@ -363,6 +369,10 @@ function createWindow() {
   }
 
   ipcMain.on("quit-app", () => app.quit());
+
+  ipcMain.handle("open-file", async (_event, filePath) => {
+    return await shell.openPath(filePath);
+  });
 
   ipcMain.on("show-context-menu", function () {
     var template = [
