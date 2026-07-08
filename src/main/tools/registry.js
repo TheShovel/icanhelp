@@ -11,7 +11,20 @@ async function searchWeb({ query, resultSize }) {
         (resultSize || 5),
     );
     var data = await res.json();
-    return JSON.stringify(data, null, 2);
+    var results = Array.isArray(data)
+      ? data
+      : data.items || data.results || data.data || [];
+    var trimmed = results.slice(0, resultSize || 5).map(function (r) {
+      return {
+        title: (r.title || "").slice(0, 120),
+        url: r.url || r.link || "",
+        snippet: (r.snippet || r.text || r.description || r.body || "").slice(
+          0,
+          200,
+        ),
+      };
+    });
+    return JSON.stringify(trimmed);
   } catch (e) {
     return "Search failed: " + e.message;
   }
