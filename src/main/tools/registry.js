@@ -152,7 +152,7 @@ var tools = [
     function: {
       name: "set_theme",
       description:
-        'Change the app\'s CSS theme. Pass a properties object of CSS variables (--bg-panel, --bg-body, --bg-header, --bg-input, --fg, --fg-dim, --fg-muted, --accent, --border, --user-bubble-bg, --user-bubble-fg). Optionally pass a name to save the theme. Example: { properties: { "--bg-panel": "#1e1e2e" } } or { name: "Dark", properties: {...} }',
+        'Change the app\'s CSS theme. Pass a properties object of CSS variables (--bg-panel, --bg-body, --bg-header, --bg-input, --fg, --fg-dim, --fg-muted, --accent, --border, --user-bubble-bg, --user-bubble-fg). You can use any CSS value: solid colors, gradients, images (url()), shadows, fonts, etc. Example: { "--bg-panel": "linear-gradient(135deg, #1e1e2e, #313244)" } or { "--bg-body": "url(https://example.com/bg.png)" }. Optionally pass a name to save the theme.',
       parameters: {
         type: "object",
         properties: {
