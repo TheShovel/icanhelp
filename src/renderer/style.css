@@ -585,10 +585,10 @@ body {
 #chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 12px 14px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .message {
@@ -646,10 +646,10 @@ body {
 }
 
 .message .bubble {
-    padding: 10px 14px;
+    padding: 8px 12px;
     border-radius: 10px;
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 1.4;
     word-wrap: break-word;
     overflow-wrap: break-word;
     word-break: break-word;
@@ -671,7 +671,7 @@ body {
 }
 
 .message .bubble p {
-    margin: 4px 0;
+    margin: 2px 0;
 }
 .message .bubble p:first-child {
     margin-top: 0;
@@ -787,9 +787,9 @@ body {
 
 /* ---- Thinking Blocks ---- */
 .thinking-block {
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     border-left: 2px solid var(--thinking-border);
-    padding-left: 10px;
+    padding-left: 8px;
 }
 
 .thinking-block.hidden {
@@ -797,11 +797,11 @@ body {
 }
 
 .thinking-header {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--thinking-fg);
     cursor: pointer;
     user-select: none;
-    padding: 2px 0;
+    padding: 1px 0;
     display: flex;
     align-items: center;
     gap: 4px;
@@ -820,7 +820,7 @@ body {
 .thinking-content {
     font-size: 12px;
     color: var(--fg-muted);
-    line-height: 1.5;
+    line-height: 1.4;
     max-height: 300px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -852,17 +852,17 @@ body {
 
 /* ---- Tool Blocks ---- */
 .tool-block {
-    margin: 6px 0;
+    margin: 4px 0;
     border-left: 2px solid var(--tool-border);
-    padding-left: 10px;
+    padding-left: 8px;
 }
 
 .tool-header {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--tool-fg);
     cursor: pointer;
     user-select: none;
-    padding: 2px 0;
+    padding: 1px 0;
     display: flex;
     align-items: center;
     gap: 4px;
@@ -897,13 +897,13 @@ body {
 }
 
 .tool-text {
-    margin: 4px 0;
-    padding: 8px 10px;
+    margin: 2px 0;
+    padding: 6px 8px;
     background: var(--bg-tool);
     border-radius: 5px;
     font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.4;
     color: var(--tool-text-fg);
     white-space: pre-wrap;
     word-break: break-word;
@@ -911,13 +911,13 @@ body {
 }
 
 .tool-output {
-    margin: 4px 0 6px;
-    padding: 8px 10px;
+    margin: 2px 0 4px;
+    padding: 6px 8px;
     background: var(--bg-tool-out);
     border-radius: 5px;
     font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.4;
     color: var(--fg-dim);
     white-space: pre-wrap;
     word-break: break-word;
@@ -926,8 +926,8 @@ body {
 
 /* ---- Markdown Content ---- */
 .message .bubble pre {
-    margin: 8px 0;
-    padding: 10px 12px;
+    margin: 4px 0;
+    padding: 8px 10px;
     background: var(--bg-code);
     border-radius: 6px;
     white-space: pre-wrap;
@@ -938,7 +938,7 @@ body {
 .message .bubble pre code {
     font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.4;
     color: var(--fg);
     background: none;
     padding: 0;
@@ -949,27 +949,27 @@ body {
     font-size: 12px;
     background: var(--bg-code);
     color: var(--fg);
-    padding: 1px 5px;
-    border-radius: 4px;
+    padding: 1px 4px;
+    border-radius: 3px;
 }
 
 .message .bubble h1,
 .message .bubble h2,
 .message .bubble h3,
 .message .bubble h4 {
-    margin: 8px 0 4px;
+    margin: 6px 0 2px;
     font-weight: 600;
     line-height: 1.3;
 }
 
 .message .bubble h1 {
-    font-size: 16px;
-}
-.message .bubble h2 {
     font-size: 15px;
 }
-.message .bubble h3 {
+.message .bubble h2 {
     font-size: 14px;
+}
+.message .bubble h3 {
+    font-size: 13px;
 }
 .message .bubble h4 {
     font-size: 13px;
@@ -977,44 +977,32 @@ body {
 
 .message .bubble ul,
 .message .bubble ol {
-    margin: 2px 0;
-    padding-left: 18px;
+    margin: 1px 0;
+    padding-left: 16px;
 }
 
 .message .bubble li {
-    margin: 2px 0;
-}
-
-.message .bubble li p {
-    margin: 0;
+    margin: 1px 0;
 }
 
 .message .bubble blockquote {
-    margin: 6px 0;
-    padding: 4px 10px;
+    margin: 4px 0;
+    padding: 3px 8px;
     border-left: 3px solid var(--border);
     color: var(--fg-muted);
     word-break: break-word;
     overflow: hidden;
 }
 
-.message .bubble a {
-    color: var(--accent);
-    text-decoration: underline;
-}
-.message .bubble a:hover {
-    color: var(--accent-hover);
-}
-
 .message .bubble hr {
     border: none;
     border-top: 1px solid var(--border);
-    margin: 8px 0;
+    margin: 6px 0;
 }
 
 .message .bubble table {
     border-collapse: collapse;
-    margin: 6px 0;
+    margin: 4px 0;
     font-size: 12px;
     width: 100%;
 }
@@ -1022,7 +1010,7 @@ body {
 .message .bubble th,
 .message .bubble td {
     border: 1px solid var(--border);
-    padding: 4px 8px;
+    padding: 3px 6px;
     text-align: left;
     word-break: break-word;
     overflow: hidden;
