@@ -13,13 +13,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   hasConfig: () => ipcRenderer.invoke("has-config"),
   getConfig: () => ipcRenderer.invoke("get-config"),
   saveConfig: (config) => ipcRenderer.invoke("save-config", config),
-  validateStoredConfig: () => ipcRenderer.invoke("validate-stored-config"),
-  fetchModels: (config) => ipcRenderer.invoke("fetch-models", config),
-  saveEffort: (effort) => ipcRenderer.invoke("save-effort", effort),
-  saveModel: (model) => ipcRenderer.invoke("save-model", model),
   parseMarkdown: (text) => ipcRenderer.invoke("parse-markdown", text),
-  startLLMStream: (messages, effort) =>
-    ipcRenderer.send("start-llm-stream", { messages, effort }),
+  startLLMStream: (messages) =>
+    ipcRenderer.send("start-llm-stream", { messages }),
   onLLMChunk: (callback) => {
     const handler = (_event, chunk) => callback(chunk);
     ipcRenderer.on("llm-chunk", handler);

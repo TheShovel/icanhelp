@@ -53,7 +53,8 @@ function loadConfig() {
     if (!fs.existsSync(CONFIG_FILE)) return null;
     const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
     return JSON.parse(decrypt(raw));
-  } catch {
+  } catch (e) {
+    console.error("[store] loadConfig failed:", e.message);
     return null;
   }
 }
@@ -61,20 +62,9 @@ function loadConfig() {
 function saveConfig(config) {
   ensureDir();
   const enc = encrypt(JSON.stringify(config, null, 2));
+  console.log("[store] saveConfig, keys:", Object.keys(config).join(", "));
   fs.writeFileSync(CONFIG_FILE, enc, { mode: 0o600 });
   fs.chmodSync(CONFIG_FILE, 0o600);
-}
-
-function saveEffort(effort) {
-  var cfg = loadConfig() || {};
-  cfg.reasoningEffort = effort;
-  saveConfig(cfg);
-}
-
-function saveModel(model) {
-  var cfg = loadConfig() || {};
-  cfg.model = model;
-  saveConfig(cfg);
 }
 
 function saveWindowPosition(x, y) {
@@ -102,7 +92,12 @@ function loadChats() {
 }
 
 function saveChats(chats) {
-  var cfg = loadConfig() || {};
+  var cfg = loadConfig();
+  console.log(
+    "[store] saveChats, cfg:",
+    cfg ? "loaded (keys: " + Object.keys(cfg).join(",") + ")" : "NULL",
+  );
+  if (!cfg) cfg = {};
   cfg.chats = chats;
   saveConfig(cfg);
 }
@@ -141,8 +136,6 @@ function saveActiveTheme(name) {
 module.exports = {
   loadConfig,
   saveConfig,
-  saveEffort,
-  saveModel,
   saveWindowPosition,
   loadWindowPosition,
   loadChats,

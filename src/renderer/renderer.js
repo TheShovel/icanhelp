@@ -6,7 +6,6 @@ const sendBtn = document.getElementById("send-btn");
 const chatListPanel = document.getElementById("chat-list-panel");
 const chatListBody = document.getElementById("chat-list-body");
 const cancelBtn = document.getElementById("cancel-btn");
-const chatEffort = document.getElementById("chat-effort");
 const typingIndicator = document.getElementById("typing-indicator");
 const settingsMenuPanel = document.getElementById("settings-menu-panel");
 const themePanel = document.getElementById("theme-panel");
@@ -738,7 +737,7 @@ chatInput.addEventListener("keydown", (e) => {
   sendBtn.classList.add("hidden");
 
   while (true) {
-    var result = await window.electronAPI.downloadModel("lfm2.5-8b");
+    var result = await window.electronAPI.downloadModel("qwen3.5-2b");
 
     if (result.ok) break;
 
@@ -749,12 +748,10 @@ chatInput.addEventListener("keydown", (e) => {
     await new Promise(function (r) {
       return setTimeout(r, 3000);
     });
-    installSubtitle.textContent = "Downloading LFM 2.5 1.2B model...";
+    installSubtitle.textContent = "Downloading Qwen 3.5 2B model...";
   }
 
   var config = {
-    provider: "local",
-    model: "local",
     modelPath: result.path,
   };
   await window.electronAPI.saveConfig(config);
@@ -964,18 +961,6 @@ async function sendMessage() {
     } else if (chunk.text) {
       setAvatarState("talking");
       buffer += chunk.text;
-      buffer = buffer.replace(
-        /\[(?:search_web|run_bash|read_file|write_file|list_directory|ocr_image|set_theme|list_themes|apply_theme|delete_theme|store_knowledge|search_knowledge|list_knowledge|clear_knowledge)\([^)]*\)\]/g,
-        "",
-      );
-      buffer = buffer.replace(
-        /^(?:search_web|run_bash|read_file|write_file|list_directory|ocr_image|set_theme|list_themes|apply_theme|delete_theme|store_knowledge|search_knowledge|list_knowledge|clear_knowledge)\s+\S+=.+$/gm,
-        "",
-      );
-      buffer = buffer.replace(
-        /\[(?:search_web|run_bash|read_file|write_file|list_directory|ocr_image|set_theme|list_themes|apply_theme|delete_theme|store_knowledge|search_knowledge|list_knowledge|clear_knowledge)\([^)]*$/g,
-        "",
-      );
       renderStreamedContent(
         bubble,
         buffer,
@@ -986,10 +971,7 @@ async function sendMessage() {
     }
   });
 
-  window.electronAPI.startLLMStream(
-    conversation,
-    chatEffort.value || undefined,
-  );
+  window.electronAPI.startLLMStream(conversation);
 }
 
 function createAssistantMessage() {

@@ -13,7 +13,6 @@ const fs = require("fs");
 const os = require("os");
 const { execFile } = require("child_process");
 const { marked } = require("marked");
-const { streamLLM, validateConfig, fetchModels } = require("./llm");
 const { runLocalChatLoop } = require("./llm-local");
 const {
   RECOMMENDED_MODELS,
@@ -24,8 +23,6 @@ const {
 const {
   loadConfig,
   saveConfig,
-  saveEffort,
-  saveModel,
   saveWindowPosition,
   loadWindowPosition,
   loadChats,
@@ -61,6 +58,23 @@ function requestSudoPassword(event) {
 }
 
 function createWindow() {
+  var startupCfg = loadConfig();
+  console.log(
+    "[main] startup config:",
+    startupCfg ? "keys: " + Object.keys(startupCfg).join(", ") : "NULL",
+  );
+  if (startupCfg) {
+    console.log(
+      "[main]   themes:",
+      startupCfg.themes
+        ? Object.keys(startupCfg.themes).length + " themes"
+        : "none",
+    );
+    console.log(
+      "[main]   chats:",
+      startupCfg.chats ? startupCfg.chats.length + " chats" : "none",
+    );
+  }
   const display = screen.getPrimaryDisplay();
   const { width, height } = display.workAreaSize;
   var savedPos = loadWindowPosition();
@@ -158,12 +172,7 @@ function createWindow() {
   ipcMain.on("start-llm-stream", function (event, payload) {
     currentAbort = new AbortController();
     var cfg = loadConfig() || {};
-    console.log(
-      "[main] start-llm-stream, provider:",
-      cfg.provider,
-      "modelPath:",
-      cfg.modelPath,
-    );
+    console.log("[main] start-llm-stream, modelPath:", cfg.modelPath);
     runLocalLLMLoop(
       event,
       payload.messages,
@@ -242,12 +251,32 @@ function createWindow() {
 
         if (name === "set_theme") {
           try {
-            if (args.properties) {
-              mainWindow.webContents.send("apply-theme", args.properties);
-              if (args.name) {
-                saveTheme(args.name, args.properties);
-                mainWindow.webContents.send("themes-changed");
-              }
+            var props = args.properties;
+            if (typeof props === "string") props = JSON.parse(props);
+            if (
+              props &&
+              typeof props === "object" &&
+              Object.keys(props).length > 0
+            ) {
+              var themeName = args.name || "custom-" + Date.now();
+              console.log(
+                "[main] saving theme:",
+                themeName,
+                "keys:",
+                Object.keys(props).length,
+              );
+              mainWindow.webContents.send("apply-theme", props);
+              saveTheme(themeName, props);
+              saveActiveTheme(themeName);
+              mainWindow.webContents.send("themes-changed");
+              console.log("[main] theme saved");
+            } else {
+              console.log(
+                "[main] set_theme skipped, props type:",
+                typeof props,
+                "keys:",
+                props ? Object.keys(props).length : 0,
+              );
             }
           } catch (e) {}
         }
@@ -277,211 +306,18 @@ function createWindow() {
       },
     });
 
+    console.log("[main] Sending done");
     event.sender.send("llm-chunk", { done: true });
-  }
-
-  async function runLLMLoop(event, messages, effort, signal) {
-    if (signal && signal.aborted) return;
-    var stream;
-    try {
-      stream = await streamLLM(messages, effort, signal);
-    } catch (e) {
-      event.sender.send("llm-chunk", { error: e.message });
-      return;
-    }
-
-    if (stream === null) {
-      event.sender.send("llm-chunk", {
-        error:
-          "No API key configured. Open the assistant and use the setup screen to configure your LLM provider.",
-      });
-      return;
-    }
-
-    var reader = stream.getReader();
-    var decoder = new TextDecoder();
-    var buf = "";
-    var toolCalls = [];
-
-    try {
-      while (true) {
-        var result = await reader.read();
-        if (result.done) break;
-
-        buf += decoder.decode(result.value, { stream: true });
-        var lines = buf.split("\n");
-        buf = lines.pop() || "";
-
-        for (var line of lines) {
-          var trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith("data: ")) continue;
-          var data = trimmed.slice(6);
-          if (data === "[DONE]") continue;
-
-          try {
-            var parsed = JSON.parse(data);
-            var choice = parsed.choices?.[0];
-            if (!choice) continue;
-            var finish = choice.finish_reason;
-            var delta = choice.delta || {};
-
-            if (delta.content) {
-              event.sender.send("llm-chunk", { text: delta.content });
-            }
-            if (delta.reasoning_content) {
-              event.sender.send("llm-chunk", {
-                thinking: delta.reasoning_content,
-              });
-            }
-
-            if (delta.tool_calls) {
-              for (var tc of delta.tool_calls) {
-                var idx = tc.index;
-                if (!toolCalls[idx]) {
-                  toolCalls[idx] = {
-                    id: tc.id || "",
-                    function: { name: "", arguments: "" },
-                  };
-                }
-                if (tc.id) toolCalls[idx].id = tc.id;
-                if (tc.function) {
-                  if (tc.function.name)
-                    toolCalls[idx].function.name = tc.function.name;
-                  if (tc.function.arguments)
-                    toolCalls[idx].function.arguments += tc.function.arguments;
-                }
-              }
-            }
-          } catch {
-            // skip malformed lines
-          }
-        }
-      }
-    } catch (e) {
-      if (e.name === "AbortError") {
-        event.sender.send("llm-chunk", { done: true });
-      } else {
-        event.sender.send("llm-chunk", { error: e.message });
-      }
-      return;
-    }
-
-    var pendingConfirm = null;
-
-    if (toolCalls.length > 0) {
-      try {
-        var { executeToolCall } = require("./tools/registry");
-        for (var tc of toolCalls) {
-          if (!tc.id || !tc.function.name) continue;
-          var args = {};
-          try {
-            args = JSON.parse(tc.function.arguments);
-          } catch {}
-
-          event.sender.send("llm-chunk", {
-            tool_start: { name: tc.function.name, args: args },
-          });
-
-          var onSudoPrompt = async function () {
-            return await requestSudoPassword(event);
-          };
-
-          var onConfirm = async function (cmd) {
-            event.sender.send("llm-chunk", {
-              confirm_prompt: { command: cmd },
-            });
-            return await new Promise(function (resolve) {
-              pendingConfirm = resolve;
-            });
-          };
-
-          var result = await executeToolCall(tc, {
-            onSudoPrompt: onSudoPrompt,
-            onConfirm: onConfirm,
-          });
-
-          if (tc.function.name === "set_theme") {
-            try {
-              var themeArgs = JSON.parse(tc.function.arguments);
-              if (themeArgs.properties) {
-                mainWindow.webContents.send(
-                  "apply-theme",
-                  themeArgs.properties,
-                );
-                if (themeArgs.name) {
-                  saveTheme(themeArgs.name, themeArgs.properties);
-                  mainWindow.webContents.send("themes-changed");
-                }
-              }
-            } catch (e) {}
-          }
-
-          if (tc.function.name === "delete_theme") {
-            try {
-              var d = JSON.parse(tc.function.arguments);
-              deleteTheme(d.name);
-              mainWindow.webContents.send("themes-changed");
-            } catch (e) {}
-          }
-
-          if (tc.function.name === "apply_theme") {
-            try {
-              var a = JSON.parse(tc.function.arguments);
-              var themes = loadThemes();
-              var theme = themes[a.name];
-              if (theme && theme.properties) {
-                saveActiveTheme(a.name);
-                mainWindow.webContents.send("apply-theme", theme.properties);
-                mainWindow.webContents.send("themes-changed");
-              }
-            } catch (e) {}
-          }
-
-          if (tc.function.name === "list_themes") {
-            var allThemes = loadThemes();
-            result = JSON.stringify({ themes: Object.keys(allThemes) });
-          }
-
-          event.sender.send("llm-chunk", {
-            tool_end: { name: tc.function.name, output: result },
-          });
-          messages.push({
-            role: "assistant",
-            content: null,
-            tool_calls: [
-              {
-                id: tc.id,
-                type: "function",
-                function: {
-                  name: tc.function.name,
-                  arguments: tc.function.arguments,
-                },
-              },
-            ],
-          });
-          messages.push({ role: "tool", tool_call_id: tc.id, content: result });
-        }
-        await runLLMLoop(event, messages, effort, signal);
-      } catch (e) {
-        event.sender.send("llm-chunk", { error: "Tool error: " + e.message });
-        event.sender.send("llm-chunk", { done: true });
-      }
-    } else {
-      event.sender.send("llm-chunk", { done: true });
-    }
+    console.log("[main] Done sent");
   }
 
   ipcMain.handle("get-config", () => {
     const cfg = loadConfig();
     return cfg
       ? {
-          provider: cfg.provider,
-          model: cfg.model,
-          endpoint: cfg.endpoint,
-          reasoningEffort: cfg.reasoningEffort,
           modelPath: cfg.modelPath || "",
           gpu: cfg.gpu !== false,
-          contextSize: cfg.contextSize || 4096,
+          contextSize: cfg.contextSize || 8192,
         }
       : null;
   });
@@ -491,34 +327,9 @@ function createWindow() {
   });
 
   ipcMain.handle("save-config", async (_event, config) => {
-    if (config.provider === "local") {
-      saveConfig(config);
-      return true;
-    }
-    const result = await validateConfig(config);
-    if (!result.valid) throw new Error(result.error);
-    saveConfig(config);
-    return true;
-  });
-
-  ipcMain.handle("validate-stored-config", async () => {
-    const cfg = loadConfig();
-    if (!cfg) return { valid: false, error: "No config found" };
-    if (cfg.provider === "local") return { valid: true };
-    return await validateConfig(cfg);
-  });
-
-  ipcMain.handle("fetch-models", async (_event, config) => {
-    return await fetchModels(config);
-  });
-
-  ipcMain.handle("save-effort", (_event, effort) => {
-    saveEffort(effort);
-    return true;
-  });
-
-  ipcMain.handle("save-model", (_event, model) => {
-    saveModel(model);
+    var existing = loadConfig() || {};
+    Object.assign(existing, config);
+    saveConfig(existing);
     return true;
   });
 
@@ -526,7 +337,9 @@ function createWindow() {
     return loadChats();
   });
   ipcMain.handle("save-chats", function (_, chats) {
+    console.log("[main] save-chats IPC, count:", chats ? chats.length : 0);
     saveChats(chats);
+    console.log("[main] save-chats done");
     return true;
   });
 

@@ -7,13 +7,12 @@ const MODELS_DIR = path.join(os.homedir(), ".cache", "icanhelp", "models");
 
 const RECOMMENDED_MODELS = [
   {
-    id: "lfm2.5-8b",
-    name: "LFM 2.5 8B MoE",
-    size: "~5.2 GB",
-    description:
-      "Mixture of Experts with chain-of-thought reasoning. 1B active, 8B total.",
-    url: "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B-GGUF/resolve/main/LFM2.5-8B-A1B-Q4_K_M.gguf",
-    filename: "LFM2.5-8B-A1B-Q4_K_M.gguf",
+    id: "qwen3.5-2b",
+    name: "Qwen 3.5 2B Instruct",
+    size: "~1.3 GB",
+    description: "Newest Qwen. Fast, small, excellent tool use.",
+    url: "https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf",
+    filename: "Qwen_Qwen3.5-2B-Q4_K_M.gguf",
   },
 ];
 

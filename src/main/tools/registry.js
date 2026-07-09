@@ -38,15 +38,31 @@ async function searchWeb({ query, resultSize }) {
 
 async function setTheme({ properties, name }) {
   if (!properties || typeof properties !== "object") {
-    return JSON.stringify({ error: "properties object required" });
+    return (
+      "The 'properties' argument must be a JSON object with CSS variable names mapping to hex colors. " +
+      "Available variables: --bg-panel, --bg-header, --bg-body, --bg-input, --bg-code, --bg-tool, " +
+      "--border, --border-strong, --fg, --fg-dim, --fg-muted, --accent, --accent-hover, " +
+      "--user-bubble-bg, --user-bubble-fg, --danger. " +
+      "Pick colors yourself based on what the user asked for. Example for a blue theme: " +
+      '{"--bg-panel":"#1a1a2e","--accent":"#5a9cf8","--fg":"#e0e0e0"}'
+    );
   }
-  var count = 0;
-  for (var key in properties) {
-    if (properties.hasOwnProperty(key)) count++;
+  var keys = Object.keys(properties);
+  if (keys.length === 0) {
+    return (
+      "No variables provided. Available variables: --bg-panel, --bg-header, --bg-body, --bg-input, --bg-code, --bg-tool, " +
+      "--border, --border-strong, --fg, --fg-dim, --fg-muted, --accent, --accent-hover, " +
+      "--user-bubble-bg, --user-bubble-fg, --danger. " +
+      "Pick colors yourself based on what the user asked for and call set_theme again. Example: " +
+      '{"--bg-panel":"#1a1a2e","--accent":"#5a9cf8","--fg":"#e0e0e0"}'
+    );
   }
-  var result = { ok: true, changed: count };
-  if (name) result.saved = name;
-  return JSON.stringify(result);
+  return (
+    "Theme applied with " +
+    keys.length +
+    " color changes." +
+    (name ? " Saved as '" + name + "'." : "")
+  );
 }
 
 function listThemesStub() {
@@ -171,13 +187,19 @@ var tools = [
     function: {
       name: "set_theme",
       description:
-        'Change the app\'s CSS theme. Pass a properties object of CSS variables (--bg-panel, --bg-body, --bg-header, --bg-input, --fg, --fg-dim, --fg-muted, --accent, --border, --user-bubble-bg, --user-bubble-fg). You can use any CSS value: solid colors, gradients, images (url()), shadows, fonts, etc. Example: { "--bg-panel": "linear-gradient(135deg, #1e1e2e, #313244)" } or { "--bg-body": "url(https://example.com/bg.png)" }. Optionally pass a name to save the theme.',
+        "Call this when the user asks to change the app's colors, make a theme (green, blue, dark, etc), or change how the app looks. Set CSS variables — only use these exact names:" +
+        " --bg-panel (main background), --bg-header (title bar), --bg-body (chat area), --bg-input (text fields)," +
+        " --bg-code (code blocks), --bg-tool (tool blocks), --border, --border-strong," +
+        " --fg (main text), --fg-dim, --fg-muted, --accent (buttons/links), --accent-hover," +
+        " --user-bubble-bg, --user-bubble-fg, --danger.",
       parameters: {
         type: "object",
         properties: {
           properties: {
             type: "object",
-            description: "CSS variable/value pairs",
+            description:
+              "CSS variable/value pairs. Only use supported names listed above. Values must be hex colors (e.g. '#1a1a2e') or rgba().",
+            additionalProperties: { type: "string" },
           },
           name: { type: "string", description: "Optional name to save as" },
         },

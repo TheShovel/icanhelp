@@ -471,35 +471,6 @@ body {
 }
 
 /* ---- Header Controls ---- */
-#chat-model,
-#chat-effort {
-    background: var(--bg-input);
-    border: 1px solid var(--border-strong);
-    border-radius: 5px;
-    padding: 3px 6px;
-    font-size: 11px;
-    color: var(--fg-dim);
-    outline: none;
-    cursor: pointer;
-    font-family: inherit;
-    max-width: 160px;
-}
-
-#chat-model:hover,
-#chat-effort:hover {
-    border-color: var(--fg-placeholder);
-}
-
-#chat-model:focus,
-#chat-effort:focus {
-    border-color: var(--border-focus);
-}
-
-#chat-model option,
-#chat-effort option {
-    background: var(--bg-input);
-    color: var(--fg);
-}
 
 /* ---- Icon Buttons ---- */
 .btn-icon {
