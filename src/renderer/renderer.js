@@ -965,10 +965,17 @@ async function sendMessage() {
       setAvatarState("talking");
       buffer += chunk.text;
       buffer = buffer.replace(
-        /\n?FUNCTION:[^\n]*\n(?:ARG [^\n]*\n)*END_FUNCTION\b\n?/g,
+        /\[(?:search_web|run_bash|read_file|write_file|list_directory|ocr_image|set_theme|list_themes|apply_theme|delete_theme|store_knowledge|search_knowledge|list_knowledge|clear_knowledge)\([^)]*\)\]/g,
         "",
       );
-      buffer = buffer.replace(/\nFUNCTION:[^\n]*(?:\nARG [^\n]*)*$/g, "");
+      buffer = buffer.replace(
+        /^(?:search_web|run_bash|read_file|write_file|list_directory|ocr_image|set_theme|list_themes|apply_theme|delete_theme|store_knowledge|search_knowledge|list_knowledge|clear_knowledge)\s+\S+=.+$/gm,
+        "",
+      );
+      buffer = buffer.replace(
+        /\[(?:search_web|run_bash|read_file|write_file|list_directory|ocr_image|set_theme|list_themes|apply_theme|delete_theme|store_knowledge|search_knowledge|list_knowledge|clear_knowledge)\([^)]*$/g,
+        "",
+      );
       renderStreamedContent(
         bubble,
         buffer,

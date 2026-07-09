@@ -11,7 +11,7 @@ const RECOMMENDED_MODELS = [
     name: "LFM 2.5 8B MoE",
     size: "~5.2 GB",
     description:
-      "8B Mixture of Experts, 1B active. Fast with strong reasoning and tool use.",
+      "Mixture of Experts with chain-of-thought reasoning. 1B active, 8B total.",
     url: "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B-GGUF/resolve/main/LFM2.5-8B-A1B-Q4_K_M.gguf",
     filename: "LFM2.5-8B-A1B-Q4_K_M.gguf",
   },
