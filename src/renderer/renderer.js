@@ -27,10 +27,13 @@ const attachmentName = document.getElementById("attachment-name");
 const removeAttachment = document.getElementById("remove-attachment");
 const installScreen = document.getElementById("install-screen");
 const installAvatar = document.getElementById("install-avatar");
+const installSpinner = document.getElementById("install-spinner");
 const installProgressFill = document.getElementById("install-progress-fill");
+const installProgressBar = document.getElementById("install-progress-bar");
 const installPct = document.getElementById("install-pct");
 const installSize = document.getElementById("install-size");
 const installSubtitle = document.getElementById("install-subtitle");
+const installModelList = document.getElementById("install-model-list");
 
 avatarInner.src = window.electronAPI.buddyArt("idle");
 installAvatar.src = window.electronAPI.buddyArt("idle");
@@ -718,7 +721,7 @@ chatInput.addEventListener("keydown", (e) => {
 
 // --- Install Screen ---
 (async function initInstall() {
-  window.electronAPI.resizeWindow(320, 380);
+  window.electronAPI.resizeWindow(320, 420);
 
   window.electronAPI.onModelDownloadProgress(function (info) {
     if (info.stage === "downloading") {
@@ -736,8 +739,98 @@ chatInput.addEventListener("keydown", (e) => {
   chatPanel.classList.add("hidden");
   sendBtn.classList.add("hidden");
 
+  var sysInfo = await window.electronAPI.getSystemInfo();
+  var allModels = await window.electronAPI.getRecommendedModels();
+  var compatModels = await window.electronAPI.getCompatibleModels();
+
+  renderModelPicker(allModels, compatModels, sysInfo);
+})();
+
+function renderModelPicker(allModels, compatModels, sysInfo) {
+  installModelList.innerHTML = "";
+  installSpinner.classList.add("hidden");
+  installProgressBar.classList.add("hidden");
+  installProgressFill.style.width = "0%";
+  installPct.textContent = "";
+  installSize.textContent = "";
+
+  var compatIds = {};
+  for (var j = 0; j < compatModels.length; j++) {
+    compatIds[compatModels[j].id] = true;
+  }
+
+  var ramNote = document.createElement("p");
+  ramNote.id = "install-ram-note";
+  ramNote.textContent =
+    "System: " +
+    sysInfo.totalRamGB +
+    " GB RAM" +
+    (sysInfo.freeRamGB < sysInfo.totalRamGB
+      ? " (" + sysInfo.freeRamGB + " GB free)"
+      : "") +
+    " · " +
+    sysInfo.cpuCores +
+    " cores · " +
+    sysInfo.gpuInfo;
+  installModelList.appendChild(ramNote);
+
+  var hasCompatible = false;
+  for (var i = 0; i < allModels.length; i++) {
+    var m = allModels[i];
+    var isCompatible = !!compatIds[m.id];
+    if (isCompatible) hasCompatible = true;
+
+    var card = document.createElement("button");
+    card.className =
+      "install-model-card" + (isCompatible ? "" : " incompatible");
+    card.disabled = !isCompatible;
+
+    var nameEl = document.createElement("span");
+    nameEl.className = "install-model-name";
+    nameEl.textContent = m.name;
+    card.appendChild(nameEl);
+
+    var sizeEl = document.createElement("span");
+    sizeEl.className = "install-model-size";
+    sizeEl.textContent = m.size;
+    card.appendChild(sizeEl);
+
+    var descEl = document.createElement("span");
+    descEl.className = "install-model-desc";
+    descEl.textContent = m.description;
+    card.appendChild(descEl);
+
+    var noteEl = document.createElement("span");
+    noteEl.className = "install-model-note";
+    if (!isCompatible) {
+      noteEl.textContent =
+        "Needs ~" + m.minRamGB + " GB RAM — not enough free memory";
+    } else if (m.sizeBytes > 2000000000) {
+      noteEl.textContent = "Larger models are slower and use more resources";
+    }
+    card.appendChild(noteEl);
+
+    if (isCompatible) {
+      card.addEventListener("click", function () {
+        startModelDownload(m.id, m.name);
+      });
+    }
+
+    installModelList.appendChild(card);
+  }
+}
+
+async function startModelDownload(modelId, modelName) {
+  installModelList.innerHTML = "";
+  installSpinner.classList.remove("hidden");
+  installProgressBar.classList.remove("hidden");
+  installSubtitle.textContent = "Downloading " + modelName + "...";
+  installProgressFill.style.width = "0%";
+  installPct.textContent = "0%";
+  installSize.textContent = "";
+
   while (true) {
-    var result = await window.electronAPI.downloadModel("qwen3.5-2b");
+    var result = await window.electronAPI.downloadModel(modelId);
 
     if (result.ok) break;
 
@@ -748,7 +841,7 @@ chatInput.addEventListener("keydown", (e) => {
     await new Promise(function (r) {
       return setTimeout(r, 3000);
     });
-    installSubtitle.textContent = "Downloading Qwen 3.5 2B model...";
+    installSubtitle.textContent = "Downloading " + modelName + "...";
   }
 
   var config = {
@@ -766,7 +859,7 @@ chatInput.addEventListener("keydown", (e) => {
     chatInput.focus();
     smoothScroll(chatMessages);
   }, 150);
-})();
+}
 
 async function sendMessage() {
   var userText = chatInput.value.trim();

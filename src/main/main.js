@@ -14,11 +14,14 @@ const os = require("os");
 const { execFile } = require("child_process");
 const { marked } = require("marked");
 const { runLocalChatLoop } = require("./llm-local");
+const { disposeModel } = require("./llm-local");
 const {
   RECOMMENDED_MODELS,
   listDownloadedModels,
   deleteModel,
   downloadModel,
+  getSystemInfo,
+  getCompatibleModels,
 } = require("./model-manager");
 const {
   loadConfig,
@@ -387,6 +390,14 @@ function createWindow() {
     return RECOMMENDED_MODELS;
   });
 
+  ipcMain.handle("get-system-info", function () {
+    return getSystemInfo();
+  });
+
+  ipcMain.handle("get-compatible-models", function () {
+    return getCompatibleModels();
+  });
+
   ipcMain.handle("list-downloaded-models", function () {
     return listDownloadedModels();
   });
@@ -621,6 +632,7 @@ app.whenReady().then(function () {
 
 app.on("before-quit", function () {
   shutdownVision();
+  disposeModel();
 });
 
 app.on("window-all-closed", () => {
