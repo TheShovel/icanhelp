@@ -749,7 +749,7 @@ chatInput.addEventListener("keydown", (e) => {
     await new Promise(function (r) {
       return setTimeout(r, 3000);
     });
-    installSubtitle.textContent = "Downloading LFM 2.5 8B model...";
+    installSubtitle.textContent = "Downloading LFM 2.5 1.2B model...";
   }
 
   var config = {
