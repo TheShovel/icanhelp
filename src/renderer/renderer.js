@@ -1074,11 +1074,9 @@ async function renderStreamedContent(
     thinkingBlock.classList.remove("collapsed");
   }
 
-  if (parsed.response) {
-    responseContent.innerHTML = await window.electronAPI.parseMarkdown(
-      parsed.response,
-    );
-  }
+  responseContent.innerHTML = parsed.response
+    ? await window.electronAPI.parseMarkdown(parsed.response)
+    : "";
 
   smoothScroll(chatMessages);
 }

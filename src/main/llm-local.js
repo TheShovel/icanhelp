@@ -112,6 +112,8 @@ async function runLocalChatLoop({
   const prompt = lastUser.content;
   let maxTurns = 8;
   let conversation = prompt;
+  const toolNames = tools.map((t) => t.function.name).join("|");
+  const toolRe = new RegExp("\\[(" + toolNames + ")\\([^)]*\\)\\]", "g");
 
   while (maxTurns > 0) {
     maxTurns--;
@@ -128,7 +130,7 @@ async function runLocalChatLoop({
       stopOnAbortSignal: true,
       onTextChunk: (chunk) => {
         fullResponse += chunk;
-        onChunk({ text: chunk });
+        onChunk({ replaceText: fullResponse.replace(toolRe, "") });
       },
       onResponseChunk: (chunk) => {
         if (
