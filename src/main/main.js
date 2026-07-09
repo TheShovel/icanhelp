@@ -164,27 +164,15 @@ function createWindow() {
       "modelPath:",
       cfg.modelPath,
     );
-    if (cfg.provider === "local") {
-      runLocalLLMLoop(
-        event,
-        payload.messages,
-        payload.effort,
-        currentAbort.signal,
-      ).catch(function (err) {
-        event.sender.send("llm-chunk", { error: err.message });
-        event.sender.send("llm-chunk", { done: true });
-      });
-    } else {
-      runLLMLoop(
-        event,
-        payload.messages,
-        payload.effort,
-        currentAbort.signal,
-      ).catch(function (err) {
-        event.sender.send("llm-chunk", { error: err.message });
-        event.sender.send("llm-chunk", { done: true });
-      });
-    }
+    runLocalLLMLoop(
+      event,
+      payload.messages,
+      payload.effort,
+      currentAbort.signal,
+    ).catch(function (err) {
+      event.sender.send("llm-chunk", { error: err.message });
+      event.sender.send("llm-chunk", { done: true });
+    });
   });
 
   async function runLocalLLMLoop(event, messages, effort, signal) {

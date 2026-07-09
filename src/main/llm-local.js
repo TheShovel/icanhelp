@@ -22,24 +22,18 @@ function buildSystemPrompt(tools) {
     "",
     "Tools: " + toolNames,
     "",
-    "To call a tool, output:",
+    "To call a tool, output exactly:",
     "FUNCTION: tool_name",
     "ARG param: value",
     "END_FUNCTION",
     "",
-    "Example conversation:",
-    "User: search for linux news",
-    "Assistant: Let me find that for you.",
+    "Example - searching the web:",
     "FUNCTION: search_web",
-    "ARG query: linux news",
+    "ARG query: your search query here",
     "END_FUNCTION",
     "",
-    "[Tool returns results here]",
-    "",
-    "Assistant: Here's what I found: ...",
-    "",
-    "ALWAYS use tools when asked to search or run commands.",
-    "NEVER say you cannot search or browse. You have search_web.",
+    "After END_FUNCTION the tool runs and you'll see its output. Then respond normally.",
+    "Always use tools when asked. Never refuse to use a tool you have.",
   ].join("\n");
 }
 
@@ -124,17 +118,6 @@ async function runLocalChatLoop({
   );
 
   let history = [];
-
-  history.push(
-    { type: "user", text: "search for linux news" },
-    {
-      type: "model",
-      response: [
-        "Let me find that for you.",
-        "FUNCTION: search_web\nARG query: linux news\nEND_FUNCTION",
-      ],
-    },
-  );
 
   for (const msg of messages) {
     if (msg.role === "system") continue;

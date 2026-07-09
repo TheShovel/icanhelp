@@ -4,7 +4,6 @@ const { tools, executeToolCall } = require("./tools/registry");
 const defaults = {
   provider: "local",
   model: "local",
-  endpoint: "http://localhost:11434/v1",
   modelPath: "",
   gpu: true,
   contextSize: 4096,

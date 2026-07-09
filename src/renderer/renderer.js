@@ -7,16 +7,7 @@ const chatListPanel = document.getElementById("chat-list-panel");
 const chatListBody = document.getElementById("chat-list-body");
 const cancelBtn = document.getElementById("cancel-btn");
 const chatEffort = document.getElementById("chat-effort");
-const chatModel = document.getElementById("chat-model");
 const typingIndicator = document.getElementById("typing-indicator");
-const setupPanel = document.getElementById("setup-panel");
-const setupProvider = document.getElementById("setup-provider");
-const setupKey = document.getElementById("setup-key");
-const setupEndpoint = document.getElementById("setup-endpoint");
-const setupModel = document.getElementById("setup-model");
-const setupSave = document.getElementById("setup-save");
-const setupStatus = document.getElementById("setup-status");
-const closeSetupBtn = document.getElementById("close-setup");
 const settingsMenuPanel = document.getElementById("settings-menu-panel");
 const themePanel = document.getElementById("theme-panel");
 const resetThemeBtn = document.getElementById("theme-reset");
@@ -35,21 +26,15 @@ const attachBtn = document.getElementById("attach-btn");
 const attachmentPreview = document.getElementById("attachment-preview");
 const attachmentName = document.getElementById("attachment-name");
 const removeAttachment = document.getElementById("remove-attachment");
-const setupLocalConfig = document.getElementById("setup-local-config");
-const setupModelPath = document.getElementById("setup-model-path");
-const setupContextSize = document.getElementById("setup-context-size");
-const setupDownloadList = document.getElementById("setup-download-list");
-const setupDownloadProgress = document.getElementById(
-  "setup-download-progress",
-);
-const setupDownloadFill = document.getElementById("setup-download-fill");
-const setupDownloadPct = document.getElementById("setup-download-pct");
-const setupKeyLabel = document.getElementById("setup-key-label");
-const setupEndpointLabel = document.getElementById("setup-endpoint-label");
-const setupModelLabel = document.getElementById("setup-model-label");
+const installScreen = document.getElementById("install-screen");
+const installAvatar = document.getElementById("install-avatar");
+const installProgressFill = document.getElementById("install-progress-fill");
+const installPct = document.getElementById("install-pct");
+const installSize = document.getElementById("install-size");
+const installSubtitle = document.getElementById("install-subtitle");
 
 avatarInner.src = window.electronAPI.buddyArt("idle");
-document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
+installAvatar.src = window.electronAPI.buddyArt("idle");
 document.getElementById("close-settings-menu").innerHTML = iconSvg("close", 16);
 document.getElementById("close-theme").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
@@ -289,7 +274,6 @@ let didDrag = false;
 let dragStartX = 0;
 let dragStartY = 0;
 let conversation = [];
-let needsSetup = true;
 
 function setAvatarState(state) {
   var img = avatarInner;
@@ -477,285 +461,19 @@ document
   .getElementById("close-chat-list")
   .addEventListener("click", closeChatList);
 
-const providerDefaults = {
-  local: {
-    endpoint: "",
-    model: "local",
-  },
-  ollama: {
-    endpoint: "http://localhost:11434/v1",
-    model: "llama3.2",
-  },
-};
-
-function tryFetchModels() {
-  if (setupProvider.value !== "ollama") return;
-  var ep = setupEndpoint.value.trim();
-  if (!ep) return;
-  setupStatus.textContent = "Fetching models...";
-  populateModels({ endpoint: ep });
-}
-
-function updateProviderUI() {
-  var isLocal = setupProvider.value === "local";
-  var isOllama = setupProvider.value === "ollama";
-  setupKeyLabel.classList.toggle("hidden", !isOllama);
-  setupEndpointLabel.classList.toggle("hidden", isLocal);
-  setupModelLabel.classList.toggle("hidden", !isOllama);
-  setupLocalConfig.classList.toggle("hidden", !isLocal);
-  if (isLocal) {
-    setupStatus.textContent = "Select or download a model below.";
-    renderDownloadList();
-  } else if (isOllama) {
-    setupStatus.textContent = "Enter your Ollama endpoint.";
-  }
-}
-
-setupProvider.addEventListener("change", () => {
-  var preset = providerDefaults[setupProvider.value];
-  if (preset) {
-    setupEndpoint.value = preset.endpoint;
-    setupModel.value = preset.model;
-  }
-  if (setupProvider.value === "ollama") {
-    setupModel.innerHTML =
-      '<option value="">— enter API key to load models —</option>';
-    tryFetchModels();
-  }
-  updateProviderUI();
-});
-
-async function renderDownloadList() {
-  setupDownloadList.innerHTML = "";
-  try {
-    var models = await window.electronAPI.getRecommendedModels();
-    var downloaded = await window.electronAPI.listDownloadedModels();
-    var downloadedNames = downloaded.map(function (d) {
-      return d.filename;
-    });
-
-    for (const m of models) {
-      var row = document.createElement("div");
-      row.className = "download-model-row";
-
-      var info = document.createElement("div");
-      info.className = "download-model-info";
-
-      var nameEl = document.createElement("span");
-      nameEl.className = "download-model-name";
-      nameEl.textContent = m.name;
-
-      var metaEl = document.createElement("span");
-      metaEl.className = "download-model-meta";
-      metaEl.textContent = m.size + " — " + m.description;
-
-      info.appendChild(nameEl);
-      info.appendChild(metaEl);
-      row.appendChild(info);
-
-      var isDownloaded = downloadedNames.indexOf(m.filename) !== -1;
-      const downloadedModel = downloaded.find(function (d) {
-        return d.filename === m.filename;
-      });
-
-      if (isDownloaded && downloadedModel) {
-        const useBtn = document.createElement("button");
-        useBtn.className = "download-model-btn";
-        useBtn.textContent = "Use (" + downloadedModel.sizeMB + " MB)";
-        useBtn.addEventListener("click", function () {
-          setupModelPath.value = downloadedModel.path;
-          setupStatus.textContent = "Model set to " + m.filename;
-        });
-        row.appendChild(useBtn);
-      } else {
-        const dlBtn = document.createElement("button");
-        dlBtn.className = "download-model-btn";
-        dlBtn.textContent = "Download";
-        dlBtn.addEventListener("click", async function () {
-          dlBtn.disabled = true;
-          dlBtn.textContent = "Starting...";
-          setupDownloadProgress.classList.remove("hidden");
-          setupDownloadFill.style.width = "0%";
-          setupDownloadPct.textContent = "0%";
-
-          var result = await window.electronAPI.downloadModel(m.id);
-          dlBtn.disabled = false;
-          if (result.error) {
-            dlBtn.textContent = "Failed";
-            setupStatus.textContent = "Error: " + result.error;
-          } else if (result.ok) {
-            dlBtn.textContent = result.alreadyExists
-              ? "Already downloaded"
-              : "Downloaded";
-            setupModelPath.value = result.path;
-            setupStatus.textContent = "Model ready at " + result.path;
-            setupDownloadProgress.classList.add("hidden");
-          }
-        });
-        row.appendChild(dlBtn);
-      }
-
-      setupDownloadList.appendChild(row);
-    }
-  } catch (e) {
-    setupDownloadList.innerHTML = "<p>Could not load model list.</p>";
-  }
-}
-
-window.electronAPI.onModelDownloadProgress(function (info) {
-  if (info.stage === "downloading") {
-    setupDownloadProgress.classList.remove("hidden");
-    setupDownloadFill.style.width = info.progress + "%";
-    setupDownloadPct.textContent = info.progress + "%";
-  } else if (info.stage === "done") {
-    setupDownloadProgress.classList.add("hidden");
-    setupStatus.textContent = "Download complete.";
-    renderDownloadList();
-  }
-});
-
-setupKey.addEventListener("blur", tryFetchModels);
-setupEndpoint.addEventListener("blur", tryFetchModels);
-
 function togglePanel() {
   chatOpen = !chatOpen;
   if (chatOpen) {
     window.electronAPI.resizeWindow(400, 550);
-    if (needsSetup) {
-      setupPanel.classList.remove("hidden");
-      chatPanel.classList.add("hidden");
-      updateProviderUI();
-    } else {
-      chatPanel.classList.remove("hidden");
-      setupPanel.classList.add("hidden");
-      setTimeout(function () {
-        chatInput.focus();
-        smoothScroll(chatMessages);
-      }, 150);
-    }
+    chatPanel.classList.remove("hidden");
+    setTimeout(function () {
+      chatInput.focus();
+      smoothScroll(chatMessages);
+    }, 150);
   } else {
     chatPanel.classList.add("hidden");
-    setupPanel.classList.add("hidden");
     window.electronAPI.resizeWindow(88, 88);
   }
-}
-
-setupSave.addEventListener("click", async () => {
-  var isLocal = setupProvider.value === "local";
-  var isOllama = setupProvider.value === "ollama";
-  var config = isLocal
-    ? {
-        provider: "local",
-        apiKey: "",
-        endpoint: "",
-        model: "local",
-        modelPath: setupModelPath.value.trim() || "",
-        contextSize: parseInt(setupContextSize.value) || 4096,
-        gpu: true,
-      }
-    : {
-        provider: setupProvider.value,
-        apiKey: setupKey.value.trim(),
-        endpoint: setupEndpoint.value.trim(),
-        model: setupModel.value.trim(),
-      };
-
-  if (isOllama) {
-    if (!config.endpoint) {
-      setupStatus.textContent = "Endpoint URL is required.";
-      return;
-    }
-    if (!config.model) {
-      setupStatus.textContent = "Select a model.";
-      return;
-    }
-  }
-
-  setupSave.disabled = true;
-  setupStatus.textContent = "Saving...";
-
-  try {
-    await window.electronAPI.saveConfig(config);
-    needsSetup = false;
-    setupStatus.textContent = "Saved! Restart the chat.";
-    setTimeout(() => {
-      setupPanel.classList.add("hidden");
-      chatPanel.classList.remove("hidden");
-      chatOpen = true;
-      setTimeout(() => chatInput.focus(), 150);
-    }, 600);
-  } catch (err) {
-    setupStatus.textContent = "Error: " + err.message;
-  } finally {
-    setupSave.disabled = false;
-  }
-});
-
-async function populateModels(cfg) {
-  try {
-    const models = await window.electronAPI.fetchModels(cfg);
-    setupModel.innerHTML = '<option value="">— select a model —</option>';
-    if (models.length === 0) {
-      setupStatus.textContent =
-        "No models returned. Check the endpoint and key.";
-      return;
-    }
-    for (const m of models) {
-      const opt = document.createElement("option");
-      opt.value = m;
-      opt.textContent = m;
-      setupModel.appendChild(opt);
-    }
-    setupStatus.textContent = `Found ${models.length} models.`;
-  } catch (err) {
-    setupStatus.textContent = "Failed to fetch models: " + err.message;
-  }
-}
-
-var chatModelsLoaded = false;
-
-function populateChatModel(current) {
-  chatModel.innerHTML = "";
-  if (current) {
-    var opt = document.createElement("option");
-    opt.value = current;
-    opt.textContent = current;
-    opt.selected = true;
-    chatModel.appendChild(opt);
-  }
-}
-
-async function loadChatModels() {
-  if (chatModelsLoaded) return;
-  var cfg = await window.electronAPI.getConfig();
-  if (!cfg) return;
-  if (cfg.provider !== "ollama") {
-    chatModel.innerHTML = "";
-    var opt = document.createElement("option");
-    opt.value = cfg.model || "local";
-    opt.textContent =
-      cfg.provider === "local" ? "Local Model" : cfg.model || "Model";
-    opt.selected = true;
-    chatModel.appendChild(opt);
-    chatModelsLoaded = true;
-    return;
-  }
-  try {
-    var models = await window.electronAPI.fetchModels({
-      endpoint: cfg.endpoint,
-    });
-    if (models.length === 0) return;
-    chatModelsLoaded = true;
-    var current = chatModel.value;
-    chatModel.innerHTML = "";
-    for (var i = 0; i < models.length; i++) {
-      var opt = document.createElement("option");
-      opt.value = models[i];
-      opt.textContent = models[i];
-      if (models[i] === current) opt.selected = true;
-      chatModel.appendChild(opt);
-    }
-  } catch (e) {}
 }
 
 avatar.addEventListener("click", (e) => {
@@ -771,7 +489,6 @@ avatar.addEventListener("contextmenu", function (e) {
 window.electronAPI.onOpenSettings(function () {
   if (!chatOpen) togglePanel();
   chatPanel.classList.add("hidden");
-  setupPanel.classList.add("hidden");
   themePanel.classList.add("hidden");
   settingsMenuPanel.classList.remove("hidden");
 });
@@ -832,7 +549,6 @@ burgerMenu.addEventListener("click", function (e) {
   } else if (action === "settings") {
     if (!chatOpen) togglePanel();
     chatPanel.classList.add("hidden");
-    setupPanel.classList.add("hidden");
     themePanel.classList.add("hidden");
     settingsMenuPanel.classList.remove("hidden");
   } else if (action === "quit") {
@@ -857,21 +573,7 @@ document
     if (!item) return;
     var action = item.dataset.action;
 
-    if (action === "provider") {
-      settingsMenuPanel.classList.add("hidden");
-      setupPanel.classList.remove("hidden");
-      window.electronAPI.getConfig().then(function (cfg) {
-        if (cfg) {
-          setupProvider.value = cfg.provider || "local";
-          setupEndpoint.value = cfg.endpoint || "";
-          setupModel.value = cfg.model || "";
-          setupModelPath.value = cfg.modelPath || "";
-          setupContextSize.value = cfg.contextSize || 4096;
-          updateProviderUI();
-        }
-      });
-      setupStatus.textContent = "Update your provider settings below.";
-    } else if (action === "theme") {
+    if (action === "theme") {
       settingsMenuPanel.classList.add("hidden");
       themePanel.classList.remove("hidden");
       renderThemeList();
@@ -987,16 +689,6 @@ resetThemeBtn.addEventListener("click", function () {
   window.electronAPI.resetActiveTheme();
 });
 
-closeSetupBtn.addEventListener("click", () => {
-  setupPanel.classList.add("hidden");
-  if (needsSetup) {
-    chatOpen = false;
-    window.electronAPI.resizeWindow(88, 88);
-  } else {
-    chatPanel.classList.remove("hidden");
-  }
-});
-
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (!chatListPanel.classList.contains("hidden")) {
@@ -1025,47 +717,59 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-window.electronAPI.hasConfig().then((has) => {
-  if (!has) {
-    needsSetup = true;
-    return;
+// --- Install Screen ---
+(async function initInstall() {
+  window.electronAPI.resizeWindow(320, 380);
+
+  window.electronAPI.onModelDownloadProgress(function (info) {
+    if (info.stage === "downloading") {
+      installProgressFill.style.width = info.progress + "%";
+      installPct.textContent = info.progress + "%";
+      if (info.total) {
+        var mb = (info.received / (1024 * 1024)).toFixed(0);
+        var totalMb = (info.total / (1024 * 1024)).toFixed(0);
+        installSize.textContent = mb + " MB / " + totalMb + " MB";
+      }
+    }
+  });
+
+  installScreen.classList.remove("hidden");
+  chatPanel.classList.add("hidden");
+  sendBtn.classList.add("hidden");
+
+  while (true) {
+    var result = await window.electronAPI.downloadModel("lfm2.5-8b");
+
+    if (result.ok) break;
+
+    installSubtitle.textContent =
+      "Download failed: " +
+      (result.error || "Unknown error") +
+      ". Retrying in 3s...";
+    await new Promise(function (r) {
+      return setTimeout(r, 3000);
+    });
+    installSubtitle.textContent = "Downloading LFM 2.5 8B model...";
   }
-  needsSetup = false;
-  window.electronAPI.getConfig().then(function (cfg) {
-    if (cfg && cfg.model) {
-      populateChatModel(cfg.model);
-    }
-    if (cfg && cfg.reasoningEffort) {
-      chatEffort.value = cfg.reasoningEffort;
-    }
-  });
-  chatEffort.addEventListener("change", function () {
-    window.electronAPI.saveEffort(chatEffort.value || undefined);
-  });
-  chatModel.addEventListener("change", function () {
-    window.electronAPI.saveModel(chatModel.value);
-  });
-  chatModel.addEventListener("focus", function () {
-    loadChatModels();
-  });
-  window.electronAPI.validateStoredConfig().then((result) => {
-    if (!result.valid) {
-      needsSetup = true;
-      setupStatus.textContent =
-        "Stored config is invalid: " + result.error + " — update it below.";
-      window.electronAPI.getConfig().then((cfg) => {
-        if (cfg) {
-          setupProvider.value = cfg.provider || "local";
-          setupEndpoint.value = cfg.endpoint || "";
-          setupModel.value = cfg.model || "";
-          setupModelPath.value = cfg.modelPath || "";
-          setupContextSize.value = cfg.contextSize || 4096;
-          updateProviderUI();
-        }
-      });
-    }
-  });
-});
+
+  var config = {
+    provider: "local",
+    model: "local",
+    modelPath: result.path,
+  };
+  await window.electronAPI.saveConfig(config);
+
+  installScreen.classList.add("hidden");
+  chatPanel.classList.remove("hidden");
+  sendBtn.classList.remove("hidden");
+  chatOpen = true;
+  window.electronAPI.resizeWindow(400, 550);
+
+  setTimeout(function () {
+    chatInput.focus();
+    smoothScroll(chatMessages);
+  }, 150);
+})();
 
 async function sendMessage() {
   var userText = chatInput.value.trim();

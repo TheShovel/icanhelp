@@ -7,36 +7,13 @@ const MODELS_DIR = path.join(os.homedir(), ".cache", "icanhelp", "models");
 
 const RECOMMENDED_MODELS = [
   {
-    id: "qwen2.5-3b",
-    name: "Qwen 2.5 3B Instruct",
-    size: "~2.0 GB",
-    description: "Excellent balance of capability and speed. Good tool use.",
-    url: "https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
-    filename: "Qwen2.5-3B-Instruct-Q4_K_M.gguf",
-  },
-  {
-    id: "llama3.2-3b",
-    name: "Llama 3.2 3B Instruct",
-    size: "~2.0 GB",
-    description: "Meta's latest small model with strong instruction following.",
-    url: "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-    filename: "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-  },
-  {
-    id: "phi-3-mini",
-    name: "Phi-3 Mini 4K Instruct",
-    size: "~2.2 GB",
-    description: "Microsoft's compact model with strong reasoning.",
-    url: "https://huggingface.co/bartowski/Phi-3-mini-4k-instruct-GGUF/resolve/main/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
-    filename: "Phi-3-mini-4k-instruct-Q4_K_M.gguf",
-  },
-  {
-    id: "mistral-7b",
-    name: "Mistral 7B Instruct v0.3",
-    size: "~4.4 GB",
-    description: "Larger model with strong general knowledge. Needs 6+ GB RAM.",
-    url: "https://huggingface.co/bartowski/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
-    filename: "Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
+    id: "lfm2.5-8b",
+    name: "LFM 2.5 8B MoE",
+    size: "~5.2 GB",
+    description:
+      "8B Mixture of Experts, 1B active. Fast with strong reasoning and tool use.",
+    url: "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B-GGUF/resolve/main/LFM2.5-8B-A1B-Q4_K_M.gguf",
+    filename: "LFM2.5-8B-A1B-Q4_K_M.gguf",
   },
 ];
 
@@ -92,56 +69,105 @@ async function downloadModel(modelId, onProgress) {
       if (onProgress) onProgress({ stage: "done", path: destPath });
       return { ok: true, path: destPath, alreadyExists: true };
     }
+    fs.unlinkSync(destPath);
   }
+
+  const partPath = destPath + ".part";
+  if (fs.existsSync(partPath)) fs.unlinkSync(partPath);
 
   if (onProgress) onProgress({ stage: "downloading", progress: 0 });
 
   try {
-    const response = await fetch(model.url, {
-      signal: AbortSignal.timeout(600000),
-    });
-
-    if (!response.ok) {
-      return { error: `Download failed: HTTP ${response.status}` };
-    }
-
-    const contentLength = parseInt(
-      response.headers.get("content-length") || "0",
+    const headRes = await fetch(model.url, { method: "HEAD" });
+    const totalSize = parseInt(
+      headRes.headers.get("content-length") || "0",
       10,
     );
-    const reader = response.body.getReader();
-    const writeStream = fs.createWriteStream(destPath);
-    let received = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      writeStream.write(value);
-      received += value.length;
-      if (onProgress && contentLength > 0) {
-        onProgress({
-          stage: "downloading",
-          progress: Math.round((received / contentLength) * 100),
-          received,
-          total: contentLength,
-        });
-      }
+    if (!totalSize) {
+      return { error: "Could not determine file size" };
     }
 
-    writeStream.end();
-    await new Promise(function (resolve, reject) {
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-    });
+    const chunks = 4;
+    const chunkSize = Math.ceil(totalSize / chunks);
+    const fd = fs.openSync(partPath, "w");
+    fs.ftruncateSync(fd, totalSize);
+    fs.closeSync(fd);
+
+    let totalReceived = 0;
+
+    const downloads = [];
+    for (let i = 0; i < chunks; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize - 1, totalSize - 1);
+      if (start >= totalSize) break;
+
+      downloads.push(
+        downloadChunk(model.url, partPath, start, end, i, function (received) {
+          totalReceived += received;
+          if (onProgress) {
+            onProgress({
+              stage: "downloading",
+              progress: Math.round((totalReceived / totalSize) * 100),
+              received: totalReceived,
+              total: totalSize,
+            });
+          }
+        }),
+      );
+    }
+
+    await Promise.all(downloads);
+
+    const stat = fs.statSync(partPath);
+    if (stat.size !== totalSize) {
+      try {
+        fs.unlinkSync(partPath);
+      } catch (_) {}
+      return { error: "Download incomplete. File size mismatch." };
+    }
+
+    fs.renameSync(partPath, destPath);
 
     if (onProgress) onProgress({ stage: "done", path: destPath });
     return { ok: true, path: destPath };
   } catch (e) {
     try {
-      fs.unlinkSync(destPath);
+      fs.unlinkSync(partPath);
     } catch (_) {}
     return { error: `Download failed: ${e.message}` };
   }
+}
+
+async function downloadChunk(
+  url,
+  partPath,
+  start,
+  end,
+  index,
+  onChunkReceived,
+) {
+  const res = await fetch(url, {
+    headers: { Range: `bytes=${start}-${end}` },
+    signal: AbortSignal.timeout(600000),
+  });
+
+  if (!res.ok && res.status !== 206) {
+    throw new Error(`Chunk ${index} failed: HTTP ${res.status}`);
+  }
+
+  const reader = res.body.getReader();
+  const fd = fs.openSync(partPath, "r+");
+  let offset = start;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    fs.writeSync(fd, value, 0, value.length, offset);
+    offset += value.length;
+    onChunkReceived(value.length);
+  }
+
+  fs.closeSync(fd);
 }
 
 module.exports = {

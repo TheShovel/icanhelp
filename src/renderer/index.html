@@ -8,10 +8,23 @@
     </head>
     <body>
         <div id="app">
+            <div id="install-screen">
+                <div id="install-content">
+                    <img id="install-avatar" src="" alt="" draggable="false" />
+                    <div id="install-spinner"></div>
+                    <p id="install-title">Setting up your assistant</p>
+                    <p id="install-subtitle">Downloading LFM 2.5 8B model...</p>
+                    <div id="install-progress-bar">
+                        <div id="install-progress-fill"></div>
+                    </div>
+                    <span id="install-pct">0%</span>
+                    <span id="install-size"></span>
+                </div>
+            </div>
+
             <div id="chat-panel" class="hidden">
                 <div id="chat-panel-header">
                     <span id="chat-panel-title">Chat</span>
-                    <select id="chat-model" title="Model"></select>
                     <select id="chat-effort" title="Reasoning effort">
                         <option value="">Auto</option>
                         <option value="low">Low</option>
@@ -68,7 +81,6 @@
                         id="chat-input"
                         placeholder="Ask me anything..."
                     />
-
                     <button
                         id="send-btn"
                         class="btn-icon"
@@ -112,12 +124,6 @@
                     ></button>
                 </div>
                 <div id="settings-menu-body">
-                    <button class="settings-menu-item" data-action="provider">
-                        <span>Provider</span>
-                        <span class="settings-menu-hint"
-                            >LLM configuration</span
-                        >
-                    </button>
                     <button class="settings-menu-item" data-action="theme">
                         <span>Theme</span>
                         <span class="settings-menu-hint"
@@ -158,85 +164,6 @@
                 </div>
             </div>
 
-            <div id="setup-panel" class="hidden">
-                <div id="setup-header">
-                    <span>Configure LLM Provider</span>
-                    <button
-                        id="close-setup"
-                        class="btn-icon"
-                        title="Back to chat"
-                    ></button>
-                </div>
-                <div id="setup-body">
-                    <label>
-                        Provider
-                        <select id="setup-provider">
-                            <option value="local">Local (built-in)</option>
-                            <option value="ollama">Ollama</option>
-                        </select>
-                    </label>
-                    <label id="setup-key-label" class="hidden">
-                        API Key
-                        <input
-                            type="password"
-                            id="setup-key"
-                            placeholder="sk-or-v1-..."
-                        />
-                    </label>
-                    <label id="setup-endpoint-label" class="hidden">
-                        Endpoint URL
-                        <input
-                            type="text"
-                            id="setup-endpoint"
-                            placeholder="http://localhost:11434/v1"
-                        />
-                    </label>
-                    <label id="setup-model-label" class="hidden">
-                        Model
-                        <select id="setup-model">
-                            <option value="">
-                                — enter API key to load models —
-                            </option>
-                        </select>
-                    </label>
-                    <div id="setup-local-config" class="hidden">
-                        <label>
-                            Model File
-                            <input
-                                type="text"
-                                id="setup-model-path"
-                                placeholder="~/.cache/icanhelp/models/model.gguf"
-                            />
-                        </label>
-                        <label id="setup-context-size-label">
-                            Context Size
-                            <input
-                                type="number"
-                                id="setup-context-size"
-                                value="4096"
-                                min="512"
-                                max="32768"
-                                step="512"
-                            />
-                        </label>
-                        <div id="setup-download-section">
-                            <p id="setup-download-title">Download a model</p>
-                            <div id="setup-download-list"></div>
-                            <div id="setup-download-progress" class="hidden">
-                                <div id="setup-download-bar">
-                                    <div id="setup-download-fill"></div>
-                                </div>
-                                <span id="setup-download-pct"></span>
-                            </div>
-                        </div>
-                    </div>
-                    <button id="setup-save" class="btn-primary">
-                        Save &amp; Start
-                    </button>
-                    <p id="setup-status"></p>
-                </div>
-            </div>
-
             <div id="avatar" title="Click to ask me anything">
                 <img id="avatar-inner" src="" alt="" draggable="false" />
             </div>
@@ -268,9 +195,7 @@
 
             <div id="confirm-overlay" class="hidden">
                 <div id="confirm-dialog">
-                    <div id="confirm-header">
-                        <span>Confirm Command</span>
-                    </div>
+                    <div id="confirm-header"><span>Confirm Command</span></div>
                     <div id="confirm-body">
                         <p id="confirm-message">Run the following command?</p>
                         <pre id="confirm-command"></pre>
