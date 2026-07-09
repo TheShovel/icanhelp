@@ -1,6 +1,12 @@
 const { runBash } = require("./bash");
 const { readFile, writeFile, listDirectory } = require("./fs");
 const { ocrImage } = require("../ocr");
+const {
+  addKnowledge,
+  searchKnowledge,
+  listKnowledge,
+  clearKnowledge,
+} = require("../rag");
 
 async function searchWeb({ query, resultSize }) {
   try {
@@ -215,6 +221,68 @@ var tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "store_knowledge",
+      description:
+        "Store information in the local knowledge base for later retrieval. Use this to remember facts, instructions, code snippets, or any information the user wants to keep. The knowledge is automatically chunked and embedded for semantic search.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "The information to store",
+          },
+          metadata: {
+            type: "object",
+            description: "Optional metadata like source, category, or tags",
+          },
+        },
+        required: ["text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_knowledge",
+      description:
+        "Search the local knowledge base for information matching the query. Returns the most relevant stored entries with similarity scores.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "What to search for in the knowledge base",
+          },
+          k: {
+            type: "number",
+            description: "Number of results to return (default 5)",
+            default: 5,
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_knowledge",
+      description:
+        "Get statistics about the knowledge base: total entries and breakdown by source.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "clear_knowledge",
+      description: "Delete all entries from the knowledge base.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];
 
 var handlers = {
@@ -228,6 +296,10 @@ var handlers = {
   list_themes: listThemesStub,
   delete_theme: deleteThemeStub,
   apply_theme: applyThemeStub,
+  store_knowledge: addKnowledge,
+  search_knowledge: searchKnowledge,
+  list_knowledge: listKnowledge,
+  clear_knowledge: clearKnowledge,
 };
 
 async function executeToolCall(toolCall, opts) {

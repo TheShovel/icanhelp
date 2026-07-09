@@ -35,6 +35,18 @@ const attachBtn = document.getElementById("attach-btn");
 const attachmentPreview = document.getElementById("attachment-preview");
 const attachmentName = document.getElementById("attachment-name");
 const removeAttachment = document.getElementById("remove-attachment");
+const setupLocalConfig = document.getElementById("setup-local-config");
+const setupModelPath = document.getElementById("setup-model-path");
+const setupContextSize = document.getElementById("setup-context-size");
+const setupDownloadList = document.getElementById("setup-download-list");
+const setupDownloadProgress = document.getElementById(
+  "setup-download-progress",
+);
+const setupDownloadFill = document.getElementById("setup-download-fill");
+const setupDownloadPct = document.getElementById("setup-download-pct");
+const setupKeyLabel = document.getElementById("setup-key-label");
+const setupEndpointLabel = document.getElementById("setup-endpoint-label");
+const setupModelLabel = document.getElementById("setup-model-label");
 
 avatarInner.src = window.electronAPI.buddyArt("idle");
 document.getElementById("close-setup").innerHTML = iconSvg("close", 16);
@@ -416,7 +428,7 @@ function switchToChat(chatId) {
       addMessage(m.content, m.role, m.attachment);
     }
     requestAnimationFrame(function () {
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+      smoothScroll(chatMessages);
     });
   }
 
@@ -449,7 +461,7 @@ window.electronAPI.loadChats().then(function (loaded) {
       addMessage(m.content, m.role, m.attachment);
     }
     requestAnimationFrame(function () {
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+      smoothScroll(chatMessages);
     });
   }
   sendBtn.classList.remove("hidden");
@@ -466,40 +478,140 @@ document
   .addEventListener("click", closeChatList);
 
 const providerDefaults = {
-  openrouter: {
-    endpoint: "https://openrouter.ai/api/v1",
-    model: "gpt-4o-mini",
-  },
-  openai: {
-    endpoint: "https://api.openai.com/v1",
-    model: "gpt-4o-mini",
+  local: {
+    endpoint: "",
+    model: "local",
   },
   ollama: {
     endpoint: "http://localhost:11434/v1",
     model: "llama3.2",
   },
-  opencode: {
-    endpoint: "https://opencode.ai/zen/go/v1",
-    model: "",
-  },
 };
 
 function tryFetchModels() {
-  const key = setupKey.value.trim();
-  const ep = setupEndpoint.value.trim();
-  if (!key || !ep) return;
+  if (setupProvider.value !== "ollama") return;
+  var ep = setupEndpoint.value.trim();
+  if (!ep) return;
   setupStatus.textContent = "Fetching models...";
-  populateModels({ apiKey: key, endpoint: ep });
+  populateModels({ endpoint: ep });
+}
+
+function updateProviderUI() {
+  var isLocal = setupProvider.value === "local";
+  var isOllama = setupProvider.value === "ollama";
+  setupKeyLabel.classList.toggle("hidden", !isOllama);
+  setupEndpointLabel.classList.toggle("hidden", isLocal);
+  setupModelLabel.classList.toggle("hidden", !isOllama);
+  setupLocalConfig.classList.toggle("hidden", !isLocal);
+  if (isLocal) {
+    setupStatus.textContent = "Select or download a model below.";
+    renderDownloadList();
+  } else if (isOllama) {
+    setupStatus.textContent = "Enter your Ollama endpoint.";
+  }
 }
 
 setupProvider.addEventListener("change", () => {
-  const preset = providerDefaults[setupProvider.value];
+  var preset = providerDefaults[setupProvider.value];
   if (preset) {
     setupEndpoint.value = preset.endpoint;
+    setupModel.value = preset.model;
   }
-  setupModel.innerHTML =
-    '<option value="">— enter API key to load models —</option>';
-  tryFetchModels();
+  if (setupProvider.value === "ollama") {
+    setupModel.innerHTML =
+      '<option value="">— enter API key to load models —</option>';
+    tryFetchModels();
+  }
+  updateProviderUI();
+});
+
+async function renderDownloadList() {
+  setupDownloadList.innerHTML = "";
+  try {
+    var models = await window.electronAPI.getRecommendedModels();
+    var downloaded = await window.electronAPI.listDownloadedModels();
+    var downloadedNames = downloaded.map(function (d) {
+      return d.filename;
+    });
+
+    for (const m of models) {
+      var row = document.createElement("div");
+      row.className = "download-model-row";
+
+      var info = document.createElement("div");
+      info.className = "download-model-info";
+
+      var nameEl = document.createElement("span");
+      nameEl.className = "download-model-name";
+      nameEl.textContent = m.name;
+
+      var metaEl = document.createElement("span");
+      metaEl.className = "download-model-meta";
+      metaEl.textContent = m.size + " — " + m.description;
+
+      info.appendChild(nameEl);
+      info.appendChild(metaEl);
+      row.appendChild(info);
+
+      var isDownloaded = downloadedNames.indexOf(m.filename) !== -1;
+      const downloadedModel = downloaded.find(function (d) {
+        return d.filename === m.filename;
+      });
+
+      if (isDownloaded && downloadedModel) {
+        const useBtn = document.createElement("button");
+        useBtn.className = "download-model-btn";
+        useBtn.textContent = "Use (" + downloadedModel.sizeMB + " MB)";
+        useBtn.addEventListener("click", function () {
+          setupModelPath.value = downloadedModel.path;
+          setupStatus.textContent = "Model set to " + m.filename;
+        });
+        row.appendChild(useBtn);
+      } else {
+        const dlBtn = document.createElement("button");
+        dlBtn.className = "download-model-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.addEventListener("click", async function () {
+          dlBtn.disabled = true;
+          dlBtn.textContent = "Starting...";
+          setupDownloadProgress.classList.remove("hidden");
+          setupDownloadFill.style.width = "0%";
+          setupDownloadPct.textContent = "0%";
+
+          var result = await window.electronAPI.downloadModel(m.id);
+          dlBtn.disabled = false;
+          if (result.error) {
+            dlBtn.textContent = "Failed";
+            setupStatus.textContent = "Error: " + result.error;
+          } else if (result.ok) {
+            dlBtn.textContent = result.alreadyExists
+              ? "Already downloaded"
+              : "Downloaded";
+            setupModelPath.value = result.path;
+            setupStatus.textContent = "Model ready at " + result.path;
+            setupDownloadProgress.classList.add("hidden");
+          }
+        });
+        row.appendChild(dlBtn);
+      }
+
+      setupDownloadList.appendChild(row);
+    }
+  } catch (e) {
+    setupDownloadList.innerHTML = "<p>Could not load model list.</p>";
+  }
+}
+
+window.electronAPI.onModelDownloadProgress(function (info) {
+  if (info.stage === "downloading") {
+    setupDownloadProgress.classList.remove("hidden");
+    setupDownloadFill.style.width = info.progress + "%";
+    setupDownloadPct.textContent = info.progress + "%";
+  } else if (info.stage === "done") {
+    setupDownloadProgress.classList.add("hidden");
+    setupStatus.textContent = "Download complete.";
+    renderDownloadList();
+  }
 });
 
 setupKey.addEventListener("blur", tryFetchModels);
@@ -512,12 +624,13 @@ function togglePanel() {
     if (needsSetup) {
       setupPanel.classList.remove("hidden");
       chatPanel.classList.add("hidden");
+      updateProviderUI();
     } else {
       chatPanel.classList.remove("hidden");
       setupPanel.classList.add("hidden");
       setTimeout(function () {
         chatInput.focus();
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        smoothScroll(chatMessages);
       }, 150);
     }
   } else {
@@ -528,24 +641,34 @@ function togglePanel() {
 }
 
 setupSave.addEventListener("click", async () => {
-  const config = {
-    provider: setupProvider.value,
-    apiKey: setupKey.value.trim(),
-    endpoint: setupEndpoint.value.trim(),
-    model: setupModel.value.trim(),
-  };
+  var isLocal = setupProvider.value === "local";
+  var isOllama = setupProvider.value === "ollama";
+  var config = isLocal
+    ? {
+        provider: "local",
+        apiKey: "",
+        endpoint: "",
+        model: "local",
+        modelPath: setupModelPath.value.trim() || "",
+        contextSize: parseInt(setupContextSize.value) || 4096,
+        gpu: true,
+      }
+    : {
+        provider: setupProvider.value,
+        apiKey: setupKey.value.trim(),
+        endpoint: setupEndpoint.value.trim(),
+        model: setupModel.value.trim(),
+      };
 
-  if (!config.apiKey) {
-    setupStatus.textContent = "API key is required.";
-    return;
-  }
-  if (!config.endpoint) {
-    setupStatus.textContent = "Endpoint URL is required.";
-    return;
-  }
-  if (!config.model) {
-    setupStatus.textContent = "Select a model.";
-    return;
+  if (isOllama) {
+    if (!config.endpoint) {
+      setupStatus.textContent = "Endpoint URL is required.";
+      return;
+    }
+    if (!config.model) {
+      setupStatus.textContent = "Select a model.";
+      return;
+    }
   }
 
   setupSave.disabled = true;
@@ -606,8 +729,21 @@ async function loadChatModels() {
   if (chatModelsLoaded) return;
   var cfg = await window.electronAPI.getConfig();
   if (!cfg) return;
+  if (cfg.provider !== "ollama") {
+    chatModel.innerHTML = "";
+    var opt = document.createElement("option");
+    opt.value = cfg.model || "local";
+    opt.textContent =
+      cfg.provider === "local" ? "Local Model" : cfg.model || "Model";
+    opt.selected = true;
+    chatModel.appendChild(opt);
+    chatModelsLoaded = true;
+    return;
+  }
   try {
-    var models = await window.electronAPI.fetchModels(cfg);
+    var models = await window.electronAPI.fetchModels({
+      endpoint: cfg.endpoint,
+    });
     if (models.length === 0) return;
     chatModelsLoaded = true;
     var current = chatModel.value;
@@ -726,9 +862,12 @@ document
       setupPanel.classList.remove("hidden");
       window.electronAPI.getConfig().then(function (cfg) {
         if (cfg) {
-          setupProvider.value = cfg.provider || "opencode";
+          setupProvider.value = cfg.provider || "local";
           setupEndpoint.value = cfg.endpoint || "";
           setupModel.value = cfg.model || "";
+          setupModelPath.value = cfg.modelPath || "";
+          setupContextSize.value = cfg.contextSize || 4096;
+          updateProviderUI();
         }
       });
       setupStatus.textContent = "Update your provider settings below.";
@@ -736,6 +875,40 @@ document
       settingsMenuPanel.classList.add("hidden");
       themePanel.classList.remove("hidden");
       renderThemeList();
+    } else if (action === "reset") {
+      if (item.dataset.confirmed !== "true") {
+        item.dataset.confirmed = "true";
+        item.querySelector("span:first-child").textContent = "Confirm Reset";
+        item.querySelector(".settings-menu-hint").textContent =
+          "Click again to wipe everything. This cannot be undone.";
+        setTimeout(function () {
+          if (item.dataset.confirmed === "true") {
+            delete item.dataset.confirmed;
+            item.querySelector("span:first-child").textContent =
+              "Reset All Data";
+            item.querySelector(".settings-menu-hint").textContent =
+              "Wipe config, models, knowledge base, and chats";
+          }
+        }, 5000);
+      } else {
+        delete item.dataset.confirmed;
+        item.querySelector("span:first-child").textContent = "Resetting...";
+        item.querySelector(".settings-menu-hint").textContent = "";
+        item.style.pointerEvents = "none";
+        item.style.opacity = "0.5";
+        window.electronAPI.resetAllData().then(function (result) {
+          if (result.ok) {
+            window.electronAPI.quitApp();
+          } else {
+            item.querySelector("span:first-child").textContent = "Reset Failed";
+            item.querySelector(".settings-menu-hint").textContent = (
+              result.errors || ["Unknown error"]
+            ).join(", ");
+            item.style.pointerEvents = "";
+            item.style.opacity = "";
+          }
+        });
+      }
     }
   });
 
@@ -882,9 +1055,12 @@ window.electronAPI.hasConfig().then((has) => {
         "Stored config is invalid: " + result.error + " — update it below.";
       window.electronAPI.getConfig().then((cfg) => {
         if (cfg) {
-          setupProvider.value = cfg.provider || "opencode";
+          setupProvider.value = cfg.provider || "local";
           setupEndpoint.value = cfg.endpoint || "";
           setupModel.value = cfg.model || "";
+          setupModelPath.value = cfg.modelPath || "";
+          setupContextSize.value = cfg.contextSize || 4096;
+          updateProviderUI();
         }
       });
     }
@@ -935,7 +1111,14 @@ async function sendMessage() {
       sendBtn.classList.remove("hidden");
       cancelBtn.classList.add("hidden");
     }
-    if (!msgEl && (chunk.text || chunk.thinking || chunk.error || chunk.done)) {
+    if (
+      !msgEl &&
+      (chunk.text ||
+        chunk.thinking ||
+        chunk.replaceText !== undefined ||
+        chunk.error ||
+        chunk.done)
+    ) {
       hideTyping();
       var el = createAssistantMessage();
       msgEl = el;
@@ -1034,7 +1217,7 @@ async function sendMessage() {
       toolBlock.appendChild(toolHeader);
       toolBlock.appendChild(toolContent);
       bubble.insertBefore(toolBlock, responseContent);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+      smoothScroll(chatMessages);
       return;
     }
 
@@ -1050,7 +1233,7 @@ async function sendMessage() {
           if (tb) tb.classList.add("collapsed");
         }, 800);
       }
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+      smoothScroll(chatMessages);
       return;
     }
 
@@ -1061,19 +1244,34 @@ async function sendMessage() {
       thinkingBlock.classList.add("has-thinking");
       thinkingContent.textContent = thinkingBuf;
       thinkingBlock.classList.remove("collapsed");
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+      smoothScroll(chatMessages);
     }
 
-    if (chunk.text) {
+    if (chunk.replaceText !== undefined) {
       setAvatarState("talking");
-      buffer += chunk.text;
+      buffer = chunk.replaceText;
       renderStreamedContent(
         bubble,
         buffer,
         thinkingBlock,
         thinkingContent,
         responseContent,
-      ).then(function () {});
+      );
+    } else if (chunk.text) {
+      setAvatarState("talking");
+      buffer += chunk.text;
+      buffer = buffer.replace(
+        /\n?FUNCTION:[^\n]*\n(?:ARG [^\n]*\n)*END_FUNCTION\b\n?/g,
+        "",
+      );
+      buffer = buffer.replace(/\nFUNCTION:[^\n]*(?:\nARG [^\n]*)*$/g, "");
+      renderStreamedContent(
+        bubble,
+        buffer,
+        thinkingBlock,
+        thinkingContent,
+        responseContent,
+      );
     }
   });
 
@@ -1109,7 +1307,7 @@ function createAssistantMessage() {
   bubble.appendChild(rc);
   div.appendChild(bubble);
   chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  smoothScroll(chatMessages);
 
   return div;
 }
@@ -1166,16 +1364,21 @@ async function renderStreamedContent(
   }
 
   if (parsed.response) {
-    responseContent.innerHTML = "";
-    await renderContent(responseContent, parsed.response);
+    responseContent.innerHTML = await window.electronAPI.parseMarkdown(
+      parsed.response,
+    );
   }
 
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  smoothScroll(chatMessages);
+}
+
+function smoothScroll(el) {
+  el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
 }
 
 function showTyping() {
   typingIndicator.classList.remove("hidden");
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  smoothScroll(chatMessages);
   setAvatarState("thinking");
 }
 
@@ -1209,7 +1412,7 @@ async function addMessage(text, role, attachment) {
   div.appendChild(bubble);
   chatMessages.appendChild(div);
   requestAnimationFrame(() => {
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    smoothScroll(chatMessages);
   });
 }
 

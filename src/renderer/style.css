@@ -1346,6 +1346,17 @@ body {
     font-size: 11px;
     color: var(--fg-muted);
 }
+.settings-menu-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 6px;
+}
+.settings-menu-item-danger span:first-child {
+    color: var(--danger);
+}
+.settings-menu-item-danger:hover {
+    background: rgba(192, 28, 40, 0.08);
+}
 
 /* ---- Theme Panel ---- */
 #theme-panel {
@@ -1486,4 +1497,107 @@ body {
 }
 .attach-menu-item:hover {
     background: var(--bg-hover);
+}
+
+#setup-local-config {
+    margin-top: 8px;
+}
+#setup-local-config label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--fg-dim);
+}
+#setup-local-config input[type="text"],
+#setup-local-config input[type="number"] {
+    width: 100%;
+    padding: 6px 10px;
+    margin-top: 3px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-input);
+    color: var(--fg);
+    font-size: 13px;
+    font-family: inherit;
+}
+#setup-download-section {
+    margin-top: 12px;
+}
+#setup-download-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-dim);
+    margin-bottom: 6px;
+}
+.download-model-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+.download-model-info {
+    flex: 1;
+    min-width: 0;
+}
+.download-model-name {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg);
+}
+.download-model-meta {
+    display: block;
+    font-size: 11px;
+    color: var(--fg-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.download-model-btn {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--fg);
+    cursor: pointer;
+    font-family: inherit;
+}
+.download-model-btn:hover {
+    background: var(--bg-hover);
+}
+.download-model-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+#setup-download-progress {
+    margin-top: 8px;
+}
+#setup-download-progress.hidden {
+    display: none;
+}
+#setup-download-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+#setup-download-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+#setup-download-pct {
+    font-size: 11px;
+    color: var(--fg-muted);
+    margin-top: 2px;
+    display: block;
+    text-align: right;
 }

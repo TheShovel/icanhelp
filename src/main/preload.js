@@ -61,4 +61,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   applyTheme: (name) => ipcRenderer.invoke("apply-theme", name),
   loadActiveTheme: () => ipcRenderer.invoke("load-active-theme"),
   resetActiveTheme: () => ipcRenderer.invoke("reset-active-theme"),
+  getRecommendedModels: () => ipcRenderer.invoke("get-recommended-models"),
+  listDownloadedModels: () => ipcRenderer.invoke("list-downloaded-models"),
+  downloadModel: (modelId) => ipcRenderer.invoke("download-model", modelId),
+  deleteModel: (filename) => ipcRenderer.invoke("delete-model", filename),
+  onModelDownloadProgress: (callback) => {
+    const handler = (_event, info) => callback(info);
+    ipcRenderer.on("model-download-progress", handler);
+    return () => ipcRenderer.removeListener("model-download-progress", handler);
+  },
+  resetAllData: () => ipcRenderer.invoke("reset-all-data"),
 });

@@ -2,42 +2,28 @@ const { loadConfig } = require("./store");
 const { tools, executeToolCall } = require("./tools/registry");
 
 const defaults = {
-  provider: "openrouter",
-  model: "gpt-4o-mini",
-  endpoint: "https://openrouter.ai/api/v1",
+  provider: "local",
+  model: "local",
+  endpoint: "http://localhost:11434/v1",
+  modelPath: "",
+  gpu: true,
+  contextSize: 4096,
 };
 
 async function validateConfig(config) {
-  if (config.provider === "ollama") {
-    try {
-      const res = await fetch(`${config.endpoint}/tags`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      return res.ok
-        ? { valid: true }
-        : { valid: false, error: `Ollama returned status ${res.status}` };
-    } catch (e) {
-      return {
-        valid: false,
-        error: `Cannot reach Ollama at ${config.endpoint}`,
-      };
-    }
-  }
+  if (config.provider !== "ollama") return { valid: true };
 
   try {
-    const res = await fetch(`${config.endpoint}/models`, {
-      headers: { Authorization: `Bearer ${config.apiKey}` },
-      signal: AbortSignal.timeout(8000),
+    const res = await fetch(`${config.endpoint}/tags`, {
+      signal: AbortSignal.timeout(5000),
     });
-    if (res.ok) return { valid: true };
-    if (res.status === 401 || res.status === 403) {
-      return { valid: false, error: "API key is invalid or unauthorized" };
-    }
-    return { valid: false, error: `Endpoint returned status ${res.status}` };
+    return res.ok
+      ? { valid: true }
+      : { valid: false, error: `Ollama returned status ${res.status}` };
   } catch (e) {
     return {
       valid: false,
-      error: `Cannot reach ${config.endpoint} — check the URL`,
+      error: `Cannot reach Ollama at ${config.endpoint}`,
     };
   }
 }
@@ -69,7 +55,7 @@ function buildConfig() {
 
 async function streamLLM(messages, effort, signal) {
   const config = buildConfig();
-  if (!config.apiKey) return null;
+  if (config.provider !== "ollama") return null;
 
   var reasoningEffort = effort || config.reasoningEffort || undefined;
   var body = {
@@ -87,6 +73,7 @@ async function streamLLM(messages, effort, signal) {
           "- Read, write, and list files via the file tools\n" +
           "- Analyze NEW images via the ocr_image tool (extracts text and describes visual content)\n" +
           "- Search the web via the search_web tool\n" +
+          "- Store and retrieve information via the knowledge tools\n" +
           "- Answer questions and solve problems\n\n" +
           "RULES:\n" +
           "- Never use emojis or emoticons in your responses. Use plain text only.\n" +
@@ -103,7 +90,7 @@ async function streamLLM(messages, effort, signal) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
+      Authorization: `Bearer ${config.apiKey || "ollama"}`,
     },
     body: JSON.stringify(body),
   };

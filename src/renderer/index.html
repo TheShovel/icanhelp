@@ -115,13 +115,24 @@
                     <button class="settings-menu-item" data-action="provider">
                         <span>Provider</span>
                         <span class="settings-menu-hint"
-                            >LLM API configuration</span
+                            >LLM configuration</span
                         >
                     </button>
                     <button class="settings-menu-item" data-action="theme">
                         <span>Theme</span>
                         <span class="settings-menu-hint"
                             >Customize appearance</span
+                        >
+                    </button>
+                    <div class="settings-menu-separator"></div>
+                    <button
+                        class="settings-menu-item settings-menu-item-danger"
+                        data-action="reset"
+                    >
+                        <span>Reset All Data</span>
+                        <span class="settings-menu-hint"
+                            >Wipe config, models, knowledge base, and
+                            chats</span
                         >
                     </button>
                 </div>
@@ -160,13 +171,11 @@
                     <label>
                         Provider
                         <select id="setup-provider">
-                            <option value="opencode">OpenCode</option>
-                            <option value="openrouter">OpenRouter</option>
-                            <option value="openai">OpenAI</option>
-                            <option value="ollama">Ollama (local)</option>
+                            <option value="local">Local (built-in)</option>
+                            <option value="ollama">Ollama</option>
                         </select>
                     </label>
-                    <label>
+                    <label id="setup-key-label" class="hidden">
                         API Key
                         <input
                             type="password"
@@ -174,15 +183,15 @@
                             placeholder="sk-or-v1-..."
                         />
                     </label>
-                    <label>
+                    <label id="setup-endpoint-label" class="hidden">
                         Endpoint URL
                         <input
                             type="text"
                             id="setup-endpoint"
-                            placeholder="https://openrouter.ai/api/v1"
+                            placeholder="http://localhost:11434/v1"
                         />
                     </label>
-                    <label>
+                    <label id="setup-model-label" class="hidden">
                         Model
                         <select id="setup-model">
                             <option value="">
@@ -190,6 +199,37 @@
                             </option>
                         </select>
                     </label>
+                    <div id="setup-local-config" class="hidden">
+                        <label>
+                            Model File
+                            <input
+                                type="text"
+                                id="setup-model-path"
+                                placeholder="~/.cache/icanhelp/models/model.gguf"
+                            />
+                        </label>
+                        <label id="setup-context-size-label">
+                            Context Size
+                            <input
+                                type="number"
+                                id="setup-context-size"
+                                value="4096"
+                                min="512"
+                                max="32768"
+                                step="512"
+                            />
+                        </label>
+                        <div id="setup-download-section">
+                            <p id="setup-download-title">Download a model</p>
+                            <div id="setup-download-list"></div>
+                            <div id="setup-download-progress" class="hidden">
+                                <div id="setup-download-bar">
+                                    <div id="setup-download-fill"></div>
+                                </div>
+                                <span id="setup-download-pct"></span>
+                            </div>
+                        </div>
+                    </div>
                     <button id="setup-save" class="btn-primary">
                         Save &amp; Start
                     </button>

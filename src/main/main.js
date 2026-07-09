@@ -14,6 +14,13 @@ const os = require("os");
 const { execFile } = require("child_process");
 const { marked } = require("marked");
 const { streamLLM, validateConfig, fetchModels } = require("./llm");
+const { runLocalChatLoop } = require("./llm-local");
+const {
+  RECOMMENDED_MODELS,
+  listDownloadedModels,
+  deleteModel,
+  downloadModel,
+} = require("./model-manager");
 const {
   loadConfig,
   saveConfig,
@@ -150,16 +157,140 @@ function createWindow() {
 
   ipcMain.on("start-llm-stream", function (event, payload) {
     currentAbort = new AbortController();
-    runLLMLoop(
-      event,
-      payload.messages,
-      payload.effort,
-      currentAbort.signal,
-    ).catch(function (err) {
-      event.sender.send("llm-chunk", { error: err.message });
-      event.sender.send("llm-chunk", { done: true });
-    });
+    var cfg = loadConfig() || {};
+    console.log(
+      "[main] start-llm-stream, provider:",
+      cfg.provider,
+      "modelPath:",
+      cfg.modelPath,
+    );
+    if (cfg.provider === "local") {
+      runLocalLLMLoop(
+        event,
+        payload.messages,
+        payload.effort,
+        currentAbort.signal,
+      ).catch(function (err) {
+        event.sender.send("llm-chunk", { error: err.message });
+        event.sender.send("llm-chunk", { done: true });
+      });
+    } else {
+      runLLMLoop(
+        event,
+        payload.messages,
+        payload.effort,
+        currentAbort.signal,
+      ).catch(function (err) {
+        event.sender.send("llm-chunk", { error: err.message });
+        event.sender.send("llm-chunk", { done: true });
+      });
+    }
   });
+
+  async function runLocalLLMLoop(event, messages, effort, signal) {
+    if (signal && signal.aborted) return;
+    var cfg = loadConfig() || {};
+    const { tools } = require("./tools/registry");
+    const { executeToolCall } = require("./tools/registry");
+
+    var pendingConfirm = null;
+
+    await runLocalChatLoop({
+      modelPath: cfg.modelPath,
+      messages: messages,
+      tools: tools,
+      config: cfg,
+      signal: signal,
+      onChunk: function (chunk) {
+        if (chunk.error) {
+          console.log("[main] LLM error:", chunk.error);
+          event.sender.send("llm-chunk", { error: chunk.error });
+        }
+        if (chunk.text) event.sender.send("llm-chunk", { text: chunk.text });
+        if (chunk.thinking)
+          event.sender.send("llm-chunk", { thinking: chunk.thinking });
+        if (chunk.replaceText !== undefined)
+          event.sender.send("llm-chunk", { replaceText: chunk.replaceText });
+      },
+      onToolStart: function (info) {
+        console.log("[main] tool_start:", info.name, JSON.stringify(info.args));
+        event.sender.send("llm-chunk", {
+          tool_start: { name: info.name, args: info.args },
+        });
+      },
+      onToolEnd: function (info) {
+        console.log(
+          "[main] tool_end:",
+          info.name,
+          "output len:",
+          info.output.length,
+        );
+        event.sender.send("llm-chunk", {
+          tool_end: { name: info.name, output: info.output },
+        });
+      },
+      executeTool: async function (name, args) {
+        var tc = {
+          id: "local-" + Date.now(),
+          function: { name: name, arguments: JSON.stringify(args) },
+        };
+
+        var onSudoPrompt = async function () {
+          return await requestSudoPassword(event);
+        };
+        var onConfirm = async function (cmd) {
+          event.sender.send("llm-chunk", {
+            confirm_prompt: { command: cmd },
+          });
+          return await new Promise(function (resolve) {
+            pendingConfirm = resolve;
+          });
+        };
+
+        var result = await executeToolCall(tc, {
+          onSudoPrompt: onSudoPrompt,
+          onConfirm: onConfirm,
+        });
+
+        if (name === "set_theme") {
+          try {
+            if (args.properties) {
+              mainWindow.webContents.send("apply-theme", args.properties);
+              if (args.name) {
+                saveTheme(args.name, args.properties);
+                mainWindow.webContents.send("themes-changed");
+              }
+            }
+          } catch (e) {}
+        }
+        if (name === "delete_theme") {
+          try {
+            deleteTheme(args.name);
+            mainWindow.webContents.send("themes-changed");
+          } catch (e) {}
+        }
+        if (name === "apply_theme") {
+          try {
+            var themes = loadThemes();
+            var theme = themes[args.name];
+            if (theme && theme.properties) {
+              saveActiveTheme(args.name);
+              mainWindow.webContents.send("apply-theme", theme.properties);
+              mainWindow.webContents.send("themes-changed");
+            }
+          } catch (e) {}
+        }
+        if (name === "list_themes") {
+          var allThemes = loadThemes();
+          return JSON.stringify({ themes: Object.keys(allThemes) });
+        }
+
+        return String(result);
+      },
+    });
+
+    event.sender.send("llm-chunk", { done: true });
+  }
 
   async function runLLMLoop(event, messages, effort, signal) {
     if (signal && signal.aborted) return;
@@ -360,6 +491,9 @@ function createWindow() {
           model: cfg.model,
           endpoint: cfg.endpoint,
           reasoningEffort: cfg.reasoningEffort,
+          modelPath: cfg.modelPath || "",
+          gpu: cfg.gpu !== false,
+          contextSize: cfg.contextSize || 4096,
         }
       : null;
   });
@@ -369,10 +503,12 @@ function createWindow() {
   });
 
   ipcMain.handle("save-config", async (_event, config) => {
-    const result = await validateConfig(config);
-    if (!result.valid) {
-      throw new Error(result.error);
+    if (config.provider === "local") {
+      saveConfig(config);
+      return true;
     }
+    const result = await validateConfig(config);
+    if (!result.valid) throw new Error(result.error);
     saveConfig(config);
     return true;
   });
@@ -380,6 +516,7 @@ function createWindow() {
   ipcMain.handle("validate-stored-config", async () => {
     const cfg = loadConfig();
     if (!cfg) return { valid: false, error: "No config found" };
+    if (cfg.provider === "local") return { valid: true };
     return await validateConfig(cfg);
   });
 
@@ -443,6 +580,52 @@ function createWindow() {
   ipcMain.handle("reset-active-theme", function () {
     saveActiveTheme(null);
     return true;
+  });
+
+  ipcMain.handle("get-recommended-models", function () {
+    return RECOMMENDED_MODELS;
+  });
+
+  ipcMain.handle("list-downloaded-models", function () {
+    return listDownloadedModels();
+  });
+
+  ipcMain.handle("download-model", async function (event, modelId) {
+    try {
+      return await downloadModel(modelId, function (progress) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("model-download-progress", progress);
+        }
+      });
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle("delete-model", function (_, filename) {
+    return deleteModel(filename);
+  });
+
+  ipcMain.handle("reset-all-data", function () {
+    const dirs = [
+      path.join(os.homedir(), ".config", "icanhelp"),
+      path.join(os.homedir(), ".cache", "icanhelp", "models"),
+      path.join(os.homedir(), ".cache", "icanhelp", "knowledge.json"),
+      path.join(os.homedir(), ".cache", "icanhelp", "vision.log"),
+      path.join(os.homedir(), ".cache", "icanhelp", "ocr.log"),
+    ];
+    var errors = [];
+    for (var p of dirs) {
+      try {
+        if (fs.existsSync(p)) {
+          fs.rmSync(p, { recursive: true, force: true });
+        }
+      } catch (e) {
+        errors.push(p + ": " + e.message);
+      }
+    }
+    if (errors.length > 0) return { ok: false, errors: errors };
+    return { ok: true };
   });
 
   ipcMain.handle("parse-markdown", (_event, text) => {
