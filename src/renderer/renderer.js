@@ -721,6 +721,23 @@ chatInput.addEventListener("keydown", (e) => {
 
 // --- Install Screen ---
 (async function initInstall() {
+  var hasCfg = await window.electronAPI.hasConfig();
+  if (hasCfg) {
+    var cfg = await window.electronAPI.getConfig();
+    if (cfg && cfg.modelPath) {
+      installScreen.classList.add("hidden");
+      chatPanel.classList.remove("hidden");
+      sendBtn.classList.remove("hidden");
+      chatOpen = true;
+      window.electronAPI.resizeWindow(400, 550);
+      setTimeout(function () {
+        chatInput.focus();
+        smoothScroll(chatMessages);
+      }, 150);
+      return;
+    }
+  }
+
   window.electronAPI.resizeWindow(320, 420);
 
   window.electronAPI.onModelDownloadProgress(function (info) {
