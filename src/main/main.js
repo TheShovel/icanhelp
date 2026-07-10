@@ -49,7 +49,7 @@ const {
 } = require("./attachments");
 const { searchKnowledge } = require("./rag");
 
-marked.setOptions({ breaks: true, gfm: true });
+marked.use({ breaks: true, gfm: true });
 
 let mainWindow;
 let pendingSudo = null;
@@ -534,6 +534,7 @@ function createWindow() {
   });
 
   ipcMain.handle("parse-markdown", (_event, text) => {
+    text = text.replace(/^(#{1,6})(?=[^#\s])/gm, "$1 ");
     return marked.parse(text);
   });
 

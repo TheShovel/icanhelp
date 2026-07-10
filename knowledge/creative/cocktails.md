@@ -88,12 +88,12 @@ Shake hard (20 sec for foam), strain, garnish coffee beans
 - **Ice dilution**: stirred drinks want 20-30% dilution, shaken drinks 15-25% — timing matters
 - **Chill glass**: fill with ice or put in freezer — drink goes in cold, stays cold longer
 
-## Simple Syrup
-- **Rich simple**: 2 parts sugar : 1 part water (dissolve, store refrigerated, lasts longer)
+### **Simple Syrup:**
+
+- **Rich simple**: 2 parts sugar : 1 part water (dissolve, refrigerate)
 - **Regular simple**: 1:1 ratio
-- Flavored: infuse with herbs (rosemary, thyme), spices (cinnamon, cardamom), fruit (strawberry, jalapeño)
-- **Demerara simple**: brown sugar for Old Fashioneds, Manhattans — richer flavor
-- **Honey syrup**: 3 parts honey : 1 part water (honey is too thick to pour plain)
+- **Flavored**: infuse with herbs, spices, or fruit
+- **Honey syrup**: 3 parts honey : 1 part water
 
 ## Stocking a Home Bar (Starter)
 - **Spirits**: bourbon/rye, gin, vodka, white rum, tequila blanco
