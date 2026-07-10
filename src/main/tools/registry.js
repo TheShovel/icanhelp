@@ -271,7 +271,12 @@ var tools = [
     function: {
       name: "search_knowledge",
       description:
-        "Search the local knowledge base for information matching the query. Returns the most relevant stored entries with similarity scores.",
+        "IMPORTANT: Search the local knowledge base BEFORE answering any question about Linux, programming, security, networking, or system administration. " +
+        "Returns the most relevant stored entries with similarity scores (higher = more relevant). " +
+        "The knowledge base covers: bash, Linux commands, filesystem, systemd, package managers (apt/dnf/pacman), " +
+        "networking, permissions, desktop environments (Wayland/X11), troubleshooting, kernel, security hardening, " +
+        "JavaScript, Node.js, Python, Git, Docker, SQL, web development, HTTP, and computer science fundamentals." +
+        " Always call this when the user asks a factual or how-to question.",
       parameters: {
         type: "object",
         properties: {
@@ -319,8 +324,8 @@ var handlers = {
   list_themes: listThemesStub,
   delete_theme: deleteThemeStub,
   apply_theme: applyThemeStub,
-  store_knowledge: addKnowledge,
-  search_knowledge: searchKnowledge,
+  store_knowledge: (args) => addKnowledge(args.text, args.metadata),
+  search_knowledge: (args) => searchKnowledge(args.query, args.k),
   list_knowledge: listKnowledge,
   clear_knowledge: clearKnowledge,
 };

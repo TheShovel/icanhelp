@@ -1,0 +1,29 @@
+# Music: Guitar & Bass
+
+## Guitar Anatomy
+- **Parts**: headstock (tuning pegs — friction, locking, or vintage). Neck (truss rod — adjusts neck bow for relief. Action = distance between strings + fretboard. Check with feeler gauge, adjust via truss rod if bow >.010 in relief at 8th fret). Fretboard (frets — stainless steel lasts longer than nickel). Body: acoustic body (hollow — wood is tone, resonance) vs electric body (solid — pickups make sound). Electric: pickups (single-coil: bright, 60-cycle hum — Stratocaster, Telecaster, P-90; humbucker: thicker, no hum, high output, more sustain — Les Paul, SG, ES-335)
+  - Scale length: Fender Strat/Tele 25.5" (bright, higher string tension), Gibson Les Paul 24.75" (warmer, easier bends)
+- **Strings**: acoustic (bronze/phospher bronze = warm, bright). Electric (nickel-plated steel = balanced, 9-42: light, 10-46: medium, 11-48: heavy). Nylon (classical only). String gauge: lighter (easier to bend, less tension, play easier, less volume). Heavier (more volume, more tension, better tuning stability for drop tuning, more finger strength required). Drop tuning: heavier gauge to maintain tension
+- **Chords**: major (1-3-5), minor (1-b3-5), 7th (1-3-5-b7), minor 7th (1-b3-5-b7), major 7th (1-3-5-7). Barre chords (finger across all strings — F major, B minor). Open chords: E, A, D, G, C, Am, Em, Dm — first three frets, with open strings ringing. Barre chord shapes (moveable anywhere on neck, using index finger as "capo" across frets)
+- **Practice**: scales (major, minor, pentatonic — most used for solos). Five pentatonic box positions (e minor pentatonic: open position, 5th fret, 7th, 10th, 12th fret boxes — basis of rock/blues/ country lead playing). Alternate picking (down+up). Legato (hammer-ons + pull-offs). Bending (bend string to new pitch — whole step = 2 frets, half step = 1 fret). Vibrato (bent oscillation). Speed building: metronome, start slow, clean, increase gradually. Maintain clean muting with both hands
+
+## Bass Guitar
+- **4-string** (standard E-A-D-G). 5-string (low B). 6-string (low B + high C). Fretless (smooth sound, harder intonation)
+- **Technique**: fingerstyle (index + middle, alternating — standard). Pick (plectrum: punk, metal). Slap (thumb strike string + pop with finger — funk, Mark King, Flea). Palm mute (rest palm on strings near bridge, for mellow tone)
+- **Role**: lock with drums (kick drum). Root notes + fifths (most common). Walking bass lines (jazz — quarter notes). Octaves (Ricky Wilson, James Jamerson style). Dead notes (percussive). Ghost notes (rest stroke) = muted string sound. Follow chord changes. Support the song — don't overplay. "A bassist's job: make the band sound good, not sound good by yourself"
+
+## Tuning
+- **Standard**: E-A-D-G-B-E (guitar), E-A-D-G (bass, descending an octave below guitar). Drop D: D-A-D-G-B-E (lower 6th string to D — heavy riffs). Open G: D-G-D-G-B-D (Keith Richards tuning, slide guitar). Half-step down: Eb-Ab-Db-Gb-Bb-Eb (common for rock — easier to bend, classic rock). Full step down: D-G-C-F-A-D (heavier tuning, less tension)
+  - Ukulele: G-C-E-A (high G or low G). The G is above middle C if high G (reentrant tuning — high G string higher than C string, re-entrant = lowest string not the lowest pitch)
+
+## Maintenance
+- **Changing strings**: replace one at a time (keep neck tension on 6+ string). Locking tuners: cut string, lock, tune. Non-locking: wrap around tuning peg with 2-3 windings. Stretch strings after restring (pull each string firm, retune, repeat until stable)
+- **Cleaning**: wipe strings with dry cloth after playing (prevents corrosion). Fretboard cleaner (lemon oil for rosewood, NOT for maple—use mild soap). Use rubbing alcohol to remove grime from frets. Polish body (guitar polish/ damp microfiber — avoid old silicone polishes)
+- **Setup**: truss rod (check neck relief: fret first + 12th fret capo, tap string at 8th fret — slight gap should be .008-.010"). Action (string height at 12th fret: 4/64-6/64" low E, 3/64-4/64" high E). Intonation (open string = 12th fret harmonic: adjust saddle length to correct pitch). Pickup height (balance strings + clean signal: adjust each pickup screw until no magnetic pull on string + volume balanced)
+
+## Amplifiers
+- **Types**: tube/valve (warm, natural overdrive, heavy, expensive, high maintenance, fragile, need to be loud to sound good. Fender, Vox, Marshall, Mesa/Boogie, Orange, Friedman, Dr. Z). Solid state (clean, reliable, cheaper, lighter). Modeling (digital simulation of many amps + effects — Kemper, Fractal Axe-Fx, Line 6 Helix, Neural DSP Quad Cortex, Boss Katana). Hybrid (tube preamp + solid state power amp)
+  - Wattage: 5W home practice, 15-30W small gig/practice, 50-100W medium/large stage. Tube watts ≈ 2-3x louder than solid state
+- **Amp types**: combo (amp + speaker in one unit). Head + cabinet (separate). Cabinet: closed back (focused bass, more directional). Open back (spread out, less bass, more room sound). Speakers: Celestion (British — V30, Greenback), Eminence (American — Swamp Thang), Jensen (vintage American) = different tone signatures
+- **Pedals/effects**: overdrive (Tube Screamer, Blues Driver, Klon Centaur). Distortion (Boss DS-1, ProCo Rat, MXR Distortion+). Fuzz (Big Muff, Fuzz Face). Modulation: chorus, phaser, flanger, tremolo. Delay (Echo/Digital/Analog/Tape). Reverb (Spring, Hall, Plate, Room). Wah (Crybaby, Morley). Compression (sustain, even out volume — important for clean tone, country, funk). EQ (graphic, parametric). Looper (record + layer loops for practice + performance)
+  - Signal chain: guitar → tuner → compressor → wah → overdrive/distortion → modulation (chorus, phaser) → delay → reverb → amp. Noise gate: reduce hum between notes (placed early in chain or between dirt and modulation). Boost: clean volume before amp (or before solo). Volume pedal: after dirt, adjust level without changing gain

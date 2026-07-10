@@ -6,7 +6,41 @@
   "scripts": {
     "start": "electron .",
     "dev": "ELECTRON_DEV=true electron .",
-    "test": "node --test 'src/main/store.test.js' 'src/main/tools.test.js' 'src/main/timing.test.js' 'src/renderer/renderer.test.js'"
+    "test": "node --test 'src/main/store.test.js' 'src/main/tools.test.js' 'src/main/timing.test.js' 'src/renderer/renderer.test.js'",
+    "build": "bash scripts/build.sh",
+    "build:dir": "bash scripts/build.sh dir",
+    "build:deb": "bash scripts/build.sh deb",
+    "build:appimage": "bash scripts/build.sh AppImage",
+    "ingest": "node scripts/ingest-knowledge.js",
+    "fetch-knowledge": "bash scripts/fetch-knowledge.sh",
+    "knowledge-stats": "node -e \"require('./src/main/rag').listKnowledge().then(console.log)\""
+  },
+  "build": {
+    "appId": "com.icanhelp.app",
+    "productName": "icanhelp",
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage",
+        "dir"
+      ],
+      "icon": "build/icons",
+      "category": "Utility",
+      "synopsis": "Linux desktop AI assistant",
+      "description": "Linux desktop AI assistant that runs as a transparent overlay"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/node-llama-cpp/**"
+    ]
   },
   "keywords": [
     "ai",
@@ -17,6 +51,7 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^33.0.0",
+    "electron-builder": "^26.15.3",
     "jsdom": "^29.1.1"
   },
   "dependencies": {

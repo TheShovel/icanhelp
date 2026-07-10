@@ -47,6 +47,7 @@ const {
   prepareAttachment,
   supportedAttachmentExtensions,
 } = require("./attachments");
+const { searchKnowledge } = require("./rag");
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -194,6 +195,39 @@ function createWindow() {
     var cfg = loadConfig() || {};
     const { tools } = require("./tools/registry");
     const { executeToolCall } = require("./tools/registry");
+
+    // Auto-search knowledge base for the latest user message
+    try {
+      var lastUser = messages
+        .filter(function (m) {
+          return m.role === "user";
+        })
+        .pop();
+      if (lastUser && lastUser.content) {
+        var kbResult = await searchKnowledge(lastUser.content, 5);
+        var kbParsed = JSON.parse(kbResult);
+        if (kbParsed.results && kbParsed.results.length > 0) {
+          var highValue = kbParsed.results.filter(function (r) {
+            return parseFloat(r.similarity) > 0.35;
+          });
+          if (highValue.length > 0) {
+            var contextLines = highValue.map(function (r) {
+              return "[KB: " + r.similarity + "] " + r.text;
+            });
+            messages.unshift({
+              role: "system",
+              content:
+                "Relevant knowledge base entries:\n" + contextLines.join("\n"),
+            });
+            console.log(
+              "[main] Injected " + highValue.length + " knowledge entries",
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.log("[main] Auto-knowledge search failed:", e.message);
+    }
 
     var pendingConfirm = null;
     var retries = 0;

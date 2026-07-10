@@ -1,0 +1,33 @@
+# Marine Biology & Ocean Life
+
+## Marine Invertebrates
+
+### Crustaceans
+- **Decapods** (5 pairs of legs): crabs (true crabs = short tail, antennae short. Hermit crab: soft abdomen protected by shell. King crab: actually a hermit crab relative, not a true crab — they have 6 walking legs + 2 huge claws, the "king crab" is often Alaska king crab, which is a different infraorder). Lobster (American lobster Homarus americanus — can live 100+ years, keep growing throughout life, but rarely in wild due to fishing pressure. Actually they grow slowly, so large old ones have reproduced many times). Shrimp (many species, most abundant in estuaries). Krill (tiny, swarms, base of Antarctic food web — Blue whales eat 4 tons/day of krill)
+- **Barnacles**: filter feeders, cement themselves to surfaces permanently, penis extends far for reproduction (longest relative penis in animal kingdom — can reach 7-8x body length). Gooseneck barnacles: stalked, attached to floating debris. Plate structure: acorn barnacles have interlocking calcium plates
+- **Isopods**: pill bugs (terrestrial). Giant isopod (Bathynomus — deep sea scavenger, up to 1.5 ft!). Parasitic isopods (tongue-eating louse — enters through gills, attaches to base of tongue, replaces tongue, feeds on mucus — doesn't kill fish, but weakens it)
+
+### Mollusks
+- **Bivalves** (clams, mussels, oysters, scallops): two shells, filter feeders. Scallops can swim (clap shells, jet propulsion). Oysters: natural pearls (form around irritants; cultured pearls use bead/nucleus insertion). Clams can be long-lived: ocean quahog (Arctica islandica) lives 500+ years (Ming the clam was 507 years old — killed when scientists opened it!)
+- **Cephalopods**: octopus (8 arms, highly intelligent, boneless — can squeeze through any opening larger than its eye. Camouflage (chromatophores (pigment sacs in skin controlled by muscles — instant color change, also papillae for texture changes) communicate, solve puzzles, open jars, mimic other animals. Arms have two-thirds of neurons, each arm semi-autonomous). Squid (10 arms — 8 arms + 2 longer tentacles with suction cups. Can jet propel, squirt ink as decoy. Giant squid (Architeuthis) up to 43 ft, elusive — first filmed in wild 2004). Cuttlefish (unique W-shaped pupil, color-changing skin, intelligent, can hypnotize prey with oscillating patterns). Nautilus (living fossil with external shell, 90+ tentacles, no ink — eyes work like pinhole cameras)
+- **Gastropods**: snails, slugs, abalone, conch. Nudibranchs (sea slugs — bright colors, toxic, camouflage. Some photosynthesize with kleptoplasty — steal chloroplasts from algae, keep them alive in tissues for photosynthesis!). Conus (cone snail): venomous, harpoon-like tooth, some species fatal to humans (potent neurotoxins — no antivenom). Abalone: prized for shell + meat, critically endangered in parts of range (illegal poaching + white abalone endangered)
+
+### Echinoderms
+- **Starfish/sea stars**: 5 arms, tube feet (hydraulic system). Can regenerate lost arms (some: one arm + central disk = full body). Stomach can extrude to digest prey externally (especially when eating clams — they open shell slightly, insert stomach, digest the clam inside its own shell). Crown-of-thorns starfish: outbreaking on Great Barrier Reef (coral predator, cycles)
+- **Sea urchins**: globular, spines. Aristotle's lantern: complex jaw structure for scraping algae off rocks. Uni = sea urchin roe (gonads). Overfishing of predators (sea otters, lobsters) → urchin barrens (overgrazed kelp forests → empty sea floor). Purple sea urchin: valuable food source in Japan, destructive in California
+- **Sea cucumbers**: elongate, soft. Defense: expel sticky filaments (Cuvierian tubules) or entire internal organs (evisceration) to distract predators → regenerate. Important for nutrient cycling on seafloor
+
+### Cnidarians (Jellyfish, Corals, Anemones)
+- **Jellyfish**: medusa (bell) + tentacles with cnidocytes (stinging cells). Nematocysts: harpoon-like organelles that fire on contact. Box jellyfish (Chironex fleckeri, Australia): extremely venomous (Irukandji syndrome) — can kill in minutes (antivenom exists). Moon jelly (Aurelia aurita): mild sting. Immortal jellyfish (Turritopsis dohrnii): can revert from medusa to polyp stage = biological immortality. Blooms occur when overfishing removes competitors + ocean warming favors jellyfish
+- **Coral polyps**: sea anemones (solitary, often symbiotic with clownfish — anemones protect clownfish from predators, clownfish clean + feed anemone, anemone delivers waste nutrients). Corals (colonial polyps, secrete calcium carbonate skeleton). Zooxanthellae (symbiotic algae inside coral tissue — photosynthesis provides 90% of coral energy, gives corals their color). Bleaching: heat stress causes loss of zooxanthellae
+
+## Marine Fish
+
+### Types by body shape & habitat
+- **Pelagic** (open ocean): tuna (warm-blooded, endothermic — circulates heat to muscles → faster, powerful, migrate vast distances across oceans; some species critically overfished). Mackerel, swordfish, marlin, mahi-mahi, sharks, barracuda, sunfish (Mola mola — heaviest bony fish, up to 2.5 tons)
+- **Reef fish**: damselfish, clownfish, angelfish, butterflyfish, parrotfish (eat coral + scrape algae, produce sand — each parrotfish can produce 200+ lbs of sand per year). Wrasse (cleaner wrasse: removes parasites from other fish at "cleaning stations," recognizes individual clients)
+- **Demersal/bottom fish**: flounder (both eyes on one side, flat body, lies on seafloor, color matches bottom), halibut, cod, grouper, snapper, eels (moray: two sets of jaws — pharyngeal jaws in throat move forward to grab prey and pull it down)
+
+### Shark Biology
+- **Cartilaginous skeleton** (lighter than bone, no swim bladder). Must swim to pass water over gills (not all — nurse sharks can pump water over gills while stationary). Ampullae of Lorenzini: electroreceptors on snout detect electrical fields of hidden prey (like hidden flounder under sand). Lateral line: detects water movement + pressure. Teeth: multiple rows (revolving conveyor belt, lost teeth replaced quickly depending on species — Great White loses/replaces ~30,000 teeth in a lifetime). Some species lay eggs (oviparous — catsharks, horn sharks), others give live birth (viviparous) with yolk sac placenta
+- **Shark senses**: smell (can detect one drop of blood in 100L water, but not across entire ocean — myth). Hearing (low frequencies, injured fish — up to 2 km range). Vision (good in low light, but not HD). Electroreception (close range millivolt fields). Extremely good at sensing water vibrations from dying/struggling prey at distance

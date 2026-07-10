@@ -72,6 +72,25 @@ Downloads automatically on first launch (~950 MB, cached at `~/.cache/icanhelp/t
 - Knowledge base: `~/.cache/icanhelp/knowledge.json`
 - Logs: `~/.cache/icanhelp/vision.log`, `ocr.log`
 
+## Build
+
+Build distributable packages for Linux:
+
+```bash
+npm run build              # all targets (deb, AppImage, dir)
+npm run build:deb          # deb only
+npm run build:appimage     # AppImage only
+npm run build:dir          # unpacked directory only
+```
+
+Artifacts are written to `dist/`.
+
+- **deb** - Debian/Ubuntu package
+- **AppImage** - portable self-contained executable
+- **dir** - unpacked directory for direct use or further packaging
+
+Icons are auto-generated from the avatar artwork on first build.
+
 ## Dev
 
 ```bash
