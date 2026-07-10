@@ -857,6 +857,8 @@ function renderModelPicker(allModels, compatModels, sysInfo) {
     if (!isCompatible) {
       noteEl.textContent =
         "Needs ~" + m.minRamGB + " GB RAM — not enough free memory";
+    } else if (m.sizeBytes < 1000000000) {
+      noteEl.textContent = "Low quality — use for simple tasks only";
     } else if (m.sizeBytes > 2000000000) {
       noteEl.textContent = "Larger models are slower and use more resources";
     }
@@ -1143,7 +1145,7 @@ async function sendMessage() {
           if (!existingOut) {
             var out = document.createElement("div");
             out.className = "tool-output";
-            out.textContent = chunk.tool_end.output;
+            out.textContent = stripEmojis(chunk.tool_end.output);
             tcEnd.appendChild(out);
           }
           var minAnim = 300;
@@ -1173,7 +1175,7 @@ async function sendMessage() {
 
     if (chunk.replaceText !== undefined) {
       setAvatarState("talking");
-      buffer = chunk.replaceText;
+      buffer = stripEmojis(chunk.replaceText);
       renderStreamedContent(
         bubble,
         buffer,
@@ -1183,7 +1185,7 @@ async function sendMessage() {
       );
     } else if (chunk.text) {
       setAvatarState("talking");
-      buffer += chunk.text;
+      buffer += stripEmojis(chunk.text);
       renderStreamedContent(
         bubble,
         buffer,
@@ -1389,6 +1391,17 @@ function showTyping() {
 function hideTyping() {
   typingIndicator.classList.add("hidden");
   setAvatarState("idle");
+}
+
+function stripEmojis(text) {
+  return text
+    .replace(
+      /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{2B50}\u{2934}\u{2935}\u{25AA}\u{25AB}\u{25FB}-\u{25FE}\u{25FC}\u{25FD}\u{2B1B}\u{2B1C}\u{2B55}]/gu,
+      "",
+    )
+    .replace(/(\*{1,2})\s+/g, "$1")
+    .replace(/\s+(\*{1,2})/g, "$1")
+    .replace(/ {2,}/g, " ");
 }
 
 async function addMessage(text, role, attachment) {

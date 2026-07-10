@@ -43,7 +43,7 @@ function resolveModelPath(config) {
 }
 
 function buildSystemPrompt() {
-  return "You are icanhelp, a Linux desktop AI assistant.\nUse tools when appropriate.";
+  return "You are Canhelpy, a Linux desktop AI assistant.\nUse tools when appropriate.";
 }
 
 function buildInlinePrompt(history, currentPrompt) {
