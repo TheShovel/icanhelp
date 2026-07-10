@@ -7,6 +7,7 @@ const {
   listKnowledge,
   clearKnowledge,
 } = require("../rag");
+const { findSkills, getSkillInstructions, getAllSkills } = require("../skills");
 
 async function searchWeb({ query, resultSize }) {
   try {
@@ -311,6 +312,34 @@ var tools = [
       parameters: { type: "object", properties: {} },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "list_skills",
+      description:
+        "List all available skills and their descriptions. Use this to discover what skills are available for the current task.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "start_skill",
+      description:
+        "Load a skill's instructions into context. Call this when the user's request matches a skill's description. The skill provides expert guidance for completing the specific task. Returns the skill's full instructions.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description:
+              "The name of the skill to load (use list_skills first to find the right one)",
+          },
+        },
+        required: ["name"],
+      },
+    },
+  },
 ];
 
 var handlers = {
@@ -328,6 +357,40 @@ var handlers = {
   search_knowledge: (args) => searchKnowledge(args.query, args.k),
   list_knowledge: listKnowledge,
   clear_knowledge: clearKnowledge,
+  list_skills: function () {
+    var all = getAllSkills();
+    return JSON.stringify(
+      all.map(function (s) {
+        return { name: s.name, description: s.description, path: s.dirName };
+      }),
+      null,
+      2,
+    );
+  },
+  start_skill: function (args) {
+    var name = args && args.name;
+    if (!name)
+      return "Please provide a skill name. Use list_skills to see available skills.";
+    var matched = findSkills(name);
+    if (matched.length === 0) {
+      return (
+        'Skill "' +
+        name +
+        '" not found. Use list_skills to see available skills.'
+      );
+    }
+    var instructions = getSkillInstructions([matched[0].name]);
+    if (!instructions) return 'Skill "' + name + '" has no instructions.';
+    return (
+      "--- Begin skill: " +
+      matched[0].name +
+      " ---\n\n" +
+      instructions +
+      "\n\n--- End skill: " +
+      matched[0].name +
+      " ---"
+    );
+  },
 };
 
 async function executeToolCall(toolCall, opts) {

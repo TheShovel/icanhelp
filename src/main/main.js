@@ -48,6 +48,12 @@ const {
   supportedAttachmentExtensions,
 } = require("./attachments");
 const { searchKnowledge } = require("./rag");
+const {
+  loadAllSkills,
+  getSkillInstructions,
+  findSkills,
+  refreshCache,
+} = require("./skills");
 
 marked.use({ breaks: true, gfm: true });
 
@@ -435,6 +441,23 @@ function createWindow() {
   ipcMain.handle("delete-theme", function (_, name) {
     deleteTheme(name);
     mainWindow.webContents.send("themes-changed");
+    return true;
+  });
+
+  ipcMain.handle("list-skills", function () {
+    return loadAllSkills().map(function (s) {
+      return { name: s.name, description: s.description, dirName: s.dirName };
+    });
+  });
+
+  ipcMain.handle("get-skill", function (_, name) {
+    var matched = findSkills(name);
+    if (matched.length === 0) return null;
+    return matched[0];
+  });
+
+  ipcMain.handle("refresh-skills", function () {
+    refreshCache();
     return true;
   });
 

@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { getSkillContext } = require("./skills");
 
 function defaultModelPath() {
   return path.join(os.homedir(), ".cache", "icanhelp", "models");
@@ -43,7 +44,7 @@ function resolveModelPath(config) {
 }
 
 function buildSystemPrompt() {
-  return [
+  var parts = [
     "You are Canhelpy, a Linux desktop AI assistant.",
     "You have access to a vector knowledge base via search_knowledge().",
     "",
@@ -65,8 +66,21 @@ function buildSystemPrompt() {
     "- Use store_knowledge() when the user teaches you something new.",
     "- Use search_knowledge() before guessing. Look it up first.",
     "",
-    "Be helpful, accurate, and thorough.",
-  ].join("\n");
+  ];
+
+  var skillCtx = getSkillContext();
+  if (skillCtx) {
+    parts.push(skillCtx);
+    parts.push("");
+    parts.push(
+      "When a skill matches the user's request, use the start_skill tool to load its instructions. " +
+        "Skills provide expert guidance for specific tasks.",
+    );
+    parts.push("");
+  }
+
+  parts.push("Be helpful, accurate, and thorough.");
+  return parts.join("\n");
 }
 
 function buildInlinePrompt(history, currentPrompt) {
