@@ -1,6 +1,6 @@
 # icanhelp
 
-Linux desktop AI assistant that runs as a transparent overlay, answers questions, executes commands, analyzes images, and searches the web — all running locally.
+Linux desktop AI assistant that runs as a transparent overlay, answers questions, executes commands, analyzes images, and searches the web, all running locally.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ Linux desktop AI assistant that runs as a transparent overlay, answers questions
 ## Install
 
 ```bash
-git clone https://github.com/yourname/icanhelp.git
+git clone https://github.com/TheShovel/icanhelp.git
 cd icanhelp
 npm install
 ```
@@ -23,16 +23,12 @@ npm start
 
 ## Setup
 
-On first launch the setup panel appears. Choose your provider:
-
-- **Local (built-in)** — runs a GGUF model directly in Electron, no external software needed. Select a model from the download list (Qwen 2.5 3B recommended).
-- **Ollama** — connects to a local Ollama instance at `http://localhost:11434/v1`.
+On first launch the setup panel appears. Select a model from the download list (Qwen 3.5 2B recommended).
 
 ## Features
 
 - Runs entirely offline with the built-in local provider
-- Chat with GGUF models via node-llama-cpp (Qwen 2.5, Llama 3.2, Phi-3, Mistral 7B)
-- Ollama support for models that support tool calling
+- Chat with GGUF models via node-llama-cpp (Qwen 3.5, Qwen 2.5)
 - Model download manager with recommended models from HuggingFace
 - File attachments: images get OCR + vision description automatically
 - Screenshot capture: attaches a screenshot of your desktop
@@ -59,21 +55,9 @@ The screenshot feature tries these tools in order. Install at least one:
 | `maim` | `maim` | X11 |
 | `scrot` | `scrot` | X11 |
 
-### Arch
-
-```bash
-sudo pacman -S grim
-```
-
-### Ubuntu / Debian
-
-```bash
-sudo apt-get install grim
-```
-
 ## Vision Model
 
-Downloads automatically on first launch (~950 MB, cached at `~/.cache/icanhelp/transformers/`). Uses local ONNX inference, no API calls or token needed.
+Downloads automatically on first launch (~950 MB, cached at `~/.cache/icanhelp/transformers/`). Uses local ONNX inference.
 
 ## Files
 
