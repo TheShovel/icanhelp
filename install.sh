@@ -33,14 +33,16 @@ heading() { printf "\n${BOLD}${BLUE}▸ %s${RST}\n" "$*"; }
 sub()     { printf "${DIM}    %s${RST}\n" "$*"; }
 
 # spinner — runs a command with a simple frame spinner
+# all output is hidden; on failure it's dumped to stderr
 spinner() {
   local label="$1"
   local cmd="$2"
-  local pid="" frame=0
+  local pid="" frame=0 logf
   local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
+  logf="$(mktemp)"
   printf "  ${CYAN}%s${RST} ${DIM}%s${RST}" "${frames[0]}" "$label"
-  eval "$cmd" &
+  eval "$cmd" >"$logf" 2>&1 &
   pid=$!
 
   while kill -0 "$pid" 2>/dev/null; do
@@ -53,8 +55,11 @@ spinner() {
   local rc=$?
   if [ $rc -eq 0 ]; then
     printf "\r${BOLD}${GREEN}  ✓${RST} ${DIM}%s${RST}\n" "$label"
+    rm -f "$logf"
   else
     printf "\r${BOLD}${RED}  ✗${RST} ${DIM}%s${RST}\n" "$label"
+    cat "$logf" >&2
+    rm -f "$logf"
     return $rc
   fi
 }
@@ -95,7 +100,7 @@ ok "rsync    $(rsync --version 2>/dev/null | head -1 | sed 's/.*version //' | cu
 heading "Downloading"
 
 rm -rf "$CLONE_DIR"
-spinner "Cloning repository …" "git clone --depth=1 '$REPO' '$CLONE_DIR' 2>&1"
+spinner "Cloning repository …" "git clone --depth=1 '$REPO' '$CLONE_DIR'"
 ok "Source fetched"
 
 # ── install ──────────────────────────────────────────────────────
@@ -148,7 +153,7 @@ else
 fi
 
 cd "$INSTALL_DIR"
-spinner "Installing dependencies (npm install) …" "npm install --ignore-scripts=false --no-audit --no-fund 2>&1"
+spinner "Installing dependencies …" "npm install --ignore-scripts=false --no-audit --no-fund"
 ok "Dependencies installed"
 
 log "Creating launcher script …"
