@@ -36,6 +36,10 @@ npm install
 npm start
 ```
 
+## Compatibility
+
+The installer supports **x86_64** and **ARM64 (aarch64)** machines running a glibc-based Linux distro (Ubuntu, Fedora, Debian, Arch, openSUSE, and derivatives) with a desktop environment. It does not work on musl-based systems like Alpine Linux, on headless/WSL setups without a desktop, or on 32-bit ARM.
+
 ## Setup
 
 On first launch the setup panel appears. Select a model from the download list (Qwen 3.5 2B recommended).
@@ -111,25 +115,6 @@ Downloads automatically on first launch (~950 MB, cached at `~/.cache/icanhelp/t
 - Vision model cache: `~/.cache/icanhelp/transformers/`
 - Knowledge base: `~/.cache/icanhelp/knowledge.json`
 - Logs: `~/.cache/icanhelp/vision.log`, `ocr.log`
-
-## Build
-
-Build distributable packages for Linux:
-
-```bash
-npm run build              # all targets (deb, AppImage, dir)
-npm run build:deb          # deb only
-npm run build:appimage     # AppImage only
-npm run build:dir          # unpacked directory only
-```
-
-Artifacts are written to `dist/`.
-
-- **deb** - Debian/Ubuntu package
-- **AppImage** - portable self-contained executable
-- **dir** - unpacked directory for direct use or further packaging
-
-Icons are auto-generated from the avatar artwork on first build.
 
 ## Dev
 

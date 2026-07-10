@@ -184,7 +184,15 @@ log "Running postinstall scripts …"
 # so we use curl + unzip instead of Node.js tooling
 ELECTRON_VER=$(node -e "console.log(require('./node_modules/electron/package.json').version)")
 ELECTRON_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/electron"
-ELECTRON_ZIP="$ELECTRON_CACHE/electron-v${ELECTRON_VER}-linux-x64.zip"
+
+case "$(uname -m)" in
+  x86_64)  ELECTRON_ARCH="x64" ;;
+  aarch64) ELECTRON_ARCH="arm64" ;;
+  armv7l)  ELECTRON_ARCH="armv7l" ;;
+  *)       fail "Unsupported architecture: $(uname -m)" ;;
+esac
+
+ELECTRON_ZIP="$ELECTRON_CACHE/electron-v${ELECTRON_VER}-linux-${ELECTRON_ARCH}.zip"
 ELECTRON_DIST="node_modules/electron/dist"
 ELECTRON_BIN="$ELECTRON_DIST/electron"
 
@@ -196,7 +204,7 @@ else
     mkdir -p "$ELECTRON_CACHE"
     set +e
     curl -fsSL \
-      "https://github.com/electron/electron/releases/download/v${ELECTRON_VER}/electron-v${ELECTRON_VER}-linux-x64.zip" \
+      "https://github.com/electron/electron/releases/download/v${ELECTRON_VER}/electron-v${ELECTRON_VER}-linux-${ELECTRON_ARCH}.zip" \
       -o "$ELECTRON_ZIP" 2>&1
     rc=$?
     set -e
