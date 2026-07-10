@@ -27,16 +27,15 @@ On first launch the setup panel appears. Select a model from the download list (
 
 ## Features
 
-- Runs entirely offline with the built-in local provider
-- Chat with GGUF models via node-llama-cpp (Qwen 3.5, Qwen 2.5)
-- Model download manager with recommended models from HuggingFace
-- File attachments: images get OCR + vision description automatically
-- Screenshot capture: attaches a screenshot of your desktop
-- Bash command execution with sudo support
+- Runs entirely offline
+- Model download manager
+- File attachments
+- Screenshot capture
+- Bash command execution
 - Web search
-- Knowledge base: the AI can store and retrieve information using semantic search
-- Theme system: AI can create, save, and apply CSS themes
-- Vision model: local BLIP image captioning, no API needed
+- Knowledge base
+- Theme system
+- Vision model
 
 ## Knowledge Base
 
