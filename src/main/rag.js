@@ -2,7 +2,12 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const STORE_PATH = path.join(os.homedir(), ".cache", "icanhelp", "knowledge.json");
+const STORE_PATH = path.join(
+  os.homedir(),
+  ".cache",
+  "icanhelp",
+  "knowledge.json",
+);
 
 let pipeline = null;
 let store = null;
@@ -34,7 +39,10 @@ function chunkText(text, maxLen) {
 
   for (const sentence of sentences) {
     if (sentence.length > len) {
-      if (current) { chunks.push(current.trim()); current = ""; }
+      if (current) {
+        chunks.push(current.trim());
+        current = "";
+      }
       chunks.push(sentence.trim());
       continue;
     }
@@ -50,7 +58,9 @@ function chunkText(text, maxLen) {
 }
 
 function cosineSimilarity(a, b) {
-  let dot = 0, magA = 0, magB = 0;
+  let dot = 0,
+    magA = 0,
+    magB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     magA += a[i] * a[i];
@@ -61,9 +71,13 @@ function cosineSimilarity(a, b) {
 }
 
 async function getEmbeddings(texts) {
-  const { pipeline: transformersPipeline } = await import("@xenova/transformers");
+  const { pipeline: transformersPipeline } =
+    await import("@xenova/transformers");
   if (!pipeline) {
-    pipeline = await transformersPipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+    pipeline = await transformersPipeline(
+      "feature-extraction",
+      "Xenova/all-MiniLM-L6-v2",
+    );
   }
   const results = [];
   for (const text of texts) {
@@ -96,12 +110,12 @@ async function addKnowledge(text, metadata) {
     });
   }
 
-  if (s.entries.length > 10000) {
-    s.entries = s.entries.slice(-10000);
-  }
-
   saveStore();
-  return JSON.stringify({ ok: true, chunks: chunks.length, total: s.entries.length });
+  return JSON.stringify({
+    ok: true,
+    chunks: chunks.length,
+    total: s.entries.length,
+  });
 }
 
 async function searchKnowledge(query, k) {
