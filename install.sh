@@ -25,34 +25,43 @@ DESKTOP_FILE="$APP_DIRS/icanhelp.desktop"
 LAUNCHER="$INSTALL_DIR/icanhelp.sh"
 
 # ── helpers ──────────────────────────────────────────────────────
-log()     { printf "${GRAY}  ◆${RST} %s\n" "$*"; }
-ok()      { printf "${GREEN}  ✔${RST} %s\n" "$*"; }
-warn()    { printf "${YELLOW}  ⚠${RST} %s\n" "$*" >&2; }
-fail()    { printf "${RED}  ✘${RST} %s\n" "$*" >&2; exit 1; }
-heading() { printf "\n${BOLD}${BLUE}▸ %s${RST}\n" "$*"; }
-sub()     { printf "${DIM}    %s${RST}\n" "$*"; }
+log()     { printf "${GRAY}  ◆${RST} %b\n" "$*"; }
+ok()      { printf "${GREEN}  ✔${RST} %b\n" "$*"; }
+warn()    { printf "${YELLOW}  ⚠${RST} %b\n" "$*" >&2; }
+fail()    { printf "${RED}  ✘${RST} %b\n" "$*" >&2; exit 1; }
+heading() { printf "\n${BOLD}${BLUE}▸ %b${RST}\n" "$*"; }
+sub()     { printf "${DIM}    %b${RST}\n" "$*"; }
 
-# spinner — runs a command with a simple frame spinner
-# all output is hidden; on failure it's dumped to stderr
+# spinner — runs a command with a live frame spinner
+# the command runs in the foreground; a background process draws the animation
 spinner() {
   local label="$1"
-  local cmd="$2"
-  local pid="" frame=0 logf
   local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  shift
 
+  local logf
   logf="$(mktemp)"
-  printf "  ${CYAN}%s${RST} ${DIM}%s${RST}" "${frames[0]}" "$label"
-  eval "$cmd" >"$logf" 2>&1 &
-  pid=$!
 
-  while kill -0 "$pid" 2>/dev/null; do
-    printf "\r  ${CYAN}%s${RST} ${DIM}%s${RST}" "${frames[frame]}" "$label"
-    ((frame = (frame + 1) % ${#frames[@]}))
-    sleep 0.08
-  done
+  # background spinner process
+  (
+    local frame=0
+    while true; do
+      printf "\r  ${CYAN}%s${RST} ${DIM}%s${RST}" "${frames[frame]}" "$label"
+      ((frame = (frame + 1) % ${#frames[@]}))
+      sleep 0.08
+    done
+  ) &
+  local spinner_pid=$!
 
-  wait "$pid"
+  # foreground command, output captured
+  set +e
+  "$@" >"$logf" 2>&1
   local rc=$?
+  set -e
+
+  kill "$spinner_pid" 2>/dev/null || true
+  wait "$spinner_pid" 2>/dev/null || true
+
   if [ $rc -eq 0 ]; then
     printf "\r${BOLD}${GREEN}  ✓${RST} ${DIM}%s${RST}\n" "$label"
     rm -f "$logf"
@@ -85,6 +94,8 @@ command -v node  &>/dev/null || missing+=("node")
 command -v npm   &>/dev/null || missing+=("npm")
 command -v git   &>/dev/null || missing+=("git")
 command -v rsync &>/dev/null || missing+=("rsync")
+command -v curl  &>/dev/null || missing+=("curl")
+command -v unzip &>/dev/null || missing+=("unzip")
 
 if [ ${#missing[@]} -gt 0 ]; then
   for cmd in "${missing[@]}"; do fail "Missing required dependency: ${BOLD}$cmd${RST}"; done
@@ -95,12 +106,14 @@ ok "Node.js  $(node --version 2>/dev/null || echo '?')"
 ok "npm      $(npm --version  2>/dev/null || echo '?')"
 ok "git      $(git --version 2>/dev/null | head -1 | sed 's/git version //' || echo '?')"
 ok "rsync    $(rsync --version 2>/dev/null | head -1 | sed 's/.*version //' | cut -d' ' -f1 || echo '?')"
+ok "curl     $(curl --version 2>/dev/null | head -1 | awk '{print $2}' || echo '?')"
+ok "unzip    $(unzip -v 2>/dev/null | head -1 | awk '{print $2}' || echo '?')"
 
 # ── download ─────────────────────────────────────────────────────
 heading "Downloading"
 
 rm -rf "$CLONE_DIR"
-spinner "Cloning repository …" "git clone --depth=1 '$REPO' '$CLONE_DIR'"
+spinner "Cloning repository …" git clone --depth=1 "$REPO" "$CLONE_DIR"
 ok "Source fetched"
 
 # ── install ──────────────────────────────────────────────────────
@@ -153,16 +166,82 @@ else
 fi
 
 cd "$INSTALL_DIR"
-spinner "Installing dependencies …" "npm install --ignore-scripts=false --no-audit --no-fund"
+echo ""
+log "Installing dependencies …"
+
+set +e
+npm install --ignore-scripts=false --no-audit --no-fund 2>&1
+rc=$?
+set -e
+if [ $rc -ne 0 ]; then
+  fail "npm install failed (exit $rc)"
+fi
+
+log "Running postinstall scripts …"
+
+# electron: download + extract binary
+# npm 11 blocks the postinstall, and extract-zip hangs on Node 26,
+# so we use curl + unzip instead of Node.js tooling
+ELECTRON_VER=$(node -e "console.log(require('./node_modules/electron/package.json').version)")
+ELECTRON_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/electron"
+ELECTRON_ZIP="$ELECTRON_CACHE/electron-v${ELECTRON_VER}-linux-x64.zip"
+ELECTRON_DIST="node_modules/electron/dist"
+ELECTRON_BIN="$ELECTRON_DIST/electron"
+
+if [ -x "$ELECTRON_BIN" ] && [ -f node_modules/electron/path.txt ]; then
+  ok "electron already installed"
+else
+  if [ ! -f "$ELECTRON_ZIP" ]; then
+    log "Downloading electron v${ELECTRON_VER} …"
+    mkdir -p "$ELECTRON_CACHE"
+    set +e
+    curl -fsSL \
+      "https://github.com/electron/electron/releases/download/v${ELECTRON_VER}/electron-v${ELECTRON_VER}-linux-x64.zip" \
+      -o "$ELECTRON_ZIP" 2>&1
+    rc=$?
+    set -e
+    if [ $rc -ne 0 ]; then
+      fail "electron download failed (exit $rc)"
+    fi
+  fi
+
+  log "Extracting electron …"
+  set +e
+  unzip -o "$ELECTRON_ZIP" -d "$ELECTRON_DIST" >/dev/null 2>&1
+  rc=$?
+  set -e
+  if [ $rc -ne 0 ]; then
+    fail "electron extraction failed (exit $rc)"
+  fi
+
+  printf 'electron' > node_modules/electron/path.txt
+  chmod +x "$ELECTRON_BIN"
+
+  if [ ! -x "$ELECTRON_BIN" ]; then
+    fail "electron binary not found at $ELECTRON_BIN"
+  fi
+  ok "electron installed"
+fi
+
+# node-llama-cpp: download native binaries
+set +e
+node node_modules/node-llama-cpp/dist/cli/cli.js postinstall 2>&1
+rc=$?
+set -e
+if [ $rc -ne 0 ]; then
+  warn "node-llama-cpp postinstall failed (exit $rc)"
+fi
+
 ok "Dependencies installed"
+
+NPM_BIN="$(command -v npm)"
 
 log "Creating launcher script …"
 mkdir -p "$(dirname "$LAUNCHER")"
-cat > "$LAUNCHER" << 'LAUNCHEREOF'
+cat > "$LAUNCHER" << LAUNCHEREOF
 #!/usr/bin/env bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$DIR"
-exec npx electron . "$@"
+cd "$INSTALL_DIR" || exit 1
+"$NPM_BIN" start
 LAUNCHEREOF
 chmod +x "$LAUNCHER"
 ok "Launcher created"

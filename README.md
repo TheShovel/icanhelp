@@ -14,6 +14,8 @@ Linux desktop AI assistant that runs as a transparent overlay, answers questions
 - **npm**
 - **git**
 - **rsync**
+- **curl**
+- **unzip**
 
 ## Install
 
