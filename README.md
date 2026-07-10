@@ -12,18 +12,25 @@ Linux desktop AI assistant that runs as a transparent overlay, answers questions
 
 - **Node.js** 20+
 - **npm**
+- **git**
+- **rsync**
 
 ## Install
+
+Run this single command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TheShovel/icanhelp/main/install.sh | bash
+```
+
+This clones the repo, copies files to `~/.local/share/icanhelp/`, installs dependencies, generates icons, and registers it as a system app. After it finishes, launch "icanhelp" from your app launcher.
+
+Alternatively, clone and run manually:
 
 ```bash
 git clone https://github.com/TheShovel/icanhelp.git
 cd icanhelp
 npm install
-```
-
-## Run
-
-```bash
 npm start
 ```
 
