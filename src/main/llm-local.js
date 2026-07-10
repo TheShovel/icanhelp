@@ -46,6 +46,57 @@ function buildSystemPrompt() {
   return "You are icanhelp, a Linux desktop AI assistant.\nUse tools when appropriate.";
 }
 
+function buildInlinePrompt(history, currentPrompt) {
+  if (history.length === 0) return currentPrompt;
+
+  var lines = [];
+  for (var i = 0; i < history.length; i++) {
+    var item = history[i];
+    if (item.type === "user") {
+      lines.push("User: " + item.text);
+    } else if (item.type === "model") {
+      var resp = item.response && item.response[0] ? item.response[0] : "";
+      lines.push("Assistant: " + resp);
+    }
+  }
+
+  lines.push("User: " + currentPrompt);
+  lines.push("Assistant:");
+
+  return lines.join("\n");
+}
+
+function RepetitionDetector() {
+  var buf = "";
+  var lines = [];
+
+  return {
+    feed: function (text) {
+      buf += text;
+      lines = buf.split("\n");
+
+      if (lines.length >= 6) {
+        var last = lines[lines.length - 1].trim();
+        var prev = lines[lines.length - 2].trim();
+        var prev2 = lines[lines.length - 3].trim();
+        if (last.length > 5 && last === prev && prev === prev2) {
+          return true;
+        }
+      }
+
+      if (buf.length > 300) {
+        var tail = buf.slice(-150);
+        var half = Math.floor(tail.length / 2);
+        if (tail.slice(0, half) === tail.slice(half)) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+  };
+}
+
 function estimateTokens(history) {
   var chars = 0;
   for (var i = 0; i < history.length; i++) {
@@ -67,8 +118,8 @@ function compressHistory(history, contextSize) {
 
   if (estimateTokens(history) <= threshold) return history;
 
-  var systemMsg = history[0];
-  var rest = history.slice(1);
+  var systemMsg = history[0].type === "system" ? history[0] : null;
+  var rest = systemMsg ? history.slice(1) : history;
 
   var keepRecent = 8;
   if (rest.length <= keepRecent + 4) return history;
@@ -103,7 +154,8 @@ function compressHistory(history, contextSize) {
         response: ["Tool results processed. Continuing the conversation."],
       },
     ];
-    return [systemMsg, ...compressed, ...toolMessages, ...recent];
+    var result = [...compressed, ...toolMessages, ...recent];
+    return systemMsg ? [systemMsg, ...result] : result;
   }
 
   var pairCount = 0;
@@ -139,7 +191,8 @@ function compressHistory(history, contextSize) {
     },
   ];
 
-  return [systemMsg, ...compressed, ...toolMessages, ...recent];
+  var result = [...compressed, ...toolMessages, ...recent];
+  return systemMsg ? [systemMsg, ...result] : result;
 }
 
 function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
@@ -157,7 +210,7 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
             return "Too many consecutive tool calls. Respond directly to the user now.";
           }
           state.consecutive++;
-          onToolStart({ name: name, args: params });
+          await onToolStart({ name: name, args: params });
           try {
             var result = await executeTool(name, params);
             var resultStr = String(result);
@@ -201,7 +254,14 @@ async function runLocalChatLoop({
 
   var { getLlama, LlamaChatSession } = await import("node-llama-cpp");
 
-  var { model } = await getOrLoadModel(resolvedPath, config);
+  var model;
+  try {
+    var loaded = await getOrLoadModel(resolvedPath, config);
+    model = loaded.model;
+  } catch (e) {
+    onChunk({ error: "Failed to load model: " + (e.message || String(e)) });
+    return;
+  }
 
   var context = await model.createContext({
     contextSize: config.contextSize || 8192,
@@ -219,7 +279,7 @@ async function runLocalChatLoop({
   console.log(buildSystemPrompt());
   console.log("[llm-local] Chat wrapper:", session.chatWrapper?.wrapperName);
 
-  var history = [{ type: "system", text: buildSystemPrompt() }];
+  var history = [];
   for (var i = 0; i < messages.length; i++) {
     var msg = messages[i];
     if (msg.role === "system") continue;
@@ -245,8 +305,29 @@ async function runLocalChatLoop({
     }
   }
 
-  session.setChatHistory(history);
+  var inlinePrompt = buildInlinePrompt(history, currentPrompt);
+  session.setChatHistory([{ type: "system", text: buildSystemPrompt() }]);
+
   console.log("[llm-local] History items:", history.length);
+  for (var hi = 0; hi < history.length; hi++) {
+    var hitem = history[hi];
+    if (hitem.type === "user") {
+      console.log(
+        "[llm-local]   history[" + hi + "] user: " + hitem.text.slice(0, 80),
+      );
+    } else if (hitem.type === "model") {
+      console.log(
+        "[llm-local]   history[" +
+          hi +
+          "] model: " +
+          (hitem.response && hitem.response[0]
+            ? hitem.response[0].slice(0, 80)
+            : "(empty)"),
+      );
+    } else {
+      console.log("[llm-local]   history[" + hi + "] " + hitem.type);
+    }
+  }
   console.log("[llm-local] Current prompt:", currentPrompt.slice(0, 100));
 
   var { functions, state } = buildFunctions(
@@ -258,6 +339,15 @@ async function runLocalChatLoop({
   console.log("[llm-local] Tools count:", Object.keys(functions).length);
 
   try {
+    var repDetector = RepetitionDetector();
+    var internalAbort = new AbortController();
+
+    if (signal) {
+      signal.addEventListener("abort", function () {
+        internalAbort.abort();
+      });
+    }
+
     var opts = {
       functions: functions,
       documentFunctionParams: true,
@@ -265,9 +355,14 @@ async function runLocalChatLoop({
         ? Math.floor(config.contextSize * 0.75)
         : 6144,
       temperature: 0.7,
-      signal: signal,
+      signal: internalAbort.signal,
       stopOnAbortSignal: true,
       onTextChunk: function (chunk) {
+        if (repDetector.feed(chunk)) {
+          console.log("[llm-local] Repetition detected, aborting");
+          internalAbort.abort();
+          throw new Error("REPETITION_DETECTED");
+        }
         onChunk({ text: chunk });
       },
       onResponseChunk: function (chunk) {
@@ -276,26 +371,31 @@ async function runLocalChatLoop({
           chunk.type === "segment" &&
           chunk.segmentType === "thought"
         ) {
+          if (repDetector.feed(chunk.text)) {
+            console.log(
+              "[llm-local] Repetition detected in thinking, aborting",
+            );
+            internalAbort.abort();
+            throw new Error("REPETITION_DETECTED");
+          }
           onChunk({ thinking: chunk.text });
         }
       },
     };
 
-    var result = await session.promptWithMeta(currentPrompt, opts);
+    var result = await session.promptWithMeta(inlinePrompt, opts);
     console.log("[llm-local] Response:", result.responseText);
   } catch (e) {
-    if (e.name === "AbortError" || (signal && signal.aborted)) {
+    if (e.message === "REPETITION_DETECTED") {
+      console.log("[llm-local] Repetition loop detected, requesting retry");
+      onChunk({ error: "Model got stuck in a loop. Please try again." });
+    } else if (e.name === "AbortError" || (signal && signal.aborted)) {
       console.log("[llm-local] Aborted");
     } else {
       onChunk({ error: e.message });
     }
   }
 
-  console.log("[llm-local] Disposing session...");
-  session.dispose();
-  console.log("[llm-local] Session disposed");
-  await context.dispose();
-  console.log("[llm-local] Context disposed");
   console.log("[llm-local] Returning");
 }
 
@@ -308,13 +408,32 @@ function disposeModel() {
   }
 }
 
+async function preloadModel(modelPath, config, onProgress) {
+  if (cachedModel && cachedModelPath === modelPath) {
+    if (onProgress) onProgress({ stage: "done" });
+    return;
+  }
+
+  if (onProgress) onProgress({ stage: "loading" });
+
+  try {
+    await getOrLoadModel(modelPath, config || {});
+    if (onProgress) onProgress({ stage: "done" });
+  } catch (e) {
+    console.error("[llm-local] preload failed:", e.message || e);
+    if (onProgress) onProgress({ stage: "error", error: e.message });
+  }
+}
+
 module.exports = {
   runLocalChatLoop,
+  buildFunctions,
   resolveModelPath,
   defaultModelPath,
   defaultModelFile,
   compressHistory,
   estimateTokens,
   getOrLoadModel,
+  preloadModel,
   disposeModel,
 };

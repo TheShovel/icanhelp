@@ -951,6 +951,9 @@ async function sendMessage() {
       cleanup();
       setAvatarState("idle");
       msgEl.classList.remove("streaming");
+      if (responseContent && responseContent.textContent === "Working...") {
+        responseContent.textContent = "";
+      }
       if (!thinkingBlock.classList.contains("has-thinking")) {
         thinkingBlock.classList.add("hidden");
       } else {
@@ -999,50 +1002,87 @@ async function sendMessage() {
       } else {
         setAvatarState("bash");
       }
-      var cmd =
-        chunk.tool_start.args.command || JSON.stringify(chunk.tool_start.args);
+      var args = chunk.tool_start.args || {};
       var toolBlock = document.createElement("div");
-      toolBlock.className = "tool-block";
+      toolBlock.className = "tool-block tool-working";
+      toolBlock.dataset.started = Date.now();
       var toolHeader = document.createElement("div");
       toolHeader.className = "tool-header";
-      var iconName = "terminal";
-      var label = chunk.tool_start.name;
-      var args = chunk.tool_start.args || {};
-      if (chunk.tool_start.name === "search_web") {
-        iconName = "search";
-        label = args.query || "search";
-      } else if (args.command) {
-        label = args.command;
+      var isFileTool = toolName === "write_file" || toolName === "read_file";
+      if (isFileTool) {
+        var filePath = args.path || "";
+        toolBlock.classList.add("tool-file");
+        toolHeader.innerHTML = iconSvg("file", 14) + " " + filePath;
+        toolHeader.addEventListener("click", function () {
+          window.electronAPI.openFile(filePath);
+        });
+      } else if (toolName === "search_web") {
+        var query = args.query || "search";
+        toolHeader.innerHTML = iconSvg("search", 14) + " " + query;
+        toolHeader.addEventListener("click", function () {
+          toolBlock.classList.toggle("collapsed");
+        });
+      } else {
+        var cmd = args.command || JSON.stringify(args);
+        var label = args.command || toolName;
+        if (label.length > 50) label = label.slice(0, 50) + "...";
+        toolHeader.innerHTML = iconSvg("terminal", 14) + " " + label;
+        toolHeader.addEventListener("click", function () {
+          toolBlock.classList.toggle("collapsed");
+        });
       }
-      if (label.length > 50) label = label.slice(0, 50) + "...";
-      toolHeader.innerHTML = iconSvg(iconName, 14) + " " + label;
-      toolHeader.addEventListener("click", function () {
-        toolBlock.classList.toggle("collapsed");
-      });
       var toolContent = document.createElement("div");
       toolContent.className = "tool-content";
-      var pre = document.createElement("pre");
-      pre.className = "tool-text";
-      pre.textContent = cmd;
-      toolContent.appendChild(pre);
+      if (isFileTool) {
+        var filePath = args.path || "";
+        var capsule = document.createElement("div");
+        capsule.className = "tool-file-capsule";
+        capsule.title = "Click to open file";
+        capsule.textContent = filePath;
+        capsule.addEventListener("click", function () {
+          window.electronAPI.openFile(filePath);
+        });
+        toolContent.appendChild(capsule);
+      } else {
+        var cmd = args.command || JSON.stringify(args);
+        var pre = document.createElement("pre");
+        pre.className = "tool-text";
+        pre.textContent = cmd;
+        toolContent.appendChild(pre);
+      }
       toolBlock.appendChild(toolHeader);
       toolBlock.appendChild(toolContent);
       bubble.insertBefore(toolBlock, responseContent);
+      if (!responseContent.textContent) {
+        responseContent.textContent = "Working...";
+      }
       smoothScroll(chatMessages);
       return;
     }
 
     if (chunk.tool_end) {
-      var out = document.createElement("div");
-      out.className = "tool-output";
-      out.textContent = chunk.tool_end.output;
-      var tc = bubble.querySelector(".tool-content");
-      if (tc) {
-        tc.appendChild(out);
-        setTimeout(function () {
-          var tb = bubble.querySelector(".tool-block");
-          if (tb) tb.classList.add("collapsed");
-        }, 800);
+      var toolBlocks = bubble.querySelectorAll(".tool-block");
+      var tbEnd = toolBlocks[toolBlocks.length - 1];
+      if (tbEnd) {
+        var tcEnd = tbEnd.querySelector(".tool-content");
+        if (tcEnd) {
+          var existingOut = tcEnd.querySelector(".tool-output");
+          if (!existingOut) {
+            var out = document.createElement("div");
+            out.className = "tool-output";
+            out.textContent = chunk.tool_end.output;
+            tcEnd.appendChild(out);
+          }
+          var minAnim = 300;
+          var elapsed = Date.now() - (parseInt(tbEnd.dataset.started) || 0);
+          var delay = Math.max(0, minAnim - elapsed);
+          setTimeout(function () {
+            tbEnd.classList.remove("tool-working");
+          }, delay);
+          setTimeout(function () {
+            tbEnd.classList.add("collapsed");
+          }, delay + 800);
+        }
       }
       smoothScroll(chatMessages);
       return;
@@ -1105,6 +1145,7 @@ function createAssistantMessage() {
 
   const rc = document.createElement("div");
   rc.className = "response-content";
+  rc.textContent = "Working...";
 
   bubble.appendChild(tb);
   bubble.appendChild(rc);

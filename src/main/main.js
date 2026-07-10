@@ -14,6 +14,7 @@ const os = require("os");
 const { execFile } = require("child_process");
 const { marked } = require("marked");
 const { runLocalChatLoop } = require("./llm-local");
+const { preloadModel } = require("./llm-local");
 const { disposeModel } = require("./llm-local");
 const {
   RECOMMENDED_MODELS,
@@ -112,6 +113,7 @@ function createWindow() {
     }
   });
 
+  ipcMain.on("close-window", function () {});
   setProgressCallback(function (info) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("vision-download-progress", info);
@@ -194,120 +196,161 @@ function createWindow() {
     const { executeToolCall } = require("./tools/registry");
 
     var pendingConfirm = null;
+    var retries = 0;
+    var maxRetries = 2;
 
-    await runLocalChatLoop({
-      modelPath: cfg.modelPath,
-      messages: messages,
-      tools: tools,
-      config: cfg,
-      signal: signal,
-      onChunk: function (chunk) {
-        if (chunk.error) {
-          console.log("[main] LLM error:", chunk.error);
-          event.sender.send("llm-chunk", { error: chunk.error });
-        }
-        if (chunk.text) event.sender.send("llm-chunk", { text: chunk.text });
-        if (chunk.thinking)
-          event.sender.send("llm-chunk", { thinking: chunk.thinking });
-        if (chunk.replaceText !== undefined)
-          event.sender.send("llm-chunk", { replaceText: chunk.replaceText });
-      },
-      onToolStart: function (info) {
-        console.log("[main] tool_start:", info.name, JSON.stringify(info.args));
-        event.sender.send("llm-chunk", {
-          tool_start: { name: info.name, args: info.args },
-        });
-      },
-      onToolEnd: function (info) {
-        console.log(
-          "[main] tool_end:",
-          info.name,
-          "output len:",
-          info.output.length,
-        );
-        event.sender.send("llm-chunk", {
-          tool_end: { name: info.name, output: info.output },
-        });
-      },
-      executeTool: async function (name, args) {
-        var tc = {
-          id: "local-" + Date.now(),
-          function: { name: name, arguments: JSON.stringify(args) },
-        };
+    while (true) {
+      var loopError = null;
 
-        var onSudoPrompt = async function () {
-          return await requestSudoPassword(event);
-        };
-        var onConfirm = async function (cmd) {
-          event.sender.send("llm-chunk", {
-            confirm_prompt: { command: cmd },
-          });
-          return await new Promise(function (resolve) {
-            pendingConfirm = resolve;
-          });
-        };
-
-        var result = await executeToolCall(tc, {
-          onSudoPrompt: onSudoPrompt,
-          onConfirm: onConfirm,
-        });
-
-        if (name === "set_theme") {
-          try {
-            var props = args.properties;
-            if (typeof props === "string") props = JSON.parse(props);
+      await runLocalChatLoop({
+        modelPath: cfg.modelPath,
+        messages: messages,
+        tools: tools,
+        config: cfg,
+        signal: signal,
+        onChunk: function (chunk) {
+          if (chunk.error) {
+            console.log("[main] LLM error:", chunk.error);
             if (
-              props &&
-              typeof props === "object" &&
-              Object.keys(props).length > 0
+              chunk.error.indexOf("stuck in a loop") !== -1 &&
+              retries < maxRetries
             ) {
-              var themeName = args.name || "custom-" + Date.now();
-              console.log(
-                "[main] saving theme:",
-                themeName,
-                "keys:",
-                Object.keys(props).length,
-              );
-              mainWindow.webContents.send("apply-theme", props);
-              saveTheme(themeName, props);
-              saveActiveTheme(themeName);
-              mainWindow.webContents.send("themes-changed");
-              console.log("[main] theme saved");
-            } else {
-              console.log(
-                "[main] set_theme skipped, props type:",
-                typeof props,
-                "keys:",
-                props ? Object.keys(props).length : 0,
-              );
+              loopError = chunk.error;
+              return;
             }
-          } catch (e) {}
-        }
-        if (name === "delete_theme") {
-          try {
-            deleteTheme(args.name);
-            mainWindow.webContents.send("themes-changed");
-          } catch (e) {}
-        }
-        if (name === "apply_theme") {
-          try {
-            var themes = loadThemes();
-            var theme = themes[args.name];
-            if (theme && theme.properties) {
-              saveActiveTheme(args.name);
-              mainWindow.webContents.send("apply-theme", theme.properties);
-              mainWindow.webContents.send("themes-changed");
-            }
-          } catch (e) {}
-        }
-        if (name === "list_themes") {
-          var allThemes = loadThemes();
-          return JSON.stringify({ themes: Object.keys(allThemes) });
-        }
+            event.sender.send("llm-chunk", { error: chunk.error });
+          }
+          if (loopError) return;
+          if (chunk.text) event.sender.send("llm-chunk", { text: chunk.text });
+          if (chunk.thinking)
+            event.sender.send("llm-chunk", { thinking: chunk.thinking });
+          if (chunk.replaceText !== undefined)
+            event.sender.send("llm-chunk", { replaceText: chunk.replaceText });
+          if (chunk.sudo_prompt) {
+            event.sender.send("llm-chunk", { sudo_prompt: chunk.sudo_prompt });
+          }
+        },
+        onToolStart: async function (info) {
+          console.log(
+            "[main] tool_start:",
+            info.name,
+            JSON.stringify(info.args),
+          );
+          event.sender.send("llm-chunk", {
+            tool_start: { name: info.name, args: info.args },
+          });
+        },
+        onToolEnd: function (info) {
+          console.log(
+            "[main] tool_end:",
+            info.name,
+            "output len:",
+            info.output.length,
+          );
+          event.sender.send("llm-chunk", {
+            tool_end: { name: info.name, output: info.output },
+          });
+        },
+        executeTool: async function (name, args) {
+          var tc = {
+            id: "local-" + Date.now(),
+            function: { name: name, arguments: JSON.stringify(args) },
+          };
 
-        return String(result);
-      },
-    });
+          var onSudoPrompt = async function () {
+            return await requestSudoPassword(event);
+          };
+          var onConfirm = async function (cmd) {
+            event.sender.send("llm-chunk", {
+              confirm_prompt: { command: cmd },
+            });
+            return await new Promise(function (resolve) {
+              pendingConfirm = resolve;
+            });
+          };
+
+          var result = await executeToolCall(tc, {
+            onSudoPrompt: onSudoPrompt,
+            onConfirm: onConfirm,
+            onOutput:
+              name === "run_bash"
+                ? function (chunk) {
+                    event.sender.send("llm-chunk", {
+                      tool_chunk: { name: name, chunk: chunk },
+                    });
+                  }
+                : null,
+          });
+
+          if (name === "set_theme") {
+            try {
+              var props = args.properties;
+              if (typeof props === "string") props = JSON.parse(props);
+              if (
+                props &&
+                typeof props === "object" &&
+                Object.keys(props).length > 0
+              ) {
+                var themeName = args.name || "custom-" + Date.now();
+                console.log(
+                  "[main] saving theme:",
+                  themeName,
+                  "keys:",
+                  Object.keys(props).length,
+                );
+                mainWindow.webContents.send("apply-theme", props);
+                saveTheme(themeName, props);
+                saveActiveTheme(themeName);
+                mainWindow.webContents.send("themes-changed");
+                console.log("[main] theme saved");
+              } else {
+                console.log(
+                  "[main] set_theme skipped, props type:",
+                  typeof props,
+                  "keys:",
+                  props ? Object.keys(props).length : 0,
+                );
+              }
+            } catch (e) {}
+          }
+          if (name === "delete_theme") {
+            try {
+              deleteTheme(args.name);
+              mainWindow.webContents.send("themes-changed");
+            } catch (e) {}
+          }
+          if (name === "apply_theme") {
+            try {
+              var themes = loadThemes();
+              var theme = themes[args.name];
+              if (theme && theme.properties) {
+                saveActiveTheme(args.name);
+                mainWindow.webContents.send("apply-theme", theme.properties);
+                mainWindow.webContents.send("themes-changed");
+              }
+            } catch (e) {}
+          }
+          if (name === "list_themes") {
+            var allThemes = loadThemes();
+            return JSON.stringify({ themes: Object.keys(allThemes) });
+          }
+
+          return String(result);
+        },
+      });
+
+      if (!loopError) break;
+
+      retries++;
+      console.log(
+        "[main] Retrying after loop detection (attempt " +
+          retries +
+          "/" +
+          maxRetries +
+          ")",
+      );
+      event.sender.send("llm-chunk", { replaceText: "" });
+    }
 
     console.log("[main] Sending done");
     event.sender.send("llm-chunk", { done: true });
@@ -416,6 +459,22 @@ function createWindow() {
 
   ipcMain.handle("delete-model", function (_, filename) {
     return deleteModel(filename);
+  });
+
+  ipcMain.handle("preload-model", async function () {
+    var cfg = loadConfig() || {};
+    if (!cfg.modelPath) return { error: "No model configured" };
+
+    try {
+      await preloadModel(cfg.modelPath, cfg, function (info) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("model-preload-progress", info);
+        }
+      });
+      return { ok: true };
+    } catch (e) {
+      return { error: e.message };
+    }
   });
 
   ipcMain.handle("reset-all-data", function () {

@@ -68,5 +68,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("model-download-progress", handler);
     return () => ipcRenderer.removeListener("model-download-progress", handler);
   },
+  preloadModel: () => ipcRenderer.invoke("preload-model"),
+  onModelPreloadProgress: (callback) => {
+    const handler = (_event, info) => callback(info);
+    ipcRenderer.on("model-preload-progress", handler);
+    return () => ipcRenderer.removeListener("model-preload-progress", handler);
+  },
   resetAllData: () => ipcRenderer.invoke("reset-all-data"),
 });

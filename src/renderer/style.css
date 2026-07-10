@@ -655,6 +655,8 @@ body {
     word-break: break-word;
     min-width: 0;
     overflow: hidden;
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 .message.user .bubble {
@@ -850,11 +852,24 @@ body {
     overflow: hidden;
 }
 
+@keyframes tool-working-pulse {
+    0%,
+    100% {
+        border-left-color: var(--tool-border);
+    }
+    50% {
+        border-left-color: var(--accent);
+    }
+}
+
 /* ---- Tool Blocks ---- */
 .tool-block {
     margin: 4px 0;
     border-left: 2px solid var(--tool-border);
     padding-left: 8px;
+}
+.tool-block.tool-working {
+    animation: tool-working-pulse 0.8s ease infinite;
 }
 
 .tool-header {
@@ -908,6 +923,8 @@ body {
     white-space: pre-wrap;
     word-break: break-word;
     overflow: hidden;
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 .tool-output {
@@ -922,6 +939,57 @@ body {
     white-space: pre-wrap;
     word-break: break-word;
     overflow: hidden;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+/* ---- File Tool Capsules ---- */
+.tool-block.tool-file .tool-header::after {
+    display: none;
+}
+
+.tool-file-capsule {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0;
+    padding: 5px 10px;
+    background: var(--bg-tool);
+    border: 1px solid var(--tool-border);
+    border-radius: 20px;
+    font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", monospace;
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+    user-select: none;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool-file-capsule:hover {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+}
+
+.tool-file-capsule::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E");
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E");
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    flex-shrink: 0;
 }
 
 /* ---- Markdown Content ---- */
