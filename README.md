@@ -27,7 +27,7 @@ On first launch the setup panel appears. Select a model from the download list (
 
 ## Features
 
-- Runs entirely offline
+- Runs mostly offline
 - Model download manager
 - File attachments
 - Screenshot capture
