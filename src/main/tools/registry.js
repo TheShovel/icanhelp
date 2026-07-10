@@ -133,7 +133,8 @@ var tools = [
     function: {
       name: "write_file",
       description:
-        "Write content to a file. Creates parent directories if needed. Overwrites existing files.",
+        "Write content to a file. Creates parent directories if needed. Overwrites existing files. " +
+        "If the user doesn't specify a path, write to their home directory.",
       parameters: {
         type: "object",
         properties: {

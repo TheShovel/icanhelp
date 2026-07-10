@@ -852,6 +852,34 @@ body {
     overflow: hidden;
 }
 
+.working-indicator {
+    font-size: 11px;
+    color: var(--accent);
+    padding: 3px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.working-indicator::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--tool-border);
+    border-top-color: var(--accent);
+    border-right-color: var(--accent);
+    border-radius: 50%;
+    box-sizing: border-box;
+    animation: working-spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes working-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @keyframes tool-working-pulse {
     0%,
     100% {
@@ -990,6 +1018,16 @@ body {
     mask-repeat: no-repeat;
     -webkit-mask-repeat: no-repeat;
     flex-shrink: 0;
+}
+
+.file-link {
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.file-link:hover {
+    color: var(--accent-hover);
 }
 
 /* ---- Markdown Content ---- */

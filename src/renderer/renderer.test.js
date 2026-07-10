@@ -186,12 +186,12 @@ test("tool_start creates tool block with header and command text", async functio
   var bubble = assistantBubble(doc);
   assert.ok(bubble, "assistant bubble should exist");
 
-  var responseContent = bubble.querySelector(".response-content");
-  assert.ok(responseContent, "response-content should exist");
+  var workingIndicator = bubble.querySelector(".working-indicator");
+  assert.ok(workingIndicator, "working-indicator should exist");
   assert.strictEqual(
-    responseContent.textContent.trim(),
+    workingIndicator.textContent.trim(),
     "Working...",
-    "response should show Working...",
+    "working indicator should show Working...",
   );
 });
 
@@ -294,7 +294,7 @@ test("file capsule click calls openFile with correct path", async function (t) {
   );
 });
 
-test("Working... appears in response content when message created", async function (t) {
+test("working indicator visible during tool execution", async function (t) {
   var dom = createTestDOM();
   await setupListener(dom);
   var doc = dom.window.document;
@@ -305,15 +305,20 @@ test("Working... appears in response content when message created", async functi
   await waitForRAF(dom);
 
   var bubble = assistantBubble(doc);
-  var responseContent = bubble.querySelector(".response-content");
+  var workingIndicator = bubble.querySelector(".working-indicator");
+  assert.ok(workingIndicator, "working-indicator should exist");
+  assert.ok(
+    !workingIndicator.classList.contains("hidden"),
+    "working indicator should be visible during tool execution",
+  );
   assert.strictEqual(
-    responseContent.textContent.trim(),
+    workingIndicator.textContent.trim(),
     "Working...",
     "should show Working... during tool execution",
   );
 });
 
-test("Working... cleared on done when no text received", async function (t) {
+test("working indicator hidden on done", async function (t) {
   var dom = createTestDOM();
   await setupListener(dom);
   var doc = dom.window.document;
@@ -327,11 +332,11 @@ test("Working... cleared on done when no text received", async function (t) {
   await waitForRAF(dom);
 
   var bubble = assistantBubble(doc);
-  var responseContent = bubble.querySelector(".response-content");
-  assert.strictEqual(
-    responseContent.textContent,
-    "",
-    "Working... should be cleared on done",
+  var workingIndicator = bubble.querySelector(".working-indicator");
+  assert.ok(workingIndicator, "working-indicator should exist");
+  assert.ok(
+    workingIndicator.classList.contains("hidden"),
+    "working indicator should be hidden on done",
   );
 });
 
@@ -691,5 +696,199 @@ test("full tool lifecycle preserves all content", async function (t) {
   assert.ok(
     !toolBlock.classList.contains("tool-working"),
     "tool-working removed after animation",
+  );
+});
+
+test("write_file adds path to toolFilePaths", async function (t) {
+  var dom = createTestDOM();
+  await setupListener(dom);
+
+  var originalLength = dom.window.toolFilePaths.length;
+
+  sendChunk(dom, {
+    tool_start: {
+      name: "write_file",
+      args: { path: "/tmp/test-output.txt", content: "hello" },
+    },
+  });
+  await waitForRAF(dom);
+
+  assert.strictEqual(
+    dom.window.toolFilePaths.length,
+    originalLength + 1,
+    "toolFilePaths should contain the written file path",
+  );
+  assert.ok(
+    dom.window.toolFilePaths.indexOf("/tmp/test-output.txt") !== -1,
+    "toolFilePaths should include /tmp/test-output.txt",
+  );
+});
+
+test("read_file adds path to toolFilePaths", async function (t) {
+  var dom = createTestDOM();
+  await setupListener(dom);
+
+  var originalLength = dom.window.toolFilePaths.length;
+
+  sendChunk(dom, {
+    tool_start: {
+      name: "read_file",
+      args: { path: "/etc/hostname" },
+    },
+  });
+  await waitForRAF(dom);
+
+  assert.strictEqual(
+    dom.window.toolFilePaths.length,
+    originalLength + 1,
+    "toolFilePaths should contain the read file path",
+  );
+  assert.ok(
+    dom.window.toolFilePaths.indexOf("/etc/hostname") !== -1,
+    "toolFilePaths should include /etc/hostname",
+  );
+});
+
+test("toolFilePaths cleared on done", async function (t) {
+  var dom = createTestDOM();
+  await setupListener(dom);
+
+  sendChunk(dom, {
+    tool_start: {
+      name: "write_file",
+      args: { path: "/tmp/test.txt", content: "data" },
+    },
+  });
+  await waitForRAF(dom);
+
+  assert.ok(
+    dom.window.toolFilePaths.length > 0,
+    "toolFilePaths should have entries during tool execution",
+  );
+
+  sendChunk(dom, { done: true });
+  await waitForRAF(dom);
+
+  assert.strictEqual(
+    dom.window.toolFilePaths.length,
+    0,
+    "toolFilePaths should be empty after done",
+  );
+});
+
+test("file paths in response text become clickable links", async function (t) {
+  var dom = createTestDOM();
+  await setupListener(dom);
+  var doc = dom.window.document;
+
+  // First send tool_start to populate toolFilePaths
+  sendChunk(dom, {
+    tool_start: {
+      name: "write_file",
+      args: { path: "/tmp/myfile.txt", content: "data" },
+    },
+  });
+  await waitForRAF(dom);
+
+  // Send text that mentions the file path
+  sendChunk(dom, { text: "I wrote your file /tmp/myfile.txt for you" });
+  await new Promise(function (resolve) {
+    dom.window.setTimeout(resolve, 30);
+  });
+
+  // The responseContent should now contain a file-link
+  var bubble = assistantBubble(doc);
+  var responseContent = bubble.querySelector(".response-content");
+  var fileLink = responseContent.querySelector(".file-link");
+  assert.ok(fileLink, "file-link should exist in response content");
+  assert.ok(
+    fileLink.textContent.indexOf("/tmp/myfile.txt") !== -1,
+    "file-link should contain the file path",
+  );
+  assert.strictEqual(
+    fileLink.title,
+    "Open /tmp/myfile.txt",
+    "file-link title should indicate opening the file",
+  );
+});
+
+test("clicking file link opens the file", async function (t) {
+  var dom = createTestDOM();
+  await setupListener(dom);
+  var doc = dom.window.document;
+
+  var openedPath = null;
+  dom.window.electronAPI.openFile = function (filePath) {
+    openedPath = filePath;
+  };
+
+  sendChunk(dom, {
+    tool_start: {
+      name: "write_file",
+      args: { path: "/tmp/clickme.txt", content: "data" },
+    },
+  });
+  await waitForRAF(dom);
+
+  sendChunk(dom, { text: "Saved to /tmp/clickme.txt" });
+  await new Promise(function (resolve) {
+    dom.window.setTimeout(resolve, 30);
+  });
+
+  var bubble = assistantBubble(doc);
+  var responseContent = bubble.querySelector(".response-content");
+  var fileLink = responseContent.querySelector(".file-link");
+  assert.ok(fileLink, "file-link should exist");
+
+  fileLink.click();
+  assert.strictEqual(
+    openedPath,
+    "/tmp/clickme.txt",
+    "clicking file-link should open the correct path",
+  );
+});
+
+test("multiple file paths are all linkified", async function (t) {
+  var dom = createTestDOM();
+  await setupListener(dom);
+  var doc = dom.window.document;
+
+  sendChunk(dom, {
+    tool_start: {
+      name: "write_file",
+      args: { path: "/tmp/first.txt", content: "a" },
+    },
+  });
+  await waitForRAF(dom);
+
+  sendChunk(dom, {
+    tool_start: {
+      name: "write_file",
+      args: { path: "/tmp/second.txt", content: "b" },
+    },
+  });
+  await waitForRAF(dom);
+
+  sendChunk(dom, { text: "Created /tmp/first.txt and /tmp/second.txt" });
+  await new Promise(function (resolve) {
+    dom.window.setTimeout(resolve, 30);
+  });
+
+  var bubble = assistantBubble(doc);
+  var responseContent = bubble.querySelector(".response-content");
+  var links = responseContent.querySelectorAll(".file-link");
+  assert.strictEqual(links.length, 2, "should have two file links");
+
+  var texts = [];
+  for (var i = 0; i < links.length; i++) {
+    texts.push(links[i].textContent);
+  }
+  assert.ok(
+    texts.indexOf("/tmp/first.txt") !== -1,
+    "first file should be linkified",
+  );
+  assert.ok(
+    texts.indexOf("/tmp/second.txt") !== -1,
+    "second file should be linkified",
   );
 });

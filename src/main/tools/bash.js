@@ -57,7 +57,6 @@ async function runBash({ command, onSudoPrompt, onConfirm, onOutput }) {
   return new Promise(function (resolve) {
     var proc = spawn("/bin/bash", ["-c", command], {
       stdio: ["pipe", "pipe", "pipe"],
-      timeout: 60000,
     });
 
     var stdout = "";

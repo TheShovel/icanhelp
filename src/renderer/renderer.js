@@ -48,6 +48,7 @@ removeAttachment.innerHTML = iconSvg("close", 14);
 
 let currentAttachment = null;
 let attachmentToken = 0;
+var toolFilePaths = [];
 
 function renderAttachment() {
   attachmentPreview.classList.remove("loading", "ready", "error");
@@ -944,6 +945,11 @@ async function sendMessage() {
       setAvatarState("idle");
       responseContent.textContent = "Error: " + chunk.error;
       msgEl.classList.remove("streaming");
+      var wi = bubble.querySelector(".working-indicator");
+      if (wi) {
+        clearInterval(wi._dotsInterval);
+        wi.classList.add("hidden");
+      }
       return;
     }
 
@@ -951,8 +957,10 @@ async function sendMessage() {
       cleanup();
       setAvatarState("idle");
       msgEl.classList.remove("streaming");
-      if (responseContent && responseContent.textContent === "Working...") {
-        responseContent.textContent = "";
+      var wi = bubble.querySelector(".working-indicator");
+      if (wi) {
+        clearInterval(wi._dotsInterval);
+        wi.classList.add("hidden");
       }
       if (!thinkingBlock.classList.contains("has-thinking")) {
         thinkingBlock.classList.add("hidden");
@@ -962,6 +970,7 @@ async function sendMessage() {
         }, 600);
       }
       var chat = getCurrentChat();
+      toolFilePaths = [];
       if (chat) {
         chat.messages.push({ role: "assistant", content: buffer });
         chat.updatedAt = Date.now();
@@ -1011,6 +1020,9 @@ async function sendMessage() {
       var isFileTool = toolName === "write_file" || toolName === "read_file";
       if (isFileTool) {
         var filePath = args.path || "";
+        if (filePath && toolFilePaths.indexOf(filePath) === -1) {
+          toolFilePaths.push(filePath);
+        }
         toolBlock.classList.add("tool-file");
         toolHeader.innerHTML = iconSvg("file", 14) + " " + filePath;
         toolHeader.addEventListener("click", function () {
@@ -1053,9 +1065,7 @@ async function sendMessage() {
       toolBlock.appendChild(toolHeader);
       toolBlock.appendChild(toolContent);
       bubble.insertBefore(toolBlock, responseContent);
-      if (!responseContent.textContent) {
-        responseContent.textContent = "Working...";
-      }
+      // Working indicator is already visible from createAssistantMessage
       smoothScroll(chatMessages);
       return;
     }
@@ -1145,10 +1155,29 @@ function createAssistantMessage() {
 
   const rc = document.createElement("div");
   rc.className = "response-content";
-  rc.textContent = "Working...";
+
+  var wi = document.createElement("div");
+  wi.className = "working-indicator";
+  var wiText = document.createElement("span");
+  wiText.className = "working-text";
+  wiText.textContent = "Working";
+  var wiDots = document.createElement("span");
+  wiDots.className = "working-dots";
+  wiDots.textContent = "...";
+  wi.appendChild(wiText);
+  wi.appendChild(wiDots);
+
+  // Animate the dots cycling
+  var dotCount = 0;
+  wi._dotsInterval = setInterval(function () {
+    dotCount = (dotCount + 1) % 4;
+    wiDots.textContent = ".".repeat(dotCount);
+  }, 400);
+  if (wi._dotsInterval.unref) wi._dotsInterval.unref();
 
   bubble.appendChild(tb);
   bubble.appendChild(rc);
+  bubble.appendChild(wi);
   div.appendChild(bubble);
   chatMessages.appendChild(div);
   smoothScroll(chatMessages);
@@ -1211,7 +1240,77 @@ async function renderStreamedContent(
     ? await window.electronAPI.parseMarkdown(parsed.response)
     : "";
 
+  if (toolFilePaths.length > 0) {
+    linkifyFilePaths(responseContent, toolFilePaths);
+  }
+
   smoothScroll(chatMessages);
+}
+
+function linkifyFilePaths(root, paths) {
+  var walker = root.ownerDocument.createTreeWalker(
+    root,
+    4, // NodeFilter.SHOW_TEXT
+    null,
+    false,
+  );
+  var nodes = [];
+  while (walker.nextNode()) {
+    nodes.push(walker.currentNode);
+  }
+  for (var i = 0; i < nodes.length; i++) {
+    var node = nodes[i];
+    var text = node.textContent;
+
+    // Find all path occurrences
+    var matches = [];
+    for (var p = 0; p < paths.length; p++) {
+      var idx = text.indexOf(paths[p]);
+      if (idx !== -1) {
+        matches.push({ path: paths[p], index: idx, length: paths[p].length });
+      }
+    }
+    if (matches.length === 0) continue;
+
+    // Sort by position, prefer longer match at same position
+    matches.sort(function (a, b) {
+      if (a.index !== b.index) return a.index - b.index;
+      return b.length - a.length;
+    });
+
+    var doc = node.ownerDocument;
+    var fragment = doc.createDocumentFragment();
+    var lastEnd = 0;
+    for (var m = 0; m < matches.length; m++) {
+      if (matches[m].index < lastEnd) continue; // skip overlapping
+      if (matches[m].index > lastEnd) {
+        fragment.appendChild(
+          doc.createTextNode(text.slice(lastEnd, matches[m].index)),
+        );
+      }
+      var link = doc.createElement("a");
+      link.className = "file-link";
+      link.href = "#";
+      link.title = "Open " + matches[m].path;
+      link.textContent = matches[m].path;
+      link.addEventListener(
+        "click",
+        (function (fp) {
+          return function (e) {
+            e.preventDefault();
+            window.electronAPI.openFile(fp);
+          };
+        })(matches[m].path),
+      );
+      fragment.appendChild(link);
+      lastEnd = matches[m].index + matches[m].length;
+    }
+    if (lastEnd < text.length) {
+      fragment.appendChild(doc.createTextNode(text.slice(lastEnd)));
+    }
+
+    node.parentNode.replaceChild(fragment, node);
+  }
 }
 
 function smoothScroll(el) {
