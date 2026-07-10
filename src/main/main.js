@@ -34,6 +34,8 @@ const {
   loadThemes,
   saveTheme,
   deleteTheme,
+  isDefaultTheme,
+  getDefaultThemeNames,
   loadActiveTheme,
   saveActiveTheme,
 } = require("./store");
@@ -434,14 +436,20 @@ function createWindow() {
   });
 
   ipcMain.handle("save-theme", function (_, name, properties) {
+    if (isDefaultTheme(name)) return false;
     saveTheme(name, properties);
     return true;
   });
 
   ipcMain.handle("delete-theme", function (_, name) {
+    if (isDefaultTheme(name)) return false;
     deleteTheme(name);
     mainWindow.webContents.send("themes-changed");
     return true;
+  });
+
+  ipcMain.handle("get-default-themes", function () {
+    return getDefaultThemeNames();
   });
 
   ipcMain.handle("list-skills", function () {
@@ -584,6 +592,37 @@ function createWindow() {
 
   ipcMain.handle("open-file", async (_event, filePath) => {
     return await shell.openPath(filePath);
+  });
+
+  ipcMain.handle("open-folder", async (_event, key) => {
+    var folder;
+    switch (key) {
+      case "skills":
+        folder = path.join(__dirname, "..", "..", "skills");
+        break;
+      case "agents-skills":
+        folder = path.join(__dirname, "..", "..", ".agents", "skills");
+        break;
+      case "knowledge":
+        folder = path.join(os.homedir(), ".cache", "icanhelp");
+        break;
+      case "config":
+        folder = path.join(os.homedir(), ".config", "icanhelp");
+        break;
+      case "models":
+        folder = path.join(os.homedir(), ".cache", "icanhelp", "models");
+        break;
+      case "buddy-art":
+        folder = path.join(__dirname, "..", "..", "assets", "buddyArt");
+        break;
+    }
+    if (folder) {
+      if (!fs.existsSync(folder)) {
+        fs.mkdirSync(folder, { recursive: true });
+      }
+      return await shell.openPath(folder);
+    }
+    return "Invalid folder key";
   });
 
   function execCommand(cmd, args) {

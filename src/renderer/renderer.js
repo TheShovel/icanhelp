@@ -372,11 +372,22 @@ function renderChatList() {
     delBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       if (chats.length <= 1) return;
+      var wasActive = chat.id === currentChatId;
       chats = chats.filter(function (c) {
         return c.id !== chat.id;
       });
-      if (currentChatId === chat.id) {
-        switchToChat(chats[0].id);
+      if (wasActive) {
+        currentChatId = chats[0].id;
+        chatMessages.querySelectorAll(".message").forEach(function (el) {
+          el.remove();
+        });
+        var newChat = chats[0];
+        for (var m of newChat.messages) {
+          addMessage(m.content, m.role, m.attachment);
+        }
+        requestAnimationFrame(function () {
+          smoothScroll(chatMessages);
+        });
       }
       renderChatList();
       saveChatsToStore();
@@ -589,6 +600,16 @@ document
     } else if (action === "model") {
       settingsMenuPanel.classList.add("hidden");
       openModelPicker();
+    } else if (action === "open-skills") {
+      window.electronAPI.openFolder("skills");
+    } else if (action === "open-knowledge") {
+      window.electronAPI.openFolder("knowledge");
+    } else if (action === "open-config") {
+      window.electronAPI.openFolder("config");
+    } else if (action === "open-models") {
+      window.electronAPI.openFolder("models");
+    } else if (action === "open-buddy-art") {
+      window.electronAPI.openFolder("buddy-art");
     } else if (action === "reset") {
       if (item.dataset.confirmed !== "true") {
         item.dataset.confirmed = "true";
@@ -643,7 +664,10 @@ var themeListEl = document.getElementById("theme-list");
 function renderThemeList() {
   if (!themeListEl) return;
   themeListEl.innerHTML = "";
-  window.electronAPI.loadThemes().then(function (themes) {
+  Promise.all([
+    window.electronAPI.loadThemes(),
+    window.electronAPI.getDefaultThemes(),
+  ]).then(function ([themes, defaultNames]) {
     var names = Object.keys(themes).sort();
     window.electronAPI.loadActiveTheme().then(function (active) {
       var activeName = active ? active.name : null;
@@ -658,30 +682,41 @@ function renderThemeList() {
         item.dataset.name = names[i];
         if (names[i] === activeName) item.classList.add("active");
 
+        var isDefault = defaultNames.indexOf(names[i]) !== -1;
+        if (isDefault) item.classList.add("theme-item-default");
+
         var nameSpan = document.createElement("span");
         nameSpan.className = "theme-item-name";
         nameSpan.textContent = names[i];
+        if (isDefault) {
+          var badge = document.createElement("span");
+          badge.className = "theme-item-badge";
+          badge.textContent = "built-in";
+          nameSpan.appendChild(badge);
+        }
         item.appendChild(nameSpan);
 
-        var delBtn = document.createElement("button");
-        delBtn.className = "theme-item-del";
-        delBtn.innerHTML = iconSvg("close", 12);
-        delBtn.title = "Delete";
-        delBtn.addEventListener("click", function (e) {
-          e.stopPropagation();
-          var item = this.closest(".theme-item");
-          var n = item.dataset.name;
-          if (n) {
-            window.electronAPI.deleteTheme(n).then(function () {
-              item.remove();
-              if (!themeListEl.querySelector(".theme-item")) {
-                themeListEl.innerHTML =
-                  '<div class="theme-item-empty">No saved themes yet.</div>';
-              }
-            });
-          }
-        });
-        item.appendChild(delBtn);
+        if (!isDefault) {
+          var delBtn = document.createElement("button");
+          delBtn.className = "theme-item-del";
+          delBtn.innerHTML = iconSvg("close", 12);
+          delBtn.title = "Delete";
+          delBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var item = this.closest(".theme-item");
+            var n = item.dataset.name;
+            if (n) {
+              window.electronAPI.deleteTheme(n).then(function () {
+                item.remove();
+                if (!themeListEl.querySelector(".theme-item")) {
+                  themeListEl.innerHTML =
+                    '<div class="theme-item-empty">No saved themes yet.</div>';
+                }
+              });
+            }
+          });
+          item.appendChild(delBtn);
+        }
 
         item.addEventListener("click", function () {
           var n = this.dataset.name;
@@ -883,10 +918,15 @@ async function openModelPicker() {
   installSubtitle.textContent = "Choose a model to download";
   installTitle.textContent = "Change Model";
   installBack.classList.remove("hidden");
+  installAvatar.classList.add("hidden");
+  installSpinner.classList.add("hidden");
+  installProgressBar.classList.add("hidden");
+  installPct.classList.add("hidden");
+  installSize.classList.add("hidden");
   installScreen.classList.remove("hidden");
   chatPanel.classList.add("hidden");
 
-  window.electronAPI.resizeWindow(320, 420);
+  window.electronAPI.resizeWindow(340, 580);
 
   var sysInfo = await window.electronAPI.getSystemInfo();
   var allModels = await window.electronAPI.getRecommendedModels();
@@ -897,6 +937,9 @@ async function openModelPicker() {
 
 function closeModelPicker() {
   installBack.classList.add("hidden");
+  installAvatar.classList.remove("hidden");
+  installPct.classList.remove("hidden");
+  installSize.classList.remove("hidden");
   installScreen.classList.add("hidden");
   chatPanel.classList.remove("hidden");
   sendBtn.classList.remove("hidden");

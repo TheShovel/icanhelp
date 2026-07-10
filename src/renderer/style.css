@@ -12,8 +12,11 @@
 
 #install-screen {
     position: absolute;
-    inset: 0;
+    inset: 12px 12px 80px 12px;
     background: var(--bg-panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -94,7 +97,7 @@
     flex-direction: column;
     gap: 8px;
     width: 100%;
-    max-height: 250px;
+    max-height: 380px;
     overflow-y: auto;
 }
 
@@ -1603,6 +1606,14 @@ body {
 .settings-menu-item-danger:hover {
     background: rgba(192, 28, 40, 0.08);
 }
+.settings-menu-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--fg-muted);
+    padding: 8px 14px 4px;
+}
 
 /* ---- Theme Panel ---- */
 #theme-panel {
@@ -1707,6 +1718,25 @@ body {
     font-size: 12px;
     color: var(--fg-muted);
     padding: 8px 14px;
+}
+.theme-item-default {
+    cursor: default;
+}
+.theme-item-default .theme-item-name {
+    color: var(--fg-muted);
+}
+.theme-item-badge {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--fg-placeholder);
+    margin-left: 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 5px;
+    line-height: 1.6;
+    vertical-align: middle;
 }
 
 /* ---- Attach Menu ---- */

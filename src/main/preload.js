@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   loadThemes: () => ipcRenderer.invoke("load-themes"),
   deleteTheme: (name) => ipcRenderer.invoke("delete-theme", name),
+  getDefaultThemes: () => ipcRenderer.invoke("get-default-themes"),
   applyTheme: (name) => ipcRenderer.invoke("apply-theme", name),
   loadActiveTheme: () => ipcRenderer.invoke("load-active-theme"),
   resetActiveTheme: () => ipcRenderer.invoke("reset-active-theme"),
@@ -75,4 +76,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("model-preload-progress", handler);
   },
   resetAllData: () => ipcRenderer.invoke("reset-all-data"),
+  openFolder: (key) => ipcRenderer.invoke("open-folder", key),
 });
