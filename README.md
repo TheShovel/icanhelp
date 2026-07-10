@@ -1,5 +1,11 @@
 # icanhelp
 
+<div align="center">
+  <img src="https://img.shields.io/github/languages/top/TheShovel/icanhelp?style=flat-square&logo=javascript&label=language" alt="Language">&nbsp;&nbsp;
+  <img src="https://img.shields.io/github/license/TheShovel/icanhelp?style=flat-square" alt="License">&nbsp;&nbsp;
+  <img src="https://img.shields.io/github/last-commit/TheShovel/icanhelp?style=flat-square&logo=git" alt="Last Commit">
+</div>
+
 Linux desktop AI assistant that runs as a transparent overlay, answers questions, executes commands, analyzes images, and searches the web, all running locally.
 
 ## Requirements
