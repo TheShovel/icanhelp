@@ -45,7 +45,38 @@ On first launch the setup panel appears. Select a model from the download list (
 
 ## Knowledge Base
 
-The AI can use the `store_knowledge` tool to remember facts, instructions, or code snippets. Use `search_knowledge` to retrieve information by meaning. Data persists to `~/.cache/icanhelp/knowledge.json`.
+The AI assistant has a local RAG (Retrieval-Augmented Generation) knowledge base at `knowledge/` - a curated collection of markdown files across 9 categories. The AI uses it to answer questions without needing larger model weights.
+
+### Categories
+
+| Category | Files | Topics |
+|----------|-------|--------|
+| `knowledge/creative/` | 35 | Music, photography, cooking, baking, sewing, drawing, writing, film, crafts |
+| `knowledge/daily/` | 60 | Life skills, travel, parenting, relationships, career, fitness, car maintenance |
+| `knowledge/finance/` | 12 | Budgeting, investing, taxes, retirement, credit, small business |
+| `knowledge/general/` | 27 | History, philosophy, economics, politics, world religions, ethics |
+| `knowledge/health/` | 50 | Mental health, nutrition, exercise, first aid, sleep, child development |
+| `knowledge/home/` | 37 | Gardening, plumbing, woodworking, electrical, home security, cleaning |
+| `knowledge/linux/` | 16 | Bash, systemd, kernel, networking, package management, troubleshooting |
+| `knowledge/programming/` | 70 | Python, JS/TS, Rust, Go, databases, Docker, Kubernetes, ML, web dev |
+| `knowledge/science/` | 32 | Physics, chemistry, biology, neuroscience, climate science, astronomy |
+
+### How It Works
+
+- `src/main/rag.js` - chunks, embeds (all-MiniLM-L6-v2), and performs cosine similarity search over the knowledge base
+- Auto-search in `src/main/main.js` injects relevant knowledge entries before every user prompt
+- The system prompt in `src/main/llm-local.js` instructs the model to always search before answering
+- Data persists to `~/.cache/icanhelp/knowledge.json`
+
+### Adding Knowledge
+
+1. Create a markdown file in the appropriate `knowledge/<category>/` directory
+2. Use dense, factual formatting - lists, tables, code blocks, clear headings
+3. Run `npm run ingest` to embed everything into the vector store
+4. Run `npm run fetch-knowledge` to download external references
+5. Run `npm run knowledge-stats` to see the current number of chunks per category
+
+The AI can also use the `store_knowledge` tool at runtime to remember facts, instructions, or code snippets, and `search_knowledge` to retrieve them by meaning.
 
 ## Screenshot Dependencies
 
