@@ -43,17 +43,7 @@ function resolveModelPath(config) {
 }
 
 function buildSystemPrompt() {
-  var homeDir = process.env.HOME || "/home/user";
-  return (
-    "You are icanhelp, a Linux desktop AI assistant.\n" +
-    "Use tools when appropriate.\n" +
-    "The user's home directory is " +
-    homeDir +
-    ". When writing files with write_file, " +
-    "write them under " +
-    homeDir +
-    " unless the user specifies a different path."
-  );
+  return "You are icanhelp, a Linux desktop AI assistant.\nUse tools when appropriate.";
 }
 
 function buildInlinePrompt(history, currentPrompt) {

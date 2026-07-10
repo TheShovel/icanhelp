@@ -33,10 +33,16 @@ const installProgressBar = document.getElementById("install-progress-bar");
 const installPct = document.getElementById("install-pct");
 const installSize = document.getElementById("install-size");
 const installSubtitle = document.getElementById("install-subtitle");
+const installTitle = document.getElementById("install-title");
+const installBack = document.getElementById("install-back");
 const installModelList = document.getElementById("install-model-list");
 
 avatarInner.src = window.electronAPI.buddyArt("idle");
 installAvatar.src = window.electronAPI.buddyArt("idle");
+document.getElementById("install-back").innerHTML = iconSvg("close", 16);
+document.getElementById("install-back").addEventListener("click", function () {
+  closeModelPicker();
+});
 document.getElementById("close-settings-menu").innerHTML = iconSvg("close", 16);
 document.getElementById("close-theme").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
@@ -580,6 +586,9 @@ document
       settingsMenuPanel.classList.add("hidden");
       themePanel.classList.remove("hidden");
       renderThemeList();
+    } else if (action === "model") {
+      settingsMenuPanel.classList.add("hidden");
+      openModelPicker();
     } else if (action === "reset") {
       if (item.dataset.confirmed !== "true") {
         item.dataset.confirmed = "true";
@@ -720,6 +729,19 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
+// Register download progress handler globally (needed for both initial install and settings)
+window.electronAPI.onModelDownloadProgress(function (info) {
+  if (info.stage === "downloading") {
+    installProgressFill.style.width = info.progress + "%";
+    installPct.textContent = info.progress + "%";
+    if (info.total) {
+      var mb = (info.received / (1024 * 1024)).toFixed(0);
+      var totalMb = (info.total / (1024 * 1024)).toFixed(0);
+      installSize.textContent = mb + " MB / " + totalMb + " MB";
+    }
+  }
+});
+
 // --- Install Screen ---
 (async function initInstall() {
   var hasCfg = await window.electronAPI.hasConfig();
@@ -740,18 +762,6 @@ chatInput.addEventListener("keydown", (e) => {
   }
 
   window.electronAPI.resizeWindow(320, 420);
-
-  window.electronAPI.onModelDownloadProgress(function (info) {
-    if (info.stage === "downloading") {
-      installProgressFill.style.width = info.progress + "%";
-      installPct.textContent = info.progress + "%";
-      if (info.total) {
-        var mb = (info.received / (1024 * 1024)).toFixed(0);
-        var totalMb = (info.total / (1024 * 1024)).toFixed(0);
-        installSize.textContent = mb + " MB / " + totalMb + " MB";
-      }
-    }
-  });
 
   installScreen.classList.remove("hidden");
   chatPanel.classList.add("hidden");
@@ -803,15 +813,39 @@ function renderModelPicker(allModels, compatModels, sysInfo) {
       "install-model-card" + (isCompatible ? "" : " incompatible");
     card.disabled = !isCompatible;
 
+    var topRow = document.createElement("div");
+    topRow.className = "install-model-top";
+
     var nameEl = document.createElement("span");
     nameEl.className = "install-model-name";
     nameEl.textContent = m.name;
-    card.appendChild(nameEl);
+    topRow.appendChild(nameEl);
+
+    if (m.recommended) {
+      var recEl = document.createElement("span");
+      recEl.className = "install-model-badge";
+      recEl.textContent = "Recommended";
+      topRow.appendChild(recEl);
+    }
+
+    card.appendChild(topRow);
+
+    var metaRow = document.createElement("div");
+    metaRow.className = "install-model-meta";
+
+    if (m.quality) {
+      var qualEl = document.createElement("span");
+      qualEl.className = "install-model-quality";
+      qualEl.textContent = m.quality;
+      metaRow.appendChild(qualEl);
+    }
 
     var sizeEl = document.createElement("span");
     sizeEl.className = "install-model-size";
     sizeEl.textContent = m.size;
-    card.appendChild(sizeEl);
+    metaRow.appendChild(sizeEl);
+
+    card.appendChild(metaRow);
 
     var descEl = document.createElement("span");
     descEl.className = "install-model-desc";
@@ -829,13 +863,42 @@ function renderModelPicker(allModels, compatModels, sysInfo) {
     card.appendChild(noteEl);
 
     if (isCompatible) {
-      card.addEventListener("click", function () {
-        startModelDownload(m.id, m.name);
-      });
+      card.addEventListener(
+        "click",
+        (function (mid, mname) {
+          return function () {
+            startModelDownload(mid, mname);
+          };
+        })(m.id, m.name),
+      );
     }
 
     installModelList.appendChild(card);
   }
+}
+
+async function openModelPicker() {
+  installSubtitle.textContent = "Choose a model to download";
+  installTitle.textContent = "Change Model";
+  installBack.classList.remove("hidden");
+  installScreen.classList.remove("hidden");
+  chatPanel.classList.add("hidden");
+
+  window.electronAPI.resizeWindow(320, 420);
+
+  var sysInfo = await window.electronAPI.getSystemInfo();
+  var allModels = await window.electronAPI.getRecommendedModels();
+  var compatModels = await window.electronAPI.getCompatibleModels();
+
+  renderModelPicker(allModels, compatModels, sysInfo);
+}
+
+function closeModelPicker() {
+  installBack.classList.add("hidden");
+  installScreen.classList.add("hidden");
+  chatPanel.classList.remove("hidden");
+  sendBtn.classList.remove("hidden");
+  window.electronAPI.resizeWindow(400, 550);
 }
 
 async function startModelDownload(modelId, modelName) {

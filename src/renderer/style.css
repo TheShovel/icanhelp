@@ -155,6 +155,38 @@
     margin-top: 2px;
 }
 
+.install-model-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.install-model-badge {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+.install-model-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.install-model-quality {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+}
+
 :root {
     --bg-panel: #f6f5f4;
     --bg-header: #fafafa;

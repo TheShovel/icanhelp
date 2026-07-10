@@ -10,6 +10,11 @@
         <div id="app">
             <div id="install-screen">
                 <div id="install-content">
+                    <button
+                        id="install-back"
+                        class="btn-icon hidden"
+                        title="Back to settings"
+                    ></button>
                     <img id="install-avatar" src="" alt="" draggable="false" />
                     <div id="install-spinner" class="hidden"></div>
                     <p id="install-title">Setting up your assistant</p>
@@ -123,6 +128,13 @@
                         <span>Theme</span>
                         <span class="settings-menu-hint"
                             >Customize appearance</span
+                        >
+                    </button>
+                    <div class="settings-menu-separator"></div>
+                    <button class="settings-menu-item" data-action="model">
+                        <span>Change Model</span>
+                        <span class="settings-menu-hint"
+                            >Download or switch AI model</span
                         >
                     </button>
                     <div class="settings-menu-separator"></div>
