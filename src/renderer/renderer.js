@@ -283,6 +283,7 @@ let didDrag = false;
 let dragStartX = 0;
 let dragStartY = 0;
 let conversation = [];
+let isProcessing = false;
 
 function setAvatarState(state) {
   var img = avatarInner;
@@ -421,6 +422,9 @@ function switchToChat(chatId) {
 
   sendBtn.classList.remove("hidden");
   cancelBtn.classList.add("hidden");
+  isProcessing = false;
+  chatInput.disabled = false;
+  sendBtn.disabled = false;
 
   chatMessages.querySelectorAll(".message").forEach(function (el) {
     el.remove();
@@ -524,6 +528,9 @@ window.electronAPI.onOpenChatList(function () {
 cancelBtn.addEventListener("click", function () {
   sendBtn.classList.remove("hidden");
   cancelBtn.classList.add("hidden");
+  isProcessing = false;
+  chatInput.disabled = false;
+  sendBtn.disabled = false;
   setAvatarState("idle");
   window.electronAPI.cancelStream();
 });
@@ -988,6 +995,7 @@ async function startModelDownload(modelId, modelName) {
 }
 
 async function sendMessage() {
+  if (isProcessing) return;
   var userText = chatInput.value.trim();
   if (!userText && !currentAttachment) return;
 
@@ -1025,11 +1033,17 @@ async function sendMessage() {
 
   sendBtn.classList.add("hidden");
   cancelBtn.classList.remove("hidden");
+  isProcessing = true;
+  chatInput.disabled = true;
+  sendBtn.disabled = true;
 
   const cleanup = window.electronAPI.onLLMChunk(function (chunk) {
     if (chunk.done || chunk.error) {
       sendBtn.classList.remove("hidden");
       cancelBtn.classList.add("hidden");
+      isProcessing = false;
+      chatInput.disabled = false;
+      sendBtn.disabled = false;
     }
     if (
       !msgEl &&
@@ -1051,6 +1065,9 @@ async function sendMessage() {
     if (chunk.error) {
       cleanup();
       setAvatarState("idle");
+      isProcessing = false;
+      chatInput.disabled = false;
+      sendBtn.disabled = false;
       responseContent.textContent = "Error: " + chunk.error;
       msgEl.classList.remove("streaming");
       var wi = bubble.querySelector(".working-indicator");
@@ -1064,6 +1081,9 @@ async function sendMessage() {
     if (chunk.done) {
       cleanup();
       setAvatarState("idle");
+      isProcessing = false;
+      chatInput.disabled = false;
+      sendBtn.disabled = false;
       msgEl.classList.remove("streaming");
       var wi = bubble.querySelector(".working-indicator");
       if (wi) {
