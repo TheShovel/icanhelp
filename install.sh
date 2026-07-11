@@ -24,16 +24,42 @@ ICON_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
 DESKTOP_FILE="$APP_DIRS/icanhelp.desktop"
 LAUNCHER="$INSTALL_DIR/icanhelp.sh"
 
-# ── helpers ──────────────────────────────────────────────────────
-log()     { printf "${GRAY}  ◆${RST} %b\n" "$*"; }
-ok()      { printf "${GREEN}  ✔${RST} %b\n" "$*"; }
-warn()    { printf "${YELLOW}  ⚠${RST} %b\n" "$*" >&2; }
-fail()    { printf "${RED}  ✘${RST} %b\n" "$*" >&2; exit 1; }
-heading() { printf "\n${BOLD}${BLUE}▸ %b${RST}\n" "$*"; }
-sub()     { printf "${DIM}    %b${RST}\n" "$*"; }
+# ── progress bar ──────────────────────────────────────────────────
+# usage: progress_bar <total> <label>
+# reads lines from stdin, increments counter, draws bar
+progress_bar() {
+  local total=$1
+  local label=$2
+  local count=0
+  local width=40
+  
+  # hide cursor
+  printf "\033[?25l"
+  
+  while IFS= read -r line; do
+    ((count++))
+    local pct=0
+    [ $total -gt 0 ] && pct=$(( count * 100 / total ))
+    local filled=$(( count * width / total ))
+    [ $filled -gt $width ] && filled=$width
+    local bar=""
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=filled; i<width; i++)); do bar+="░"; done
+    printf "\r  ${CYAN}%s${RST} ${DIM}[%s]${RST} %3d%% (%d/%d)" "$label" "$bar" "$pct" "$count" "$total"
+  done
+  
+  # show cursor, newline
+  printf "\033[?25h\n"
+  
+  # if we didn't reach total, show completion
+  if [ $count -lt $total ]; then
+    printf "  ${GREEN}✓${RST} ${DIM}%s${RST} (completed %d of %d)\n" "$label" "$count" "$total"
+  else
+    printf "  ${GREEN}✓${RST} ${DIM}%s${RST}\n" "$label"
+  fi
+}
 
 # spinner — runs a command with a live frame spinner
-# the command runs in the foreground; a background process draws the animation
 spinner() {
   local label="$1"
   local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
@@ -72,6 +98,66 @@ spinner() {
     return $rc
   fi
 }
+
+# run a command with a progress bar based on output lines
+# usage: progress_cmd <total> <label> <command...>
+progress_cmd() {
+  local total=$1
+  local label=$2
+  shift 2
+  
+  # run command, pipe output through progress bar
+  set +e
+  "$@" 2>&1 | progress_bar "$total" "$label"
+  local rc=${PIPESTATUS[0]}
+  set -e
+  return $rc
+}
+
+# progress_bar <total> <label>
+# reads lines from stdin, draws progress bar
+progress_bar() {
+  local total=$1
+  local label=$2
+  local count=0
+  local width=40
+
+  # hide cursor
+  printf "[?25l"
+
+  while IFS= read -r line; do
+    ((count++))
+    local pct=0
+    [ $total -gt 0 ] && pct=$(( count * 100 / total ))
+    local filled=$(( count * width / total ))
+    [ $filled -gt $width ] && filled=$width
+    local bar=""
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=filled; i<width; i++)); do bar+="░"; done
+    printf "  ${CYAN}%s${RST} ${DIM}[%s]${RST} %3d%% (%d/%d)" "$label" "$bar" "$pct" "$count" "$total"
+  done
+
+  # show cursor, newline
+  printf "[?25h
+"
+
+  # completion message
+  if [ $count -lt $total ]; then
+    printf "  ${GREEN}✓${RST} ${DIM}%s${RST} (completed %d of %d)
+" "$label" "$count" "$total"
+  else
+    printf "  ${GREEN}✓${RST} ${DIM}%s${RST}
+" "$label"
+  fi
+}
+
+# ── helpers ──────────────────────────────────────────────────────
+log()     { printf "${GRAY}  ◆${RST} %b\n" "$*"; }
+ok()      { printf "${GREEN}  ✔${RST} %b\n" "$*"; }
+warn()    { printf "${YELLOW}  ⚠${RST} %b\n" "$*" >&2; }
+fail()    { printf "${RED}  ✘${RST} %b\n" "$*" >&2; exit 1; }
+heading() { printf "\n${BOLD}${BLUE}▸ %b${RST}\n" "$*"; }
+sub()     { printf "${DIM}    %b${RST}\n" "$*"; }
 
 # ── banner ───────────────────────────────────────────────────────
 clear 2>/dev/null || true
@@ -241,6 +327,19 @@ if [ $rc -ne 0 ]; then
 fi
 
 ok "Dependencies installed"
+
+# ── ingest knowledge base ──────────────────────────────────────────
+heading "Building knowledge base"
+log "Counting documents …"
+# Count total markdown files for progress bar
+TOTAL_DOCS=$(find "$INSTALL_DIR/knowledge" -type f -name "*.md" 2>/dev/null | wc -l)
+if [ "$TOTAL_DOCS" -eq 0 ]; then
+  warn "No knowledge documents found"
+else
+  log "Embedding $TOTAL_DOCS documents …"
+  progress_cmd "$TOTAL_DOCS" "Ingesting knowledge base …" npm run ingest
+  ok "Knowledge base ready"
+fi
 
 NPM_BIN="$(command -v npm)"
 
