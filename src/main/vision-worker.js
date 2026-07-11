@@ -44,20 +44,21 @@ async function downloadFile(filename, progressCb) {
 
   var total = parseInt(res.headers.get("content-length") || "0", 10);
   var reader = res.body.getReader();
-  var chunks = [];
   var loaded = 0;
+  var fd = fs.openSync(dest, "w");
 
   while (true) {
     var result = await reader.read();
     if (result.done) break;
-    chunks.push(result.value);
+    fs.writeSync(fd, Buffer.from(result.value));
     loaded += result.value.length;
     if (progressCb && total > 0) {
       progressCb({ file: filename, loaded: loaded, total: total });
     }
   }
 
-  fs.writeFileSync(dest, Buffer.concat(chunks));
+  fs.closeSync(fd);
+  send({ type: "log", message: "Downloaded " + filename + " (" + Math.round(loaded / 1024 / 1024) + " MB)" });
   return dest;
 }
 

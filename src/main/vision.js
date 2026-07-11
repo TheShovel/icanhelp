@@ -3,7 +3,7 @@ const fs = require("fs");
 const { fork } = require("child_process");
 
 const WORKER_PATH = path.join(__dirname, "vision-worker.js");
-const LOAD_TIMEOUT_MS = 90 * 1000;
+const LOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const DESCRIBE_TIMEOUT_MS = 20 * 1000;
 const MAX_CRASHES = 2;
 const CRASH_WINDOW_MS = 60 * 1000;

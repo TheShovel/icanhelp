@@ -1,4 +1,8 @@
+const fs = require("fs");
+const path = require("path");
 const { appPath, ocrLog, tesseractCache } = require("./paths");
+const { createWorker } = require("tesseract.js");
+const { describeImage } = require("./vision");
 
 const IMAGE_EXTENSIONS = new Set([
   ".png",
