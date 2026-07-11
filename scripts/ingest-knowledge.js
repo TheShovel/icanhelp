@@ -44,11 +44,11 @@ const DEFAULT_IGNORE = [
 ];
 
 function buildIgnoreSet() {
-  // The installer passes an explicit INGEST_IGNORE reflecting the user's
-  // interactive choice; when it's set we honor it exactly. DEFAULT_IGNORE is
-  // only a fallback for manual `npm run ingest` with no env override.
+  // The installer always exports INGEST_IGNORE (empty string = embed all).
+  // DEFAULT_IGNORE is only a fallback for a manual `npm run ingest` where the
+  // env var is truly undefined. An explicit empty string must NOT re-enable it.
   const env = process.env.INGEST_IGNORE;
-  const base = env ? [] : DEFAULT_IGNORE;
+  const base = env === undefined ? DEFAULT_IGNORE : [];
   const set = new Set(base.map((p) => p.replace(/^\/+/, "")));
   if (env) {
     for (const raw of env.split(",")) {
@@ -77,9 +77,11 @@ const MAX_BATCH_TOKENS = 8192;
 const MAX_SEQ_LEN = 256;
 
 async function main() {
-  // Diagnostics go to stderr so the progress bar (which counts stdout lines)
-  // stays accurate: exactly one stdout line is emitted per ingested file.
-  const logErr = (...a) => console.error(...a);
+  // Diagnostics are buffered and flushed to stderr only after the progress bar
+  // finishes, so they don't interleave with and corrupt the single-line bar.
+  const diag = [];
+  const logErr = (...a) => diag.push(a.map(String).join(" "));
+  const flushDiag = () => { if (diag.length) { console.error(diag.join("\n")); diag.length = 0; } };
 
   logErr("=== Knowledge Ingestion ===\n");
   logErr("Knowledge directory:", KNOWLEDGE_DIR);
@@ -176,6 +178,7 @@ async function main() {
 
   const stats = await listKnowledge();
   logErr("Knowledge base stats:", stats);
+  flushDiag();
 }
 
 main().catch((e) => {
