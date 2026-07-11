@@ -1,95 +1,619 @@
-# Web Application Security
+# Web Security (OWASP Top 10 + Beyond)
 
-## OWASP Top 10 (2021)
-1. **Broken Access Control** — users access resources they shouldn't
-2. **Cryptographic Failures** — weak encryption, exposed secrets
-3. **Injection** — SQL, NoSQL, OS command, LDAP injection
-4. **Insecure Design** — missing threat modeling, rate limiting
-5. **Security Misconfiguration** — default creds, verbose errors, missing headers
-6. **Vulnerable Components** — outdated libraries with known CVEs
-7. **Auth Failures** — weak passwords, broken session management
-8. **Data Integrity Failures** — software supply chain, unsigned updates
-9. **Logging/Monitoring Failures** — can't detect breaches
-10. **SSRF** — server-side request forgery
+## OWASP Top 10 2021
 
-## SQL Injection Prevention
+### A01: Broken Access Control
 ```python
-# BAD — string concatenation
-cursor.execute(f"SELECT * FROM users WHERE id = '{user_input}'")
+# Bad: No authorization check
+@app.route('/api/users/<user_id>/orders')
+def get_orders(user_id):
+    return db.query('SELECT * FROM orders WHERE user_id = ?', user_id)
 
-# GOOD — parameterized query
-cursor.execute("SELECT * FROM users WHERE id = %s", (user_input,))
+# Good: Authorization enforced
+@app.route('/api/users/<user_id>/orders')
+@login_required
+def get_orders(user_id):
+    if current_user.id != user_id and not current_user.is_admin:
+        abort(403)
+    return db.query('SELECT * FROM orders WHERE user_id = ?', user_id)
+
+# RBAC implementation
+def require_role(*roles):
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if current_user.role not in roles:
+                abort(403)
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
+
+@app.route('/admin/users')
+@require_role('admin')
+def admin_users():
+    ...
 ```
-- Use parameterized queries / prepared statements — always
-- ORMs (SQLAlchemy, Prisma, Hibernate) prevent injection when used correctly
-- Avoid raw `$where` in MongoDB, raw queries in any DB
-- Least privilege: DB user should only have needed permissions
 
-## XSS (Cross-Site Scripting)
-- **Stored**: malicious script saved to DB, served to all visitors
-- **Reflected**: script in URL/search param, reflected back immediately
-- **DOM-based**: client-side JS modifies DOM unsafely
+### A02: Cryptographic Failures
+```python
+# Bad: Weak crypto
+password_hash = hashlib.md5(password.encode()).hexdigest()
+# Or: plain text storage
+
+# Good: Strong hashing
+import bcrypt
+password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12))
+# Verify
+bcrypt.checkpw(password.encode(), stored_hash)
+
+# Or argon2 (modern)
+import argon2
+ph = argon2.PasswordHasher()
+hash = ph.hash(password)
+ph.verify(hash, password)
+
+# Encryption for sensitive data
+from cryptography.fernet import Fernet
+key = Fernet.generate_key()
+cipher = Fernet(key)
+encrypted = cipher.encrypt(b"SSN: 123-45-6789")
+decrypted = cipher.decrypt(encrypted)
+```
+
+### A03: Injection
+
+#### SQL Injection
+```python
+# Bad: String concatenation
+query = f"SELECT * FROM users WHERE email = '{email}'"
+
+# Good: Parameterized queries
+# SQLite
+cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+
+# PostgreSQL (psycopg2)
+cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+
+# MySQL (mysql-connector)
+cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+
+# SQLAlchemy ORM
+user = session.query(User).filter_by(email=email).first()
+
+# Raw SQL with SQLAlchemy
+result = session.execute(text("SELECT * FROM users WHERE email = :email"), 
+                        {"email": email})
+```
+
+#### NoSQL Injection (MongoDB)
+```python
+# Bad: Direct object
+db.users.find({"email": email, "password": password})
+
+# Good: Explicit operators
+db.users.find({"email": email, "password": {"$eq": password}})
+
+# Or use ODM (Mongoose)
+User.findOne({ email: email }).select('+password')
+```
+
+#### Command Injection
+```python
+# Bad: Shell injection
+os.system(f"ping -c 4 {host}")
+subprocess.run(f"ping -c 4 {host}", shell=True)
+
+# Good: No shell, args list
+subprocess.run(["ping", "-c", "4", host], capture_output=True)
+
+# Or use libraries
+import ping3
+ping3.ping(host)
+```
+
+#### LDAP Injection
+```python
+# Bad
+filter = f"(uid={username})"
+
+# Good: Escape
+import ldap3
+from ldap3.utils.conv import escape_filter_chars
+filter = f"(uid={escape_filter_chars(username)})"
+```
+
+### A04: Insecure Design
+```python
+# Design security from start
+# Threat modeling: STRIDE
+# Spoofing, Tampering, Repudiation, Information Disclosure, DoS, Elevation of Privilege
+
+# Secure design patterns:
+# - Principle of least privilege
+# - Defense in depth
+# - Fail securely
+# - Secure defaults
+# - Economy of mechanism
+# - Complete mediation
+# - Open design
+# - Separation of privilege
+# - Least common mechanism
+# - Psychological acceptability
+```
+
+### A05: Security Misconfiguration
+```nginx
+# Secure headers
+add_header X-Frame-Options "SAMEORIGIN";
+add_header X-Content-Type-Options "nosniff";
+add_header X-XSS-Protection "1; mode=block";
+add_header Referrer-Policy "strict-origin-when-cross-origin";
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.example.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https://api.example.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self';";
+add_header Permissions-Policy "geolocation=(), microphone=(), camera=()";
+
+# Hide version
+server_tokens off;
+
+# Secure cookies
+# Set-Cookie: session=abc; HttpOnly; Secure; SameSite=Strict
+```
+
+```python
+# Flask/Django secure config
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
+    WTF_CSRF_ENABLED=True,
+    WTF_CSRF_TIME_LIMIT=None,
+)
+
+# Security headers via Flask-Talisman
+from flask_talisman import Talisman
+Talisman(app, 
+    force_https=True,
+    strict_transport_security=True,
+    session_cookie_secure=True,
+    content_security_policy={
+        'default-src': "'self'",
+        'script-src': ["'self'", "'unsafe-inline'", 'https://cdn.example.com'],
+        'style-src': ["'self'", "'unsafe-inline'"],
+    }
+)
+```
+
+### A06: Vulnerable Components
+```bash
+# Dependency scanning
+# npm
+npm audit
+npm audit fix
+
+# Python
+pip-audit
+safety check
+
+# Go
+govulncheck ./...
+
+# Java
+mvn org.owasp:dependency-check-maven:check
+
+# Docker
+docker scan myimage
+trivy image myimage
+
+# CI integration
+# GitHub Actions: github/codeql-action
+# GitLab: dependency_scanning
+```
+
+### A07: Authentication Failures
+```python
+# Strong password policy
+import zxcvbn
+def validate_password(password):
+    result = zxcvbn.zxcvbn(password)
+    if result['score'] < 3:
+        raise ValueError("Password too weak")
+    if len(password) < 12:
+        raise ValueError("Password too short")
+
+# Rate limiting
+from flask_limiter import Limiter
+limiter = Limiter(key_func=get_remote_address)
+
+@app.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")
+def login():
+    ...
+
+# Multi-factor authentication
+import pyotp
+# Setup
+totp = pyotp.TOTP(pyotp.random_base32())
+qr = totp.provisioning_uri(user.email, issuer_name="MyApp")
+# Verify
+if totp.verify(token):
+    login_user(user)
+
+# Account lockout
+FAILED_ATTEMPTS = 5
+LOCKOUT_TIME = 300  # 5 minutes
+
+def check_lockout(ip):
+    key = f"login_failures:{ip}"
+    count = redis.get(key)
+    if count and int(count) >= FAILED_ATTEMPTS:
+        return True
+    return False
+
+def record_failure(ip):
+    key = f"login_failures:{ip}"
+    redis.incr(key)
+    redis.expire(key, LOCKOUT_TIME)
+
+def clear_failures(ip):
+    redis.delete(f"login_failures:{ip}")
+```
+
+### A08: Software & Data Integrity Failures
+```python
+# Subresource Integrity (SRI)
+# <script src="https://cdn.example.com/app.js" 
+#         integrity="sha384-..." crossorigin="anonymous"></script>
+
+# Generate SRI
+import hashlib, base64
+def generate_sri(filepath):
+    with open(filepath, 'rb') as f:
+        content = f.read()
+    hash = hashlib.sha384(content).digest()
+    return f"sha384-{base64.b64encode(hash).decode()}"
+
+# CI/CD integrity
+# - Sign commits (GPG)
+# - Verify signatures
+# - SBOM (Software Bill of Materials)
+# - Reproducible builds
+
+# Supply chain
+# - Pin dependencies (package-lock.json, Pipfile.lock)
+# - Use private registries
+# - Scan for malicious packages
+# - Dependency confusion prevention
+```
+
+### A09: Logging & Monitoring Failures
+```python
+# Structured logging
+import structlog
+logger = structlog.get_logger()
+
+logger.info("user_login", 
+    user_id=user.id, 
+    ip=request.remote_addr,
+    user_agent=request.user_agent.string,
+    success=True
+)
+
+logger.warning("failed_login",
+    email=email,
+    ip=request.remote_addr,
+    reason="invalid_password",
+    attempt_count=attempts
+)
+
+# Security events to monitor
+SECURITY_EVENTS = [
+    'failed_login',
+    'password_change',
+    'email_change',
+    'permission_change',
+    'admin_action',
+    'data_export',
+    'bulk_delete',
+    'privilege_escalation',
+    'unauthorized_access',
+    'sql_injection_attempt',
+    'xss_attempt',
+    'csrf_failure',
+]
+
+# Alerting rules (Prometheus/Grafana)
+# - Failed logins > 10/min from same IP
+- 404 errors > 100/min (scanning)
+- 5xx errors > 1% (attack causing errors)
+- New admin user created
+- Password reset requested
+- Unusual data access patterns
+```
+
+### A10: Server-Side Request Forgery (SSRF)
+```python
+# Bad: User-controlled URL
+@app.route('/fetch')
+def fetch():
+    url = request.args.get('url')
+    response = requests.get(url)  # SSRF!
+    return response.text
+
+# Good: Validate URL
+def fetch_url(url):
+    parsed = urlparse(url)
+    
+    # Block private/internal networks
+    blocked = [
+        'localhost', '127.0.0.1', '::1',
+        '10.', '172.16.', '172.17.', '172.18.', '172.19.',
+        '172.20.', '172.21.', '172.22.', '172.23.',
+        '172.24.', '172.25.', '172.26.', '172.27.',
+        '172.28.', '172.29.', '172.30.', '172.31.',
+        '192.168.', '169.254.', '::ffff:'
+    ]
+    
+    for block in blocked:
+        if parsed.hostname.startswith(block):
+            raise ValueError("Blocked URL")
+    
+    # Allow only HTTP/HTTPS
+    if parsed.scheme not in ('http', 'https'):
+        raise ValueError("Invalid scheme")
+    
+    # Use allowlist for domains
+    allowed_domains = ['api.github.com', 'api.twitter.com']
+    if parsed.hostname not in allowed_domains:
+        raise ValueError("Domain not allowed")
+    
+    return requests.get(url, timeout=5)
+```
+
+## Additional Critical Vulnerabilities
+
+### Cross-Site Scripting (XSS)
+
+#### Reflected XSS
+```python
+# Bad: Direct output
+@app.route('/search')
+def search():
+    q = request.args.get('q', '')
+    return f"<h1>Results for: {q}</h1>"
+
+# Good: Template engine auto-escapes
+@app.route('/search')
+def search():
+    q = request.args.get('q', '')
+    return render_template('search.html', query=q)
+
+# search.html
+# <h1>Results for: {{ query }}</h1>  # Auto-escaped
+```
+
+#### Stored XSS
+```python
+# Bad: Raw HTML storage
+@app.route('/comment', methods=['POST'])
+def add_comment():
+    comment = Comment(content=request.form['content'])
+    db.save(comment)
+
+# Good: Sanitize on input AND output
+import bleach
+
+ALLOWED_TAGS = ['b', 'i', 'u', 'em', 'strong', 'a', 'p', 'br']
+ALLOWED_ATTRS = {'a': ['href', 'title']}
+
+def sanitize_html(html):
+    return bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
+
+@app.route('/comment', methods=['POST'])
+def add_comment():
+    clean_content = sanitize_html(request.form['content'])
+    comment = Comment(content=clean_content)
+    db.save(comment)
+
+# Also escape on output (defense in depth)
+# {{ comment.content | safe }}  # Only if already sanitized
+```
+
+#### DOM-based XSS
 ```javascript
-// BAD — inserts raw HTML
-document.getElementById('output').innerHTML = userInput;
+// Bad: Using innerHTML with user data
+document.getElementById('output').innerHTML = location.hash.substring(1);
 
-// GOOD — never use innerHTML with user content
-document.getElementById('output').textContent = userInput;
-```
-- **Sanitize output**: template engines auto-escape (React JSX, Jinja2, Handlebars)
-- Content Security Policy (CSP) header as defense-in-depth
-- `HttpOnly` cookies — prevent JS from reading session cookies
-- Validate input on server too (client validation is cosmetic)
+// Good: textContent
+document.getElementById('output').textContent = location.hash.substring(1);
 
-## CSRF (Cross-Site Request Forgery)
-- Attacker tricks logged-in user into making unwanted requests
-- **Prevention**:
-  - CSRF tokens: random token per session/form, validated server-side
-  - `SameSite=Strict` or `SameSite=Lax` cookie attribute
-  - Custom request headers (API calls from JS can set headers)
-  - Double-submit cookie pattern
-
-## Authentication Best Practices
-- Hash passwords: **bcrypt** (cost ≥ 12), **argon2**, or **scrypt** — never MD5/SHA1
-- Rate limit login attempts (e.g., 5 tries/min per IP)
-- MFA: TOTP (Google Authenticator), WebAuthn/passkeys > SMS codes
-- Session management: rotate session ID on login, set expiry
-- JWT: short expiry (15 min), store refresh tokens securely, `aud` + `iss` claims
-- Never roll your own crypto or auth — use well-audited libraries
-
-## API Security
-- Rate limiting: 100 req/min per user, 10 req/min for sensitive endpoints
-- Auth: OAuth 2.0 / OpenID Connect for third-party, API keys for service-to-service
-- Input validation: validate all input types, lengths, ranges server-side
-- CORS: don't use `Access-Control-Allow-Origin: *` for authenticated endpoints
-- GraphQL: depth limiting, query cost analysis, pagination
-- Versioning: `/v1/users`, `Accept: application/vnd.api+json;version=1`
-
-## Security Headers
-```
-Content-Security-Policy: default-src 'self'
-Strict-Transport-Security: max-age=63072000; includeSubDomains
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: geolocation=()
+// Or DOMPurify
+import DOMPurify from 'dompurify';
+element.innerHTML = DOMPurify.sanitize(userInput);
 ```
 
-## Dependency Management
-- Scan regularly: `npm audit`, `pip audit`, `mvn dependency-check`, `trivy`
-- Dependabot / Renovate: auto-PR for vulnerable dependencies
-- Pin versions in lockfiles (npm ci, pip freeze, Cargo.lock)
-- Supply chain: sign commits, verify package checksums, use private registry for internal packages
+### Cross-Site Request Forgery (CSRF)
+```python
+# Flask-WTF CSRF protection
+from flask_wtf.csrf import CSRFProtect
+csrf = CSRFProtect(app)
 
-## Secrets Management
-- Never commit secrets to git; use `.gitignore` and pre-commit hooks
-- Environment variables for config; secrets stored in vault (HashiCorp Vault, AWS Secrets Manager)
-- Rotate keys/credentials regularly
-- Scan repos for leaked secrets (git-secrets, truffleHog, GitHub secret scanning)
+# Templates
+<form method="POST">
+    {{ csrf_token() }}
+    <!-- form fields -->
+</form>
 
-## Logging & Monitoring
-- Log auth failures, access denied, input validation errors
-- Never log passwords, tokens,信用卡 numbers (PCI DSS)
-- Centralized logging: ELK (Elasticsearch, Logstash, Kibana), Loki, Datadog
-- Alert on: repeated 403/401, unusual traffic spikes, known attack patterns
-- Incident response plan: detect → contain → eradicate → recover → postmortem
+# AJAX
+$.ajaxSetup({
+    beforeSend: function(xhr) {
+        xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token() }}');
+    }
+});
+
+# Exempt API endpoints (use token auth instead)
+@csrf.exempt
+@app.route('/api/webhook', methods=['POST'])
+def webhook():
+    ...
+
+# SameSite cookie (modern CSRF protection)
+app.config.update(
+    SESSION_COOKIE_SAMESITE='Lax',  # or 'Strict'
+    SESSION_COOKIE_SECURE=True,
+)
+```
+
+### Insecure Deserialization
+```python
+# Bad: pickle (arbitrary code execution)
+import pickle
+data = pickle.loads(user_supplied_data)
+
+# Good: JSON only
+import json
+data = json.loads(user_supplied_data)
+
+# If complex objects needed: safe serialization
+from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
+s = Serializer(secret_key, expires_in=3600)
+token = s.dumps({'user_id': 123})
+data = s.loads(token)  # Verifies signature
+
+# Or marshmallow for validation
+from marshmallow import Schema, fields, validate
+
+class UserSchema(Schema):
+    id = fields.Int(required=True)
+    email = fields.Email(required=True)
+    name = fields.Str(validate=validate.Length(min=1, max=100))
+
+schema = UserSchema()
+user_data = schema.load(json_data)  # Validates!
+```
+
+### XXE (XML External Entity)
+```python
+# Bad: Vulnerable to XXE
+import xml.etree.ElementTree as ET
+root = ET.fromstring(xml_data)  # Processes external entities!
+
+# Good: Disable external entities
+parser = ET.XMLParser()
+parser.parser.UseForeignDTD(False)
+parser.parser.SetParamEntityParsing(0)  # XML_PARAM_ENTITY_PARSING_NEVER
+root = ET.fromstring(xml_data, parser=parser)
+
+# Or use defusedxml
+from defusedxml import ElementTree as ET
+root = ET.fromstring(xml_data)  # Safe by default
+```
+
+### Path Traversal
+```python
+# Bad: No validation
+@app.route('/download/<filename>')
+def download(filename):
+    return send_file(f"/uploads/{filename}")
+
+# Good: Secure filename handling
+import os
+from werkzeug.utils import secure_filename
+
+@app.route('/download/<filename>')
+def download(filename):
+    # Secure the filename
+    safe_name = secure_filename(filename)
+    
+    # Validate path stays in upload directory
+    upload_dir = os.path.abspath("/uploads")
+    requested_path = os.path.abspath(os.path.join(upload_dir, safe_name))
+    
+    if not requested_path.startswith(upload_dir):
+        abort(403)
+    
+    if not os.path.exists(requested_path):
+        abort(404)
+    
+    return send_file(requested_path)
+```
+
+## Security Headers Reference
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` | Force HTTPS |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'...` | Prevent XSS |
+| `X-Frame-Options` | `DENY` or `SAMEORIGIN` | Prevent clickjacking |
+| `X-Content-Type-Options` | `nosniff` | Prevent MIME sniffing |
+| `X-XSS-Protection` | `1; mode=block` | Legacy XSS filter |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Control referrer |
+| `Permissions-Policy` | `geolocation=(), microphone=()` | Feature policy |
+| `Cross-Origin-Embedder-Policy` | `require-corp` | COEP |
+| `Cross-Origin-Opener-Policy` | `same-origin` | COOP |
+| `Cross-Origin-Resource-Policy` | `same-origin` | CORP |
+
+## Content Security Policy Generator
+
+```python
+# Build CSP programmatically
+CSP_DEFAULTS = {
+    'default-src': ["'self'"],
+    'script-src': ["'self'", "'unsafe-inline'"],
+    'style-src': ["'self'", "'unsafe-inline'"],
+    'img-src': ["'self'", 'data:', 'https:'],
+    'font-src': ["'self'", 'https:', 'data:'],
+    'connect-src': ["'self'"],
+    'frame-ancestors': ["'self'"],
+    'form-action': ["'self'"],
+    'base-uri': ["'self'"],
+    'object-src': ["'none'"],
+}
+
+def build_csp(overrides=None):
+    csp = CSP_DEFAULTS.copy()
+    if overrides:
+        for k, v in overrides.items():
+            csp[k] = v
+    return '; '.join(f"{k} {' '.join(v)}" for k, v in csp.items())
+
+# Usage
+csp = build_csp({
+    'script-src': ["'self'", 'https://cdn.example.com'],
+    'connect-src': ["'self'", 'https://api.example.com', 'wss://ws.example.com'],
+})
+```
+
+## Security Testing Tools
+
+| Category | Tools |
+|----------|-------|
+| **SAST** | SonarQube, CodeQL, Semgrep, Bandit (Python), ESLint security plugins |
+| **DAST** | OWASP ZAP, Burp Suite, Nikto, w3af |
+| **IAST** | Contrast Security, Seeker |
+| **SCA** | Dependabot, Snyk, WhiteSource, OWASP Dependency Check |
+| **Secrets** | TruffleHog, GitLeaks, detect-secrets |
+| **Container** | Trivy, Clair, Anchore, Docker Scout |
+| **Infrastructure** | Checkov, tfsec, kics, OPA |
+
+## Security Checklist for Releases
+
+- [ ] Dependency scan passes
+- [ ] SAST scan passes
+- [ ] DAST scan on staging
+- [ ] Penetration test (annual)
+- [ ] Secrets scan clean
+- [ ] CSP implemented and tested
+- [ ] Security headers present
+- [ ] HTTPS enforced everywhere
+- [ ] Cookies secure (HttpOnly, Secure, SameSite)
+- [ ] Rate limiting on auth endpoints
+- [ ] Input validation on all endpoints
+- [ ] Output encoding on all templates
+- [ ] Authentication tested (MFA, lockout, reset)
+- [ ] Authorization tested (RBAC, ABAC)
+- [ ] Error handling doesn't leak info
+- [ ] Logging captures security events
+- [ ] Monitoring alerts configured
+- [ ] Incident response plan tested
+- [ ] Backup/restore tested
+- [ ] Third-party components assessed

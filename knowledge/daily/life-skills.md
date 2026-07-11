@@ -1,76 +1,372 @@
-# Common Life Skills
+# Daily Life Skills
 
-## Laundry
-- Sort: whites, darks, colors, delicates, towels (separate lint shedders)
-- Check care labels: machine/dry clean, max temp, bleach/no bleach
-- Cold water for darks/delicates (prevents fading, shrinkage)
-- Warm/hot for whites, towels, bedding (kills bacteria, removes oils)
-- Don't overload machine — clothes need room to move
-- Dryer: low heat for delicates, medium for most, high for towels
-- Clean lint filter every load (fire hazard)
-- Air dry: sweaters, bras, anything with elastic, wool, silk
-- Treat stains ASAP: blot (don't rub), pre-treat with stain remover
-- Common stains:
-  - Coffee/wine: cold water + dish soap
-  - Grease/oil: dish soap before wash
-  - Blood: cold water only (hot sets protein stains)
-  - Ink: rubbing alcohol
-  - Grass: hydrogen peroxide or white vinegar
+## Communication
 
-## Driving Basics
-- Adjust seat, mirrors, steering wheel before moving
-- Hand position: 9 and 3 (not 10 and 2 — airbags can break thumbs)
-- Blind spots: check over shoulder before lane changes (mirrors don't show everything
-- Following distance: 3 seconds minimum (4-5 in rain, more in snow)
-- Stopping distance increases with speed — at 60 mph, ~240 ft total
-- Four-way stop: first to stop goes first, then right of way clockwise
-- Merge: match highway speed BEFORE entering, use merge lane fully
-- Winter: slow down, increase following distance, gentle inputs, don't brake while turning
-- Hydroplaning: ease off gas, steer straight, don't brake
-- If pulled over: turn on hazards, pull over safely, hands on wheel, wait for officer
-- Road rage: don't engage, slow down/let them pass, don't make eye contact, drive to police station
+### Active Listening
+```
+1. Give full attention (phone away, eye contact)
+2. Don't interrupt
+3. Paraphrase: "So you're saying..."
+4. Ask clarifying questions
+5. Validate feelings: "That sounds frustrating"
+6. Then share your perspective
+```
 
-## Car Maintenance
-- Oil change: every 5,000-7,500 miles (check manual)
-- Tire pressure: check monthly (including spare) — sticker inside driver door
-- Tire tread depth: penny test (insert penny upside down — if see Lincoln's whole head, replace)
-- Tire rotation: every 5,000-7,500 miles (with oil change)
-- Air filter: replace every 15,000-30,000 miles
-- Wiper blades: replace every 6-12 months (streaking = replace)
-- Battery: typically lasts 3-5 years — replace proactively in cold climates
-- Brake pads: squealing, pulsing, or > 1/8" left = replace soon
-- Coolant/antifreeze: check level at reservoir (not radiator when hot!)
-- Check engine light: get code read at auto parts store (free), then diagnose
-- Emergency kit: jumper cables, first aid, flashlight, blanket, water, basic tools
-- Learn to: jump start a car, change a tire, check oil
+### Non-Violent Communication (NVC)
+```
+Observation → Feeling → Need → Request
+"I notice dishes in the sink" (not "You never do dishes")
+"I feel overwhelmed" (not "You're lazy")
+"I need support" (not "You should help")
+"Would you be willing to do dishes tonight?"
+```
 
-## Basic Sewing
-- **Threading needle**: cut thread at angle, wet tip, use needle threader if needed
-- **Basic stitch**: in and out, even spacing, knot at end
-- **Sew on button**: thread through button 4-6 times, shank for thick fabric (wrap thread under button)
-- **Hem**: fold twice (to hide raw edge), iron flat, stitch close to inner fold
-- **Darning**: weave over/under across hole in fabric
-- Stitch types: running stitch (basic), backstitch (stronger), whip stitch (join edges)
-- Sewing kit: needles, thread (black, white, matching common colors), pins, thimble, small scissors, measuring tape
+### Assertiveness
+```
+Passive: "Whatever you want"
+Aggressive: "Do it my way"
+Assertive: "I'd prefer X because Y. What do you think?"
 
-## First Apartment Setup
-- Kitchen: chef's knife, cutting board, pan, pot, baking sheet, bowls, plates, utensils, glasses, can opener, colander
-- Bathroom: plunger (before you need it!), shower curtain/liner, towels, bathmat, toilet brush
-- Cleaning: all-purpose cleaner, disinfectant, scrub brush, sponge, broom + dustpan, mop, vacuum, trash cans
-- Tools: hammer, screwdriver set (philips + flathead), pliers, adjustable wrench, measuring tape, flashlight
-- Linens: sheets (2 sets minimum), pillows, blanket/comforter, towels (bath + hand + washcloth)
-- Safety: smoke detector (check it works), fire extinguisher (kitchen), CO detector, first aid kit
-- Renter's insurance: cheap (~$15/month) and covers your stuff + liability
-- Move-in: take photos of every wall/floor/ceiling (damage documentation)
+Formula: "I feel [feeling] when [behavior] because [impact]. I'd like [request]."
+```
 
-## Pet Care Basics
-- **Dogs**: walk 30+ min daily, vet annual, vaccinations, flea/tick prevention, training (positive reinforcement)
-  - Food: high-quality brand, not grain-free unless vet recommends (linked to heart disease)
-  - Grooming: brush weekly, bathe monthly, trim nails every 1-2 months
-  - Common toxins: chocolate, grapes, raisins, onions, garlic, xylitol (gum/candy)
-- **Cats**: litter box (1 per cat + 1, scoop daily), scratching post, vertical space
-  - Indoor cats live 2-3x longer than outdoor cats
-  - Must eat meat (obligate carnivores) — no vegan cat food
-  - Keep toxic plants away: lilies (extremely toxic), poinsettias, aloe
-- General: spay/neuter, microchip, fresh water always, don't give human meds (ibuprofen kills)
-- Emergency signs: not eating 24h+, vomiting/diarrhea 24h+, difficulty breathing, collapse, seizure
+### Difficult Conversations
+```
+1. Prepare: What's the goal? What's the data?
+2. Start with intent: "I want us to work better together"
+3. Share observations (facts, not judgments)
+4. Describe impact
+5. Ask for their perspective
+6. Co-create solution
+7. Follow up in writing
+```
+
+### Email Etiquette
+```
+Subject: Clear, specific, actionable
+Greeting: Professional
+BLUF: Bottom Line Up Front (purpose in first sentence)
+Context: Brief background
+Ask: Explicit request with deadline
+Closing: Professional sign-off
+Response time: 24 hours business, 48 hours personal
+```
+
+## Time Management
+
+### Eisenhower Matrix
+```
+Urgent + Important: DO now (crises, deadlines)
+Not Urgent + Important: SCHEDULE (planning, health, relationships)
+Urgent + Not Important: DELEGATE (interruptions, some emails)
+Not Urgent + Not Important: DELETE (scrolling, busywork)
+```
+
+### Time Blocking
+```
+1. Fixed commitments (work, appointments)
+2. Deep work blocks (2-4 hours, no distractions)
+3. Shallow work blocks (email, admin)
+4. Buffer time (transitions, overruns)
+5. Recovery (breaks, exercise, meals)
+```
+
+### Pomodoro Technique
+```
+25 min work → 5 min break
+After 4 cycles → 15-30 min break
+Adjust intervals to your focus span
+```
+
+### Weekly Review (30 min Sunday)
+```
+1. Review last week: Wins, lessons, incomplete
+2. Check calendar: Next 2 weeks
+3. Prioritize: Top 3 for week
+4. Schedule: Time block priorities
+5. Prep: Materials, decisions needed
+```
+
+## Productivity
+
+### Task Management
+```
+Capture → Clarify → Organize → Review → Engage
+(GTD - Getting Things Done)
+
+Inbox zero: Process daily (do, delegate, defer, delete)
+Next actions: Specific, physical, visible
+Projects: Anything >1 action step
+Someday/maybe: Ideas, not commitments
+```
+
+### Deep Work
+```
+Environment: Phone in another room, site blockers
+Ritual: Same time, place, setup
+Duration: 90 min cycles (ultradian rhythm)
+Recovery: Real breaks (walk, stretch, not phone)
+```
+
+### Energy Management
+```
+Track energy for 1 week (1-10 scale hourly)
+Match high-energy tasks to high-energy times
+Low energy → admin, meetings, learning
+Protect peak hours fiercely
+```
+
+## Decision Making
+
+### Two-Way Door vs One-Way Door
+```
+Two-way: Reversible, decide fast, iterate
+One-way: Irreversible, gather data, deliberate
+Most decisions are two-way doors
+```
+
+### 10/10/10 Rule
+```
+How will I feel in 10 minutes? 10 months? 10 years?
+Reduces short-term emotion bias
+```
+
+### Regret Minimization
+```
+"Will I regret not doing this more than doing it?"
+Optimize for minimizing future regret
+```
+
+### Pre-Mortem
+```
+Before deciding: "Imagine it's 6 months later and this failed. Why?"
+Identifies risks before committing
+```
+
+## Negotiation
+
+### Preparation
+```
+1. Know your BATNA (Best Alternative To Negotiated Agreement)
+2. Know their BATNA
+3. Define: Target, reservation point, walk-away
+4. List tradeables (what you value less, they value more)
+5. Research market standards
+```
+
+### During
+```
+- Anchor first (if you know the range)
+- Ask open questions: "What's important to you?"
+- Listen more than talk
+- Make small concessions slowly
+- Use "If...then..." framing
+- Silence is powerful
+```
+
+### Closing
+```
+Summarize agreement
+Confirm next steps in writing
+Thank them
+```
+
+## Personal Finance Daily Habits
+
+### Daily (2 min)
+```
+- Check accounts (fraud, balances)
+- Log expenses (app or spreadsheet)
+- Move money if needed
+```
+
+### Weekly (15 min)
+```
+- Reconcile budget
+- Pay bills (auto-pay preferred)
+- Review subscriptions
+- Check investment allocations
+```
+
+### Monthly (30 min)
+```
+- Net worth update
+- Progress on goals
+- Adjust budget for next month
+- Tax planning (quarterly)
+```
+
+## Digital Organization
+
+### File Structure
+```
+/Documents
+  /Personal
+    /Finance
+    /Health
+    /Legal
+    /Home
+  /Work
+    /Projects
+    /Reference
+  /Projects (active)
+  /Archive (completed)
+/Photos
+  /YYYY
+    /YYYY-MM Event
+/Downloads (clean weekly)
+```
+
+### Password Management
+```
+Use: Bitwarden, 1Password, KeePass
+Unique password for EVERY site
+2FA on email, banking, social, password manager
+Passphrases: 4-5 random words (correct-horse-battery-staple)
+```
+
+### Email Management
+```
+Folders: Action, Waiting, Reference, Archive
+Rules: Auto-sort newsletters, receipts
+Unsubscribe: Weekly purge
+Search > Folders (modern search is fast)
+```
+
+## Home Management
+
+### Laundry System
+```
+Sort: Lights, darks, delicates, towels
+Schedule: One load daily (prevents piles)
+Fold immediately (or use "clean basket" per person)
+Stain guide: Keep printed near washer
+```
+
+### Meal Planning
+```
+1. Check calendar (busy nights = easy meals)
+2. Check pantry/fridge/freezer
+3. Pick 4-5 dinners
+4. Shop list by store section
+5. Prep Sunday (chop, cook grains, marinate)
+```
+
+### Cleaning Schedule
+```
+Daily: Dishes, counters, 10-min tidy
+Weekly: Bathrooms, floors, sheets, trash
+Monthly: Fridge, oven, windows, baseboards
+Quarterly: Deep clean zones
+```
+
+## Health Habits
+
+### Sleep
+```
+7-9 hours, consistent schedule
+Dark, cool (65-68°F), quiet
+No screens 1 hour before
+Caffeine cutoff: 2pm
+Alcohol: 3 hours before bed
+Morning light within 30 min of waking
+```
+
+### Nutrition
+```
+Eat real food (perimeter of grocery store)
+Protein at every meal (0.7-1g/lb bodyweight)
+Vegetables: 5+ servings, variety of colors
+Water: Half bodyweight in ounces
+Limit: Added sugar, seed oils, ultra-processed
+```
+
+### Movement
+```
+Walk: 7-10k steps daily
+Strength: 2-3x/week full body
+Mobility: Daily 5-10 min
+Cardio: 150 min moderate or 75 min vigorous/week
+```
+
+### Stress Management
+```
+Daily: 5 min breathing/meditation
+Weekly: Nature, hobby, social connection
+Monthly: Unplug day/half-day
+Tools: Box breathing (4-4-4-4), body scan, gratitude journal
+```
+
+## Relationship Maintenance
+
+### Partner
+```
+Daily: 6-second kiss, 20-second hug, appreciation
+Weekly: Date night (phone-free)
+Monthly: State of union (calendar, finances, feelings)
+Yearly: Get away, review goals
+```
+
+### Friends
+```
+Weekly: One meaningful connection (call, walk, meal)
+Monthly: Group activity
+Quarterly: Trip or extended time
+System: Recurring calendar invites
+```
+
+### Family
+```
+Weekly: Call parents/grandparents
+Monthly: Siblings
+Holidays: Plan early, rotate, set boundaries
+```
+
+## Learning
+
+### Reading System
+```
+Input: Read widely, highlight liberally
+Process: Write 3-bullet summary in own words
+Output: Teach someone, apply immediately
+Review: Monthly review of summaries
+```
+
+### Skill Acquisition
+```
+Deconstruct: Sub-skills
+Learn enough to self-correct
+Remove barriers to practice
+Practice 20 hours (Kaufman method)
+Focus on fundamentals
+```
+
+## Maintenance Lists
+
+### Car (Monthly)
+- [ ] Tire pressure
+- [ ] Oil level
+- [ ] Washer fluid
+- [ ] Lights
+- [ ] Tire tread
+
+### Home (Monthly)
+- [ ] HVAC filter
+- [ ] Water softener salt
+- [ ] GFCI test
+- [ ] Smoke/CO test
+- [ ] Drain maintenance
+
+### Digital (Monthly)
+- [ ] Password audit
+- [ ] Backup verification
+- [ ] Subscription review
+- [ ] Photo backup
+- [ ] Software updates
+
+### Financial (Quarterly)
+- [ ] Credit report (annualcreditreport.com)
+- [ ] Beneficiary review
+- [ ] Insurance coverage
+- [ ] Investment rebalance
+- [ ] Tax withholding check

@@ -13,6 +13,7 @@
     "build:appimage": "bash scripts/build.sh AppImage",
     "ingest": "node scripts/ingest-knowledge.js",
     "fetch-knowledge": "bash scripts/fetch-knowledge.sh",
+    "knowledge": "bash scripts/knowledge.sh",
     "knowledge-stats": "node -e \"require('./src/main/rag').listKnowledge().then(console.log)\""
   },
   "build": {

@@ -1,91 +1,333 @@
-# Negotiation Skills
+# Negotiation Strategy & Tactics
 
-## Core Principles
-- **BATNA** (Best Alternative To Negotiated Agreement): what you'll do if deal falls through
-  - Know your BATNA before negotiating — stronger BATNA = more leverage
-  - Improve your BATNA during negotiation (explore alternatives)
-  - Estimate OTHER party's BATNA — this tells you how much they need the deal
-- **Reservation price**: your walk-away point (lowest salary you'll accept, highest price you'll pay)
-- **ZOPA** (Zone Of Possible Agreement): overlap between both parties' reservation prices
-  - If no ZOPA exists, no deal is possible
-- **Anchoring**: first number mentioned anchors the negotiation — whoever anchors first has advantage
-  - If they anchor first (too low for you / too high for them), you can counter-anchor
-  - Don't accept first offer (even if good — leaves money on table, they expect you to negotiate)
-- Make the first offer when you have good information about market value
-- Let the other side go first when you don't have good information
+## Overview
+Negotiation is a structured dialogue to reach mutually acceptable agreements. Success depends on preparation, understanding interests, and creating value before claiming it.
 
-## Preparation
-- Research: market rates, typical terms, other party's situation and constraints
-- Know what you want AND why (interests vs positions)
-  - Position: "I want $150,000" — Interest: "I want to feel valued and live comfortably"
-  - Positions are what people say they want. Interests are WHY they want it
-  - Understanding interests reveals creative solutions (maybe they can't pay more but can offer equity, flexibility, title, vacation time)
-- List: what you must have (non-negotiable), what you want (negotiable), what you can trade (concessions)
-- Know your emotions and triggers beforehand — don't get emotional during
-- Role-play tough questions before high-stakes negotiation
+## Core Frameworks
 
-## Tactics
-- **Active listening**: "Let me make sure I understand..." — builds rapport, reveals information
-- **Mirroring**: repeat last 1-3 words they said (questioningly) — encourages them to elaborate
-  - Them: "This is a fair offer given the market" — You: "Given the market?"
-- **Labeling**: name the emotion — "It sounds like you're frustrated with the timeline"
-  - Diffuses negative emotions, builds connection
-- **Silence**: after making an offer or asking a tough question — SHUT UP
-  - Whoever speaks first loses — silence is powerful, let them fill it
-  - Count to 10 in your head before speaking
-- **"No" is protection**: asking "Is now a bad time to discuss?" gets better results than "Do you have a few minutes?"
-  - "No" feels safe; "Yes" feels like a trap
-- **Fairness**: "I want you to feel this is fair" — frames collaboration, not competition
-- **Bracket**: if they say $80k and you want $100k, ask for $120k (brackets their number to your target)
-- **Reciprocity**: give something to get something — "If I can X, will you Y?"
-  - Concessions should be traded, not given freely
-- **Nibble**: after major terms are agreed, ask for a small additional item ("Could you also throw in...")
-  - Small at the end (when they want to close) often gets yes
+### Positions vs Interests
+| Level | Example | Question to Uncover |
+|-------|---------|---------------------|
+| **Position** | "I need $50k" | What do you want? |
+| **Interest** | "I need to cover student loans + emergency fund" | Why do you want it? |
+| **Need** | Security, autonomy, recognition | What happens if you don't get it? |
 
-## Salary Negotiation
-1. **Never give first number**: "I'm flexible — what range do you have budgeted for this role?"
-   - If pressed: "Based on my research and experience, I'm looking for $X-$Y"
-2. **Know market**: research at Levels.fyi, Glassdoor, LinkedIn Salary, Blind
-3. **Consider total comp**: base + bonus + equity + 401k match + insurance value + vacation + perks
-   - A $120k salary with 50% remote flexibility may be worth more than $130k with 5 days in office
-4. **After offer**: express enthusiasm, then ask for time ("I'd like to think about this. When do you need a decision?")
-   - Never accept on the spot — always take 24+ hours
-5. **Counter**: specific, justified, collaborative
-   - "I'm very excited about this role. Based on my experience in [specific achievement], I was hoping for $X. Is there flexibility in the budget?"
-6. **If they can't move on salary**: negotiate other items
-   - Sign-on bonus, relocation, equity, title, vacation time, start date, remote flexibility, professional development budget, performance review timing (earlier for raise)
-7. **Get it in writing**: verbal offer = not real until written offer letter
+**Rule**: Negotiate interests, not positions. Positions are inflexible; interests have multiple solutions.
 
-## Business Negotiation
-- **Focus on interests, not positions**: "Why do you want this term?" reveals what's really important
-  - "We need 90-day payment terms because of our cash flow cycle" → maybe offer discount for 30-day payment
-- **Create value**: expand the pie before dividing it
-  - Example: supplier wants 3-year contract, you want lower price → longer contract = better price for you, guaranteed revenue for them
-- **Trading concessions**: don't give something for nothing — "If I move on price, would you move on delivery timeline?"
-  - Every concession should get something in return
-- **Multiple equivalent simultaneous offers** (MESO): present 2-3 different packages, all equal value to you but different for them
-  - Shows flexibility, reveals what they value most
-- **Deadline**: deadlines are often arbitrary — challenge them. "Can you check if there's flexibility on that timeline?"
-- **Walk away**: be willing to walk — if you can't walk, you can't negotiate
-  - Even if you can't walk, pretend you can (bluffing has risks though)
+### BATNA (Best Alternative to Negotiated Agreement)
+```
+Your BATNA = What you'll do if no deal is reached
+Their BATNA = What they'll do if no deal is reached
 
-## Common Mistakes
-- **Talking too much**: you learn from listening, not talking — ask questions
-- **Not asking for what you want**: you don't get what you don't ask for (most people don't ask)
-- **Revealing your BATNA**: never show how much you need the deal
-- **Accepting first offer**: almost always room for improvement, leaving money on table
-- **Getting emotional**: anger, desperation, attachment → make you vulnerable
-- **Win-lose mindset**: burning bridges for short-term gain loses long-term
-- **Negotiating against yourself**: they say low offer, you raise your own offer without them asking
-  - If they offer $80k and you say "I was hoping for more like $100k... but I could do $90k" — you've given away your upper bound
-- **Not writing down what's agreed**: memory is unreliable — confirm in writing after meeting
+Strong BATNA = Leverage
+Weak BATNA = Concessions needed
 
-## Cross-Cultural Negotiation
-- **US**: direct, fast-paced, friendly but transactional, lawyers present, deadlines matter
-- **Japan**: relationship-first, indirect, hierarchy critical, consensus decision-making, silent pauses are normal
-- **China**: relationship (guanxi) before deal, aggressive opening, use intermediaries, banquets are business
-- **Middle East**: relationship first, trust based on personal connection, bargaining expected, hospitality important
-- **Europe**: North (direct, on time, data-driven) vs South (relationship, flexible with time, expressive)
-- **Latin America**: warm personal relationship first, hierarchy respected, flexible with time, emotional expression normal
-- **Global: slower is faster** — building trust takes time upfront but speeds deal later
-  - Respect hierarchy, understand decision-making process, learn basic cultural greetings
+Before negotiating:
+1. Identify your BATNA
+2. Improve your BATNA
+3. Estimate their BATNA
+4. Don't reveal your BATNA (unless very strong)
+```
+
+### ZOPA (Zone of Possible Agreement)
+```
+Your Reservation Point (worst acceptable) = $X
+Their Reservation Point (worst acceptable) = $Y
+
+ZOPA exists if X ≤ Y (for buyer/seller) or overlap exists
+No ZOPA = No deal possible (walk away)
+
+Example:
+Seller min: $300k
+Buyer max: $350k
+ZOPA: $300k - $350k
+```
+
+## Preparation Checklist
+
+### Information Gathering
+```
+☐ My interests (must-haves, nice-to-haves, deal-breakers)
+☐ Their likely interests (research, network, empathy)
+☐ Objective criteria (market rates, precedents, standards)
+☐ My BATNA (concrete, quantified)
+☐ Their BATNA (estimate)
+☐ ZOPA estimate
+☐ Anchoring strategy (first offer)
+☐ Concession plan (what, when, how much)
+☐ Walk-away point (commit in writing)
+☐ Team roles (lead, note-taker, observer)
+```
+
+### Mental Preparation
+- **Growth mindset**: "We can create value together"
+- **Curiosity over judgment**: Ask "Help me understand..."
+- **Emotional regulation**: Pause before reacting
+- **Time perspective**: This is one of many negotiations
+
+## Negotiation Phases
+
+### Phase 1: Opening (Relationship & Information)
+```
+Goals:
+- Build rapport (5-10 min small talk)
+- Set agenda ("What would make today successful?")
+- Gather information (ask, listen, probe)
+- Establish credibility
+
+Key Questions:
+- "What are your priorities for this deal?"
+- "What does a successful outcome look like for you?"
+- "What constraints are you working within?"
+- "How does this fit into your broader goals?"
+
+Techniques:
+- Mirror last 3 words
+- Label emotions: "It seems like timing is critical..."
+- Open-ended questions (what, how, not why)
+- Silence after questions (count to 3)
+```
+
+### Phase 2: Exploration (Value Creation)
+```
+Goals:
+- Expand the pie before dividing
+- Identify tradeables (low cost to you, high value to them)
+- Generate options without commitment
+
+Techniques:
+- "What if we...?" (hypothetical)
+- "Suppose we could... would that work?"
+- Package deals (bundle issues)
+- Post-settlement settlement ("We have a deal, but can we improve it?")
+
+Tradeable Matrix:
+| Issue | My Priority | Their Priority | Trade Potential |
+|-------|-------------|----------------|-----------------|
+| Price | High | High | Low |
+| Timeline | Medium | High | HIGH |
+| Payment terms | Low | Medium | HIGH |
+| Scope | High | Low | HIGH |
+| Warranty | Low | High | HIGH |
+```
+
+### Phase 3: Bargaining (Value Claiming)
+```
+Anchoring:
+- First offer sets reference point
+- Make it aggressive but defensible
+- Use precise numbers ($37,850 vs $38,000)
+- Justify with objective criteria
+
+Concession Patterns:
+✓ Decreasing increments ($5k → $2k → $1k → $500)
+✓ Reciprocity (never concede unilaterally)
+✓ Label concessions: "I can move on X if you can move on Y"
+✓ Don't split the difference (lazy)
+
+Tactics to Recognize & Counter:
+| Tactic | Recognition | Counter |
+|--------|-------------|---------|
+| Good cop/bad cop | Extreme then reasonable | "I need to work with decision-maker" |
+| Nibbling | Small asks after deal | "That's a new issue, let's discuss" |
+| Exploding offer | "Today only" | "I don't make good decisions under pressure" |
+| Flinch | Visible shock at offer | Silence, then "Help me understand..." |
+| Higher authority | "Need boss approval" | "What can YOU commit to?" |
+| Take it or leave it | Final ultimatum | Test: "Is that truly final?" |
+```
+
+### Phase 4: Closing (Agreement & Commitment)
+```
+Closing Techniques:
+- Summary close: "So we agree on X, Y, Z at $P"
+- Assumptive close: "When shall we sign here's the agreement..."
+- Choice close: "Option A or B?"
+- Urgency close: "Need signed by Friday for..."
+
+Documentation:
+- Written summary before leaving
+- Next steps with owners & deadlines
+- Contingencies clearly defined
+- Review period if complex
+```
+
+## Specific Contexts
+
+### Salary Negotiation
+```
+Preparation:
+☐ Market data (Levels.fyi, Glassdoor, peers)
+☐ Company bands (ask recruiter: "What's the band?")
+☐ Your unique value (metrics, projects, skills)
+☐ Total comp: Base + Bonus + Equity + Benefits
+
+Script:
+"Based on my research and the value I bring [specifics], 
+I'm targeting $X base. The market for this role 
+with my experience is $X-$Y. Can we get to $X?"
+
+Equity negotiation:
+"What's the current 409A? Last preferred price? 
+Outstanding shares? % this grant represents?"
+```
+
+### Real Estate
+```
+Buyer:
+- Inspection contingency (leverage for repairs/price)
+- Appraisal contingency (protection)
+- Earnest money (shows seriousness, risk)
+- Closing timeline (seller's constraint)
+- Personal letter (emotional connection)
+
+Seller:
+- Pre-inspection (control narrative)
+- Multiple offers → best & final
+- Rent-back (if need time)
+- Exclude personal property
+```
+
+### Business Deals
+```
+Term Sheet Key Terms:
+- Valuation (pre-money vs post-money)
+- Liquidation preference (1x non-participating standard)
+- Anti-dilution (weighted average vs full ratchet)
+- Board composition
+- Protective provisions (veto rights)
+- Vesting (4-year, 1-year cliff)
+- Option pool (10-20% post-money)
+```
+
+### Conflict Resolution
+```
+Interest-Based Relational (IBR) Approach:
+1. Separate people from problem
+2. Focus on interests, not positions
+3. Generate options for mutual gain
+4. Insist on objective criteria
+5. Use BATNA as benchmark, not weapon
+
+Mediation Structure:
+- Opening statements (each side, uninterrupted)
+- Joint discussion (clarify, explore)
+- Private caucuses (confidential, reality test)
+- Joint negotiation (package deals)
+- Agreement writing
+```
+
+## Psychological Principles
+
+### Cognitive Biases to Leverage/Guard Against
+| Bias | Leverage | Guard Against |
+|------|----------|---------------|
+| **Anchoring** | Make first offer | Re-anchor with data |
+| **Loss Aversion** | Frame as avoiding loss | Reframe as gain |
+| **Reciprocity** | Give small concession first | Don't feel obligated |
+| **Scarcity** | Real deadlines, alternatives | Verify urgency |
+| **Social Proof** | "Others have agreed to..." | Check independently |
+| **Authority** | Use expert standards | Question credentials |
+| **Commitment/Consistency** | Get small yeses first | Re-evaluate if context changes |
+
+### Emotional Intelligence
+```
+Self-Awareness:
+- Name the emotion ("I'm feeling anxious about...")
+- Identify trigger
+- Choose response (pause, breathe, reframe)
+
+Social Awareness:
+- Watch micro-expressions
+- Listen for tone shifts
+- Notice body language clusters
+- Ask: "You seem hesitant about..."
+
+Relationship Management:
+- Acknowledge their perspective first
+- Use "we" language for shared problems
+- Separate intent from impact
+- Repair ruptures immediately
+```
+
+## Cross-Cultural Considerations
+
+| Dimension | Low Context | High Context |
+|-----------|-------------|--------------|
+| Communication | Explicit, direct | Implicit, indirect |
+| Time | Monochronic (linear) | Polychronic (fluid) |
+| Relationship | Task-first | Relationship-first |
+| Hierarchy | Egalitarian | Hierarchical |
+| Conflict | Confrontational | Harmonious |
+
+**Examples**: US/Germany = Low context; Japan/China/Arab = High context
+**Adaptation**: Mirror their style, not yours
+
+## Ethics & Reputation
+
+### Red Lines
+- Never lie about facts (BATNA, authority, deadlines)
+- Don't use confidential information improperly
+- No threats, intimidation, or personal attacks
+- Honor commitments (even informal)
+
+### Reputation Capital
+- Every negotiation builds/destroys trust
+- Word travels fast in industries
+- Long-term relationships > short-term wins
+- Be known as "tough but fair"
+
+## Tools & Templates
+
+### One-Page Prep Sheet
+```
+NEGOTIATION: ___________________ DATE: ______
+
+MY GOALS:
+Must have: _______________________________
+Nice to have: ____________________________
+Walk away: _______________________________
+
+THEIR GOALS (est.): _______________________
+___________________________________________
+
+MY BATNA: ________________________________
+Value: $_______ / Terms: __________________
+
+THEIR BATNA (est.): _______________________
+Value: $_______ / Terms: __________________
+
+ZOPA ESTIMATE: ____________________________
+
+ANCHOR (my first offer): ___________________
+JUSTIFICATION: ____________________________
+
+CONCESSION PLAN:
+1. Give: ___________ Get: ___________
+2. Give: ___________ Get: ___________
+3. Give: ___________ Get: ___________
+
+KEY QUESTIONS TO ASK:
+1. ________________________________________
+2. ________________________________________
+3. ________________________________________
+
+OBJECTIONS TO ANTICIPATE:
+1. ___________________ Response: ___________
+2. ___________________ Response: ___________
+```
+
+### Post-Negotiation Review
+```
+What went well? ____________________________
+What would I change? _______________________
+What did I learn about them? _______________
+What did I learn about me? _________________
+Relationship status: Better / Same / Worse
+Follow-up needed: __________________________
+```
+
+## Resources
+- **Books**: "Getting to Yes" (Fisher/Ury), "Never Split the Difference" (Voss), "Negotiation Genius" (Malhotra/Bazerman)
+- **Courses**: Harvard Negotiation Institute, Coursera (Yale - Barry Nalebuff)
+- **Practice**: Role-play with colleagues, negotiate daily (coffee, bills, favors)
+- **Frameworks**: 7 Elements (Fisher), 3-D Negotiation (Lax/Sebenius)

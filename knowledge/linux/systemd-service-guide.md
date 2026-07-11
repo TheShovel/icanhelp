@@ -1,200 +1,518 @@
-<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-  "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd">
-  
-    systemd.service
-    systemd
-  
-  
-    systemd.service
-    5
-  
-  
-    systemd.service
-    Service unit configuration
-  
-  
-    service.service
-  
-  
-    Description
-    A unit configuration file whose name ends in
-    .service encodes information about a process
-    controlled and supervised by systemd.
-    This man page lists the configuration options specific to
-    this unit type. See
-    systemd.unit5
-    for the common options of all unit configuration files. The common
-    configuration items are configured in the generic
-    [Unit] and [Install]
-    sections. The service specific configuration options are
-    configured in the [Service] section.
-    Additional options are listed in
-    systemd.exec5,
-    which define the execution environment the commands are executed
-    in, and in
-    systemd.kill5,
-    which define the way the processes of the service are terminated,
-    and in
-    systemd.resource-control5,
-    which configure resource control settings for the processes of the
-    service.
-    The systemd-run1
-    command allows creating .service and .scope units dynamically
-    and transiently from the command line.
-  
-  
-    Service Templates
-    It is possible for systemd services to take a single argument via the
-    service@argument.service
-    syntax. Such services are called "instantiated" services, while the unit definition without the
-    argument parameter is called a "template". An example could be a
-    dhcpcd@.service service template which takes a network interface as a
-    parameter to form an instantiated service. Within the service file, this parameter or "instance
-    name" can be accessed with %-specifiers. See
-    systemd.unit5
-    for details.
-  
-  
-    Automatic Dependencies
-    
-      Implicit Dependencies
-      The following dependencies are implicitly added:
-      
-        Services with Type=dbus set automatically
-        acquire dependencies of type Requires= and
-        After= on
-        dbus.socket.
-        Socket activated services are automatically ordered after
-        their activating .socket units via an
-        automatic After= dependency.
-        Services also pull in all .socket units
-        listed in Sockets= via automatic
-        Wants= and After= dependencies.
-      
-      Additional implicit dependencies may be added as result of
-      execution and resource control parameters as documented in
-      systemd.exec5
-      and
-      systemd.resource-control5.
-    
-    
-      Default Dependencies
-      The following dependencies are added unless DefaultDependencies=no is set:
-      
-        Service units will have dependencies of type Requires= and
-        After= on sysinit.target, a dependency of type After= on
-        basic.target as well as dependencies of type Conflicts= and
-        Before= on shutdown.target. These ensure that normal service units pull in
-        basic system initialization, and are terminated cleanly prior to system shutdown. Only services involved with early
-        boot or late system shutdown should disable this option.
-        Instanced service units (i.e. service units with an @ in their name) are assigned by
-        default a per-template slice unit (see
-        systemd.slice5), named after the
-        template unit, containing all instances of the specific template. This slice is normally stopped at shutdown,
-        together with all template instances. If that is not desired, set DefaultDependencies=no in the
-        template unit, and either define your own per-template slice unit file that also sets
-        DefaultDependencies=no, or set Slice=system.slice (or another suitable slice)
-        in the template unit. Also see
-        systemd.resource-control5.
-        
-      
-    
-  
-  
-    Options
-    Service unit files may include [Unit] and [Install] sections, which are described in
-    systemd.unit5.
-    
-    Service unit files must include a [Service]
-    section, which carries information about the service and the
-    process it supervises. A number of options that may be used in
-    this section are shared with other unit types. These options are
-    documented in
-    systemd.exec5,
-    systemd.kill5
-    and
-    systemd.resource-control5.
-    The options specific to the [Service] section
-    of service units are the following:
-    
-      
-        Type=
-        
-          Configures the mechanism via which the service notifies the manager that the service start-up
-          has finished. One of simple, exec, forking,
-          oneshot, dbus, notify,
-          notify-reload, or idle:
-          
-            If set to simple (the default if ExecStart=
-            is specified but neither Type= nor BusName= are, and
-            credentials are not used), the service manager will consider the unit started immediately after
-            the main service process has been forked off (i.e. immediately after fork(),
-            and before various process attributes have been configured and in particular before the new process
-            has called execve() to invoke the actual service binary). Typically,
-            Type=exec is the better choice, see below.
-            It is expected that the process configured with ExecStart= is the main
-            process of the service. In this mode, if the process offers functionality to other processes on
-            the system, its communication channels should be installed before the service is started up
-            (e.g. sockets set up by systemd, via socket activation), as the service manager will immediately
-            proceed starting follow-up units, right after creating the main service process, and before
-            executing the service's binary. Note that this means systemctl start command
-            lines for simple services will report success even if the service's binary
-            cannot be invoked successfully (for example because the selected User= does not
-            exist, or the service binary is missing).
-            The exec type is similar to simple, but the
-            service manager will consider the unit started immediately after the main service binary has been
-            executed. The service manager will delay starting of follow-up units until that point. (Or in
-            other words: simple proceeds with further jobs right after
-            fork() returns, while exec will not proceed before both
-            fork() and execve() in the service process succeeded.)
-            Note that this means systemctl start command lines for exec
-            services will report failure when the service's binary cannot be invoked successfully (for
-            example because the selected User= does not exist, or the service binary is
-            missing). This type is implied if credentials are used (refer to LoadCredential=
-            in systemd.exec5
-            for details).
-            If set to forking, the manager will consider the unit started
-            immediately after the binary that forked off by the manager exits. The use of this type
-            is discouraged, use notify, notify-reload, or
-            dbus instead.
-            It is expected that the process configured with ExecStart= will call
-            fork() as part of its start-up. The parent process is expected to exit when
-            start-up is complete and all communication channels are set up. The child continues to run as the
-            main service process, and the service manager will consider the unit started when the parent
-            process exits. This is the behavior of traditional UNIX services. If this setting is used, it is
-            recommended to also use the PIDFile= option, so that systemd can reliably
-            identify the main process of the service. The manager will proceed with starting follow-up units
-            after the parent process exits.
-            Behavior of oneshot is similar to exec;
-            however, the service manager will consider the unit up after the main process exits. It will then
-            start follow-up units. RemainAfterExit= is particularly useful for this type
-            of service. Type=oneshot is the implied default if neither
-            Type= nor ExecStart= are specified. Note that if this
-            option is used without RemainAfterExit= the service will never enter
-            active unit state, but will directly transition from
-            activating to deactivating or dead,
-            since no process is configured that shall run continuously. In particular this means that after a
-            service of this type ran (and which has RemainAfterExit= not set) it will not
-            show up as started afterwards, but as dead.
-            Behavior of dbus is similar to simple; however,
-            units of this type must have the BusName= specified and the service manager
-            will consider the unit up when the specified bus name has been acquired. This type is the default
-            if BusName= is specified.
-            Service units with this option configured implicitly gain dependencies on the
-            dbus.socket unit. A service unit of this type is considered to be in the
-            activating state until the specified bus name is acquired. It is considered activated while the
-            bus name is taken. Once the bus name is released the service is considered being no longer
-            functional which has the effect that the service manager attempts to terminate any remaining
-            processes belonging to the service. Services that drop their bus name as part of their shutdown
-            logic thus should be prepared to receive a SIGTERM (or whichever signal is
-            configured in KillSignal=) as result.
-            Behavior of notify is similar to exec; however,
-            it is expected that the service sends a READY=1 notification message via
-            sd_notify3 or
-            an equivalent call when it has finished starting up. systemd will proceed with starting follow-up
-            units after this notification message has been sent. If this option is used,
-            NotifyAccess= (see below) should be set to open access to the notification
-            socket provided by systemd. If NotifyAccess= is missing or set to
-            none, it will be forcibly set to main.
-            If the service supports reloading, and uses a signal to start the reload, using
-            notify-reload instead is recommended.
+# Linux Systemd Service Guide
+
+## Service Unit Structure
+```ini
+[Unit]
+Description=My Application
+Documentation=https://example.com/docs
+After=network.target postgresql.service
+Requires=postgresql.service
+Wants=redis.service
+Before=nginx.service
+
+[Service]
+Type=simple
+User=myapp
+Group=myapp
+WorkingDirectory=/opt/myapp
+Environment=ENV=production
+EnvironmentFile=-/etc/myapp/.env
+ExecStart=/opt/myapp/bin/myapp
+ExecStartPre=/opt/myapp/bin/migrate
+ExecStop=/bin/kill -TERM $MAINPID
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+TimeoutStartSec=60
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+SendSIGHUP=no
+SyslogIdentifier=myapp
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/myapp/data /var/log/myapp
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryLimit=512M
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Service Types
+
+| Type | Behavior | Use Case |
+|------|----------|----------|
+| `simple` | Default, process stays in foreground | Most services |
+| `forking` | Parent exits, child runs in background | Traditional daemons |
+| `oneshot` | Runs once, exits | Setup scripts |
+| `dbus` | Acquires D-Bus name | D-Bus services |
+| `notify` | Sends READY=1 via sd_notify | Services with startup notification |
+| `idle` | Runs after all jobs dispatched | Low priority |
+
+## Exec Directives
+
+```ini
+# Main command (required for non-oneshot)
+ExecStart=/path/to/executable arg1 arg2
+
+# Run before ExecStart
+ExecStartPre=/path/to/pre-start.sh
+
+# Run after ExecStart (for notify type)
+ExecStartPost=/path/to/post-start.sh
+
+# Run on stop
+ExecStop=/path/to/stop.sh
+
+# Run on reload (systemctl reload)
+ExecReload=/path/to/reload.sh
+
+# Multiple commands
+ExecStartPre=/bin/mkdir -p /run/myapp
+ExecStartPre=/bin/chown myapp:myapp /run/myapp
+ExecStart=/opt/myapp/bin/myapp
+
+# Shell features (use /bin/sh -c)
+ExecStart=/bin/sh -c 'cd /opt/myapp && ./myapp >> /var/log/myapp.log 2>&1'
+
+# Environment expansion
+ExecStart=${MYAPP_BIN}/myapp
+```
+
+## Environment & Configuration
+
+```ini
+# Direct environment variables
+Environment=VAR1=value1
+Environment=VAR2=value2
+
+# From file (one VAR=value per line, # comments)
+EnvironmentFile=/etc/myapp/config.env
+
+# Optional file (ignore if missing)
+EnvironmentFile=-/etc/myapp/local.env
+
+# Override at runtime
+systemctl set-environment VAR=value
+systemctl unset-environment VAR
+```
+
+## Restart Policies
+
+```ini
+# When to restart
+Restart=no                    # Never (default)
+Restart=on-success            # Exit code 0
+Restart=on-failure            # Non-zero exit, signal
+Restart=on-abnormal           # Signal, timeout
+Restart=on-abort              # Uncaught signal
+Restart=on-watchdog           # Watchdog timeout
+Restart=always                # Any exit
+
+# Delay between restarts
+RestartSec=5                  # Fixed 5s
+RestartSec=5s 10s 30s         # Exponential backoff
+RestartSec=5s                 # Or just one value
+
+# Rate limiting
+StartLimitIntervalSec=60      # Time window
+StartLimitBurst=3             # Max restarts in window
+StartLimitAction=reboot-force # Action if exceeded: none, reboot, reboot-force, poweroff, poweroff-force
+```
+
+## Socket Activation
+
+```ini
+# mysocket.socket
+[Unit]
+Description=MyApp Socket
+
+[Socket]
+ListenStream=8080
+ListenStream=[::]:8080
+Accept=yes          # One service per connection (default: no)
+MaxConnections=100
+
+[Install]
+WantedBy=sockets.target
+```
+
+```ini
+# mysocket@.service (template)
+[Unit]
+Description=MyApp Worker
+
+[Service]
+ExecStart=/opt/myapp/bin/worker
+StandardInput=socket
+```
+
+```bash
+systemctl enable --now mysocket.socket
+# systemd listens on port 8080, starts mysocket@.service on connection
+```
+
+## Timer Units (Cron Replacement)
+
+```ini
+# myapp-backup.timer
+[Unit]
+Description=Daily backup timer
+Requires=myapp-backup.service
+
+[Timer]
+OnCalendar=daily                  # Daily at midnight
+OnCalendar=*-*-* 02:30:00         # Daily 2:30 AM
+OnCalendar=Mon..Fri 09:00:00      # Weekdays 9 AM
+OnCalendar=*-*-1 00:00:00         # 1st of month
+OnCalendar=Sat,Sun *-*-* 10:00:00 # Weekends 10 AM
+OnBootSec=15min                   # 15 min after boot
+OnUnitActiveSec=1h                # 1h after last activation
+OnUnitInactiveSec=30min           # 30min after last deactivation
+Persistent=true                   # Run immediately if missed
+RandomizedDelaySec=15min          # Random delay 0-15min
+AccuracySec=1min                  # Default 1min
+
+[Install]
+WantedBy=timers.target
+```
+
+```ini
+# myapp-backup.service (oneshot)
+[Unit]
+Description=Backup database
+
+[Service]
+Type=oneshot
+ExecStart=/opt/myapp/bin/backup.sh
+User=myapp
+```
+
+```bash
+systemctl enable --now myapp-backup.timer
+systemctl list-timers --all
+```
+
+## Drop-in Overrides
+
+```bash
+# Create override directory
+systemctl edit myservice
+# Creates /etc/systemd/system/myservice.d/override.conf
+
+# Or manually
+mkdir -p /etc/systemd/system/myservice.d/
+cat > /etc/systemd/system/myservice.d/override.conf <<'EOF'
+[Service]
+MemoryLimit=1G
+Environment=EXTRA_VAR=value
+EOF
+
+systemctl daemon-reload
+systemctl restart myservice
+```
+
+## Common Patterns
+
+### Application with Migrations
+```ini
+[Service]
+Type=simple
+ExecStartPre=/opt/myapp/bin/migrate up
+ExecStart=/opt/myapp/bin/server
+ExecStop=/opt/myapp/bin/migrate down  # Optional rollback
+```
+
+### Multiple Workers
+```ini
+# myapp@.service (template)
+[Service]
+Type=simple
+ExecStart=/opt/myapp/bin/worker --id=%i
+```
+
+```bash
+systemctl enable --now myapp@1 myapp@2 myapp@3 myapp@4
+```
+
+### Dependency on Mount
+```ini
+[Unit]
+Requires=mnt-data.mount
+After=mnt-data.mount
+```
+
+```ini
+# mnt-data.mount
+[Unit]
+Description=Data mount
+
+[Mount]
+What=/dev/sdb1
+Where=/mnt/data
+Type=ext4
+Options=defaults,noatime
+```
+
+### Watchdog
+```ini
+[Service]
+Type=notify
+WatchdogSec=30
+ExecStart=/opt/myapp/bin/server
+
+# Application must call sd_notify(0, "WATCHDOG=1") every <30s
+# If not, systemd restarts it
+```
+
+## Logging & Debugging
+
+```bash
+# Follow logs
+journalctl -u myservice -f
+
+# Last 100 lines
+journalctl -u myservice -n 100
+
+# Since timestamp
+journalctl -u myservice --since "1 hour ago"
+journalctl -u myservice --since "2024-01-15 10:00:00"
+
+# By priority
+journalctl -u myservice -p err
+
+# Output formats
+journalctl -u myservice -o json
+journalctl -u myservice -o short-precise
+journalctl -u myservice -o cat
+
+# Filter by field
+journalctl _SYSTEMD_UNIT=myservice _PID=1234
+
+# Disk usage
+journalctl --disk-usage
+journalctl --vacuum-time=30d
+journalctl --vacuum-size=500M
+```
+
+### Log Forwarding
+```ini
+[Service]
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=myapp
+# Or forward to syslog
+# StandardOutput=syslog
+# StandardError=syslog
+# SyslogFacility=daemon
+# SyslogLevel=info
+```
+
+## Security Hardening Checklist
+
+```ini
+[Service]
+# Run as non-root
+User=myapp
+Group=myapp
+DynamicUser=yes           # Creates transient user (systemd 235+)
+
+# Filesystem
+ProtectSystem=strict      # Read-only /usr, /boot, /etc
+ReadWritePaths=/var/lib/myapp /var/log/myapp
+ProtectHome=yes           # No access to /home, /root
+PrivateTmp=yes            # Private /tmp, /var/tmp
+PrivateDevices=yes        # No device access
+PrivateNetwork=yes        # No network (if not needed)
+PrivateUsers=yes          # User namespace
+PrivateIPC=yes            # Private IPC namespace
+
+# Capabilities
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE  # Only bind low ports
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# System calls
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Kernel
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectProc=invisible     # Hide other processes in /proc
+ProcSubset=pid            # Only show own PID in /proc
+
+# Other
+NoNewPrivileges=yes       # Prevent privilege escalation
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RemoveIPC=yes
+```
+
+## Systemd-analyze
+
+```bash
+# Boot time
+systemd-analyze
+systemd-analyze blame
+systemd-analyze critical-chain
+systemd-analyze plot > boot.svg
+
+# Service time
+systemd-analyze verify myservice.service
+systemd-analyze security myservice.service
+```
+
+## Troubleshooting
+
+```bash
+# Service status
+systemctl status myservice
+systemctl is-active myservice
+systemctl is-enabled myservice
+systemctl is-failed myservice
+
+# Failed units
+systemctl --failed
+
+# Debug startup
+systemd-analyze verify /etc/systemd/system/myservice.service
+systemctl cat myservice
+systemctl show myservice
+
+# View all config (including drop-ins)
+systemctl cat myservice
+
+# Reload daemon
+systemctl daemon-reload
+
+# Reset failed state
+systemctl reset-failed myservice
+
+# Mask (prevent start)
+systemctl mask myservice
+systemctl unmask myservice
+
+# Resource usage
+systemd-cgtop
+systemd-cgls
+```
+
+## User Services (systemd --user)
+
+```bash
+# Enable linger for user services at boot
+loginctl enable-linger $USER
+
+# User service directory
+~/.config/systemd/user/
+
+# Manage
+systemctl --user status myservice
+systemctl --user enable --now myservice
+
+# Environment
+systemctl --user show-environment
+systemctl --user import-environment PATH DISPLAY
+```
+
+## Container Integration
+
+```ini
+# For podman/docker containers
+[Unit]
+Description=MyApp Container
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+ExecStartPre=-/usr/bin/podman rm -f myapp
+ExecStart=/usr/bin/podman run --rm --name myapp \
+  -p 8080:8080 \
+  -v /opt/myapp/data:/data \
+  -e ENV=production \
+  myregistry/myapp:latest
+ExecStop=/usr/bin/podman stop -t 10 myapp
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Or use podman generate systemd
+podman run -d --name myapp myimage
+podman generate systemd --name myapp --files --new
+# Creates container-myapp.service
+systemctl enable --now container-myapp.service
+```
+
+## Boot Process
+
+```
+BIOS/UEFI
+    ↓
+Bootloader (GRUB/systemd-boot)
+    ↓
+Kernel + initramfs
+    ↓
+systemd (PID 1)
+    ↓
+1. local-fs.target (mount /, /boot, etc)
+2. swap.target
+3. sysinit.target (basic initialization)
+    - systemd-journald
+    - systemd-udevd
+    - systemd-tmpfiles
+    - sysctl
+    - kernel modules
+4. basic.target
+    - sockets, timers, paths
+    - syslog
+5. multi-user.target (or graphical.target)
+    - NetworkManager
+    - sshd
+    - custom services
+    - getty@tty1
+```
+
+## Best Practices
+
+1. **Use Type=simple** for most services
+2. **Set User/Group** - never run as root
+3. **Use Restart=on-failure** with RestartSec
+4. **Add security hardening** - start strict, relax as needed
+5. **Use EnvironmentFile** for configuration directories** - /etc/myapp/
+6. **Set resource limits** - MemoryLimit, CPUQuota, LimitNOFILE
+7. **Use StandardOutput=journal** - centralized logging
+8. **Test with systemd-analyze verify** and **systemd-analyze security**
+9. **Document dependencies** - After, Requires, Wants
+10. **Use drop-ins** for overrides - don't edit vendor units

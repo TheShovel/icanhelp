@@ -1,57 +1,547 @@
-# Redis
+# Redis Operations & Performance
 
-In-memory data structure store used as cache, database, and message broker.
+## Installation
+
+```bash
+# Ubuntu/Debian
+apt install redis-server
+
+# RHEL/Fedora
+dnf install redis
+
+# From source (latest)
+wget http://download.redis.io/redis-stable.tar.gz
+tar xzf redis-stable.tar.gz
+cd redis-stable && make && make install
+```
+
+## Configuration
+
+### redis.conf - Memory
+
+```conf
+# Memory limit
+maxmemory 4gb
+maxmemory-policy allkeys-lru
+
+# Memory allocation
+maxmemory-samples 5
+```
+
+### redis.conf - Persistence
+
+```conf
+# RDB Snapshots
+save 900 1      # 1 change in 15 min
+save 300 10     # 10 changes in 5 min
+save 60 10000   # 10000 changes in 1 min
+
+stop-writes-on-bgsave-error yes
+rdbcompression yes
+rdbchecksum yes
+dbfilename dump.rdb
+dir /var/lib/redis
+
+# AOF (Append Only File)
+appendonly yes
+appendfilename "appendonly.aof"
+appendfsync everysec  # always, everysec, no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+aof-load-truncated yes
+aof-use-rdb-preamble yes
+```
+
+### redis.conf - Network
+
+```conf
+bind 127.0.0.1 ::1
+port 6379
+timeout 0
+tcp-keepalive 300
+maxclients 10000
+tcp-backlog 511
+```
+
+### redis.conf - Security
+
+```conf
+requirepass yourpassword
+# rename-command FLUSHDB ""
+# rename-command FLUSHALL ""
+# rename-command CONFIG ""
+# rename-command EVAL ""
+```
+
+### redis.conf - Replication
+
+```conf
+# Replica
+replicaof 192.168.1.10 6379
+masterauth masterpassword
+replica-serve-stale-data yes
+replica-read-only yes
+repl-diskless-sync yes
+repl-diskless-sync-delay 5
+repl-disable-tcp-nodelay no
+```
+
+### redis.conf - Performance
+
+```conf
+# Lua
+lua-time-limit 5000
+
+# Slow log
+slowlog-log-slower-than 10000  # microseconds
+slowlog-max-len 128
+
+# Latency monitoring
+latency-monitor-threshold 100  # milliseconds
+
+# Active defragmentation
+activedefrag yes
+active-defrag-ignore-bytes 100mb
+active-defrag-threshold-lower 10
+active-defrag-threshold-upper 100
+```
 
 ## Data Structures
-- **Strings**: `SET key value`, `GET key`, `INCR key` (atomic increment), `SETEX key 3600 value` (set + expire). Binary safe. Max 512MB per string
-- **Lists**: `LPUSH/RPUSH`, `LPOP/RPOP`, `LRANGE key 0 -1` (all elements), `LLEN`. Linked lists — fast head/tail operations, slow random access. Use for: queues, recent items, timelines
-- **Sets**: `SADD`, `SMEMBERS`, `SISMEMBER`, `SINTER` (intersection), `SUNION`, `SDIFF`. Unordered, unique strings. Use for: tags, deduplication, friends list, random sampling via `SRANDMEMBER`
-- **Sorted sets**: `ZADD key score member`, `ZRANGE key 0 -1 WITHSCORES`, `ZRANK`, `ZREVRANK`, `ZRANGEBYSCORE`. Ordered by score. Use for: leaderboards, rate limiting (score = timestamp), autocomplete, priority queues
-- **Hashes**: `HSET`, `HGET`, `HGETALL`, `HDEL`, `HINCRBY`. Like objects/dicts — efficient for storing objects. Use for: user profiles, session data, product details
-- **Bitmaps**: `SETBIT`, `GETBIT`, `BITCOUNT`, `BITOP`. Operate on bits of string value. Extremely memory efficient. Use for: daily active users (setbit 100M users = 12.5MB), bloom filters
-- **HyperLogLog**: `PFADD`, `PFCOUNT`, `PFMERGE`. Probabilistic cardinality estimator. ~0.81% error, constant memory ~12KB. Use for: unique visitor counting
-- **Streams**: `XADD`, `XREAD`, `XREADGROUP`, `XRANGE`, `XDEL`. Append-only log of messages. Like Kafka but simpler. Use for: event sourcing, message queuing, log aggregation
-- **Geospatial**: `GEOADD`, `GEODIST`, `GEORADIUS`, `GEOSEARCH`. Store lat/lon, query by radius. Use for: nearby places, location-based services
 
-## Persistence
-- **RDB (Redis Database Backup)**: Point-in-time snapshot at configurable intervals (save 900 1 — if 1 key changed in 900 sec, save). Compact binary file. Good for backups, failover. Loses data since last save on crash
-- **AOF (Append-Only File)**: Logs every write operation. More durable (fsync every sec = 1 sec data loss). Larger than RDB. Slower rewrites (background rewrite compacts log). Choose: `appendonly yes`, `appendfsync everysec`
-- **RDB + AOF combined**: Best durability — AOF for crash recovery (more complete), RDB for faster restarts
-- **Hybrid persistence** (Redis 4.0+): `aof-use-rdb-preamble yes` — AOF starts with RDB header for faster rewrite + replay
+### Strings
 
-## Caching Patterns
-- **Cache-aside (lazy loading)**: App checks cache → miss → load from DB → store in cache. Set TTL for eventual consistency. Simple, handles failures gracefully
-- **Write-through**: Write to cache AND DB simultaneously. Ensures cache always fresh. More writes, higher latency
-- **Write-behind**: Write to cache, async write to DB. Lower latency, risk of data loss if cache fails
-- **Cache invalidation**: Hardest problem — invalidate/ update cache when DB changes. Use TTL + explicit invalidation. Avoid complex cache consistency schemes
-- **Cache stampede prevention**: When hot key expires and multiple requests hit — all go to DB. Use locking (SETNX) or "early recompute" (recompute before TTL expires)
+```bash
+SET key value
+GET key
+MSET key1 val1 key2 val2
+MGET key1 key2
+SETEX key 60 value
+SETNX key value
+INCR key
+INCRBY key 10
+APPEND key "suffix"
+STRLEN key
+GETRANGE key 0 5
+SETRANGE key 3 "over"
+```
 
-## Pub/Sub
-- **Publishers**: `PUBLISH channel message` — fire and forget. No message persistence (subscriber down = message lost)
-- **Subscribers**: `SUBSCRIBE channel` → blocks waiting. Pattern subscribe: `PSUBSCRIBE news:*`
-- **Limitations**: No message acknowledgment, no replay, no delivery guarantees. For reliable messaging use Redis Streams or dedicated queue
+### Hashes
+
+```bash
+HSET user:1 name "John" email "john@example.com" age 30
+HGET user:1 name
+HMGET user:1 name email
+HGETALL user:1
+HKEYS user:1
+HVALS user:1
+HLEN user:1
+HEXISTS user:1 name
+HDEL user:1 age
+HINCRBY user:1 age 1
+```
+
+### Lists
+
+```bash
+LPUSH mylist "world"
+LPUSH mylist "hello"
+RPUSH mylist "again"
+LRANGE mylist 0 -1
+LPOP mylist
+RPOP mylist
+LLEN mylist
+LINDEX mylist 1
+LSET mylist 0 "new"
+LTRIM mylist 0 2
+```
+
+### Sets
+
+```bash
+SADD myset "a" "b" "c"
+SREM myset "a"
+SMEMBERS myset
+SISMEMBER myset "b"
+SCARD myset
+SINTER set1 set2
+SUNION set1 set2
+SDIFF set1 set2
+SPOP myset
+SRANDMEMBER myset 2
+```
+
+### Sorted Sets
+
+```bash
+ZADD leaderboard 100 "player1"
+ZADD leaderboard 200 "player2"
+ZRANGE leaderboard 0 -1 WITHSCORES
+ZREVRANGE leaderboard 0 -1 WITHSCORES
+ZRANK leaderboard "player1"
+ZSCORE leaderboard "player1"
+ZINCRBY leaderboard 50 "player1"
+ZREM leaderboard "player1"
+ZCOUNT leaderboard 100 200
+```
+
+### Streams (Redis 5+)
+
+```bash
+XADD mystream * name "John" message "Hello"
+XADD mystream MAXLEN 1000 * name "Jane" message "Hi"
+XREAD COUNT 2 STREAMS mystream 0
+XREAD BLOCK 5000 STREAMS mystream $
+XRANGE mystream - +
+XLEN mystream
+
+# Consumer groups
+XGROUP CREATE mystream mygroup 0
+XREADGROUP GROUP mygroup consumer1 COUNT 2 STREAMS mystream >
+XACK mystream mygroup 1234567890-0
+XPENDING mystream mygroup
+```
+
+## Redis Cluster
+
+```bash
+# Create cluster (6 nodes, 3 masters + 3 replicas)
+redis-cli --cluster create \
+  192.168.1.10:7000 192.168.1.11:7000 192.168.1.12:7000 \
+  192.168.1.13:7000 192.168.1.14:7000 192.168.1.15:7000 \
+  --cluster-replicas 1
+
+# Check cluster
+redis-cli -c -h 192.168.1.10 -p 7000 CLUSTER INFO
+redis-cli -c -h 192.168.1.10 -p 7000 CLUSTER NODES
+redis-cli -c -h 192.168.1.10 -p 7000 CLUSTER SLOTS
+
+# Reshard
+redis-cli --cluster reshard 192.168.1.10:7000 \
+  --cluster-from <node-id> --cluster-to <node-id> --cluster-slots 1000
+
+# Add node
+redis-cli --cluster add-node 192.168.1.16:7000 192.168.1.10:7000
+redis-cli --cluster add-node 192.168.1.17:7000 192.168.1.10:7000 --cluster-slave --cluster-master <master-id>
+
+# Remove node
+redis-cli --cluster del-node 192.168.1.10:7000 <node-id>
+```
+
+## Sentinel (HA)
+
+```conf
+# sentinel.conf
+port 26379
+sentinel monitor mymaster 192.168.1.10 6379 2
+sentinel down-after-milliseconds mymaster 5000
+sentinel failover-timeout mymaster 60000
+sentinel parallel-syncs mymaster 1
+sentinel auth-pass mymaster yourpassword
+```
+
+```bash
+# Start sentinel
+redis-sentinel /etc/redis/sentinel.conf
+
+# Query
+redis-cli -p 26379 SENTINEL MASTER mymaster
+redis-cli -p 26379 SENTINEL REPLICAS mymaster
+redis-cli -p 26379 SENTINEL GET-MASTER-ADDR-BY-NAME mymaster
+```
 
 ## Lua Scripting
-- **Atomic scripts**: `EVAL "return redis.call('SET', KEYS[1], ARGV[1])" 1 key value`. Execute Lua inside Redis atomically. No race conditions
-- **Use cases**: Compare-and-set, rate limiting (sliding window), batch operations with rollback
-- **Script cache**: `SCRIPT LOAD` → `EVALSHA` — avoid sending script text every time
 
-## Clustering
-- **Redis Cluster**: Data sharded across nodes (16384 hash slots). Automatic failover. `redis-cli --cluster create`. No cross-slot multi-key operations (unless keys share hash tag `{user:123}:key1`)
-- **Sentinel**: High availability without clustering — monitors master, promotes replica on failure. Client connects via sentinel (get-master-addr-by-name). Use for: HA with single-node performance
-- **Replication**: Master-replica — async replication (replica lag). Replica can serve read queries (scale reads). Chain replication (replica of replica) allowed
+```lua
+-- Atomic operations
+-- KEYS[1] = key, ARGV[1] = value
 
-## Performance
-- **Single-threaded** for command execution (networking + processing). Benefits: no locking overhead, atomic operations. Limits: one slow command blocks all others. Avoid: KEYS (use SCAN), HGETALL on huge hashes, LRANGE on long lists
-- **I/O multiplexing**: Uses epoll/kqueue — handles 100K+ connections on single thread
-- **Pipelining**: Send multiple commands without waiting for each response — ~10x throughput improvement
-- **Memory optimization**: Use smaller keys (short names), hash data types for objects (not string-per-field), `MEMORY USAGE key` to check, set `maxmemory` + eviction policy
+-- Set if not exists with TTL
+if redis.call('SET', KEYS[1], ARGV[1], 'NX', 'EX', ARGV[2]) then
+    return 1
+else
+    return 0
+end
 
-## Eviction Policies
-- `noeviction`: Return errors on write when memory limit reached (default)
-- `allkeys-lru`: Evict least recently used keys (most common — good for cache)
-- `allkeys-lfu`: Evict least frequently used keys
-- `volatile-lru`: Evict LRU among keys with TTL set (use when mix cache + persistent data)
-- `volatile-ttl`: Evict shortest TTL first
-- `allkeys-random`: Evict random keys — fair but unpredictable
-- `volatile-random`: Evict random among keys with TTL
+-- Rate limiting (sliding window)
+local key = KEYS[1]
+local limit = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local now = redis.call('TIME')
+local current = now[1] * 1000000 + now[2]
+local start = current - window * 1000000
+redis.call('ZREMRANGEBYSCORE', key, '-inf', start)
+local count = redis.call('ZCARD', key)
+if count < limit then
+    redis.call('ZADD', key, current, current .. '-' .. math.random())
+    redis.call('EXPIRE', key, window + 1)
+    return {1, limit - count - 1}
+else
+    return {0, limit - count}
+end
+```
+
+```bash
+# Load script
+SCRIPT LOAD "script_content"
+EVALSHA <sha1> 1 key 10 60
+
+# Redis 7+ functions
+FUNCTION LOAD "library_name" "code"
+FCALL library_name.fn 1 key arg1 arg2
+```
+
+## Monitoring
+
+```bash
+# INFO sections
+INFO memory
+INFO stats
+INFO replication
+INFO cpu
+INFO commandstats
+INFO keyspace
+
+# Memory analysis
+MEMORY USAGE key
+MEMORY STATS
+MEMORY DOCTOR
+
+# Slow log
+SLOWLOG GET 10
+SLOWLOG LEN
+SLOWLOG RESET
+
+# Latency
+LATENCY LATEST
+LATENCY HISTORY command
+LATENCY RESET
+
+# Client list
+CLIENT LIST
+CLIENT KILL TYPE normal SKIP ME
+
+# Keyspace stats
+redis-cli --bigkeys
+redis-cli --hotkeys
+redis-cli --memkeys
+```
+
+## Performance Tuning
+
+### Pipeline & MGET
+
+```bash
+# Pipeline (batch commands)
+redis-cli --pipe < commands.txt
+
+# MGET instead of multiple GET
+MGET key1 key2 key3 key4 key5
+
+# Lua for complex atomic ops
+```
+
+### Connection Pooling
+
+```python
+# Python redis-py
+pool = redis.ConnectionPool(
+    host='localhost',
+    port=6379,
+    max_connections=50,
+    decode_responses=True
+)
+r = redis.Redis(connection_pool=pool)
+
+# With retry
+from redis.retry import Retry
+from redis.backoff import ExponentialBackoff
+
+retry = Retry(ExponentialBackoff(), 3)
+r = redis.Redis(retry=retry, retry_on_timeout=True)
+```
+
+### Key Design
+
+```bash
+# Good: short keys with prefixes
+user:1000:profile
+user:1000:orders
+session:abc123
+cache:product:5000
+
+# Bad: long keys
+"user_profile_for_user_id_1000_v2"
+```
+
+### Memory Optimization
+
+```bash
+# Use hashes for small objects (encoded as ziplist)
+HSET user:1000 name "John" email "john@example.com"
+
+# Use INTSET for small integer sets
+SADD tags 1 2 3 4 5
+
+# Compress large values
+SET large_data "<compressed_json>"
+
+# TTL for temporary data
+EXPIRE key 3600
+EXPIREAT key 1705315200
+```
+
+## Backup & Restore
+
+```bash
+# RDB copy (while running)
+cp /var/lib/redis/dump.rdb /backup/dump-$(date +%F).rdb
+
+# BGSAVE (async)
+redis-cli BGSAVE
+redis-cli LASTSAVE
+
+# SAVE (blocking - avoid)
+redis-cli SAVE
+
+# AOF rewrite
+redis-cli BGREWRITEAOF
+
+# Restore
+redis-cli -r /backup/dump.rdb
+# Or copy to data dir and restart
+```
+
+## Redis Modules
+
+```bash
+# RedisJSON
+redis-server --loadmodule /path/to/rejson.so
+
+# RedisSearch
+redis-server --loadmodule /path/to/redisearch.so
+
+# RedisGraph
+redis-server --loadmodule /path/to/redisgraph.so
+
+# RedisTimeSeries
+redis-server --loadmodule /path/to/redistimeseries.so
+
+# RedisBloom
+redis-server --loadmodule /path/to/redisbloom.so
+```
+
+## Troubleshooting
+
+| Issue | Diagnosis | Fix |
+|-------|-----------|-----|
+| OOM | `INFO memory`, `maxmemory` | Increase limit, change policy, expire keys |
+| High CPU | `INFO commandstats`, slowlog | Optimize queries, add indexes |
+| High latency | `LATENCY DOCTOR`, slowlog | Pipeline, reduce payload, check persistence |
+| Memory fragmentation | `MEMORY STATS` | Active defrag, restart |
+| Replication lag | `INFO replication` | Network, disk I/O, replica priority |
+| Connection refused | `maxclients`, firewall | Increase limit, check bind |
+| Keyspace misses | `INFO stats` | Check TTL, add cache warming |
+
+## Security Checklist
+
+- [ ] Bind to localhost or specific IP
+- [ ] Set strong password (`requirepass`)
+- [ ] Rename dangerous commands (`FLUSHALL`, `CONFIG`, `EVAL`)
+- [ ] Disable protected mode if not needed
+- [ ] Use TLS (Redis 6+)
+- [ ] Run as non-root user
+- [ ] Limit network exposure
+- [ ] Regular key rotation
+- [ ] Audit access logs
+
+## TLS (Redis 6+)
+
+```conf
+# redis.conf
+tls-port 6380
+port 0
+tls-cert-file /etc/redis/certs/redis.crt
+tls-key-file /etc/redis/certs/redis.key
+tls-ca-cert-file /etc/redis/certs/ca.crt
+tls-auth-clients yes
+tls-replication yes
+```
+
+```bash
+# Client
+redis-cli --tls --cacert /etc/redis/certs/ca.crt --cert /etc/redis/certs/client.crt --key /etc/redis/certs/client.key
+```
+
+## Benchmarking
+
+```bash
+# redis-benchmark
+redis-benchmark -h localhost -p 6379 -n 100000 -c 50 -t SET,GET -d 100
+
+# Pipeline benchmark
+redis-benchmark -h localhost -p 6379 -n 100000 -c 50 -P 10 -t SET,GET
+
+# Custom Lua
+redis-benchmark -h localhost -p 6379 -n 100000 -c 50 -r 100000 \
+  -l 'eval "return redis.call(\"SET\",KEYS[1],ARGV[1])" 1 key value'
+```
+
+## Patterns
+
+### Distributed Lock
+
+```lua
+-- Lock
+if redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2]) then
+    return 1
+else
+    return 0
+end
+
+-- Unlock (only if owner)
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+else
+    return 0
+end
+```
+
+### Rate Limiter
+
+```bash
+# Sliding window (via Lua)
+# Or use RedisCell module
+CL.THROTTLE user:1000 15 30 60 1
+```
+
+### Session Store
+
+```bash
+# Session with TTL
+SET session:abc123 '{"user_id":1000,"roles":["admin"]}' EX 86400
+
+# Get
+GET session:abc123
+
+# Extend
+EXPIRE session:abc123 86400
+```
+
+### Cache Invalidation
+
+```bash
+# Tags pattern
+SADD cache:tags:user:1000 product:500 product:501
+# Invalidate
+SMEMBERS cache:tags:user:1000 | xargs redis-cli DEL
+```
+
+## Redis 7 Features
+
+- Functions (replaces scripts, persistent)
+- ACL improvements
+- RESP3 protocol
+- Cluster sharding improvements
+- Lua 5.4
+- ACL LOG
+- Client tracking (caching)

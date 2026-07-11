@@ -1,90 +1,637 @@
-# System Design & Architecture
+# System Design Fundamentals
 
-## Design Process
-1. **Clarify requirements**: functional (what the system must do) + non-functional (performance, availability, scalability, latency, durability, consistency)
-   - Ask: what are the features? How many users? Read vs write heavy? Expected traffic? Latency requirements? Data storage needs? Geographic distribution?
-2. **Estimate scale**: requests per second (RPS), storage needed (TB/PB), bandwidth, read/write ratio
-   - Daily active users (DAU) × actions per user per day / 86400 seconds = peak RPS
-   - Storage: data per item × items created per day × retention period
-3. **High-level design**: components, data flow, APIs, data model
-4. **Deep dive**: specific components, tradeoffs, bottlenecks, optimization
+## Scalability Patterns
 
-## Key Tradeoffs
-- **Latency vs throughput**: can optimize for low latency (response quickly) or high throughput (handle many requests) — often conflicting
-- **Consistency vs availability** (CAP theorem): in distributed systems, you can't have all three (Consistency, Availability, Partition tolerance). Pick two
-  - CP system (consistent, partition tolerant): bank transactions — if network partition, may refuse writes (unavailable)
-  - AP system (available, partition tolerant): social media feed — you can always post, but followers may not see it immediately (eventually consistent)
-- **Strong vs eventual consistency**: strong (all replicas agree immediately — write is slower), eventual (replicas converge over time — faster writes, read could see stale data)
-- **SQL vs NoSQL**:
-  - SQL: structured data, relationships, ACID transactions, complex queries. Use for: payments, user accounts, any data with joins and strict consistency
-  - NoSQL: flexible schema, horizontal scaling, high throughput. Key-value (Redis, DynamoDB): simple lookups, caching. Document (MongoDB): semi-structured data. Column-family (Cassandra): time-series, high write volume. Graph (Neo4j): relationships, recommendations
-- **Normalization vs denormalization**: normalize (reduce redundancy, preserve integrity) vs denormalize (improve read performance, simplify queries) — often denormalize for read-heavy systems
+### Vertical vs Horizontal Scaling
 
-## Core Components
+| Aspect | Vertical (Scale Up) | Horizontal (Scale Out) |
+|--------|---------------------|------------------------|
+| **Cost** | Exponential | Linear |
+| **Limit** | Hardware max | Near unlimited |
+| **Downtime** | Often required | Zero-downtime possible |
+| **Complexity** | Low | Higher |
 
-### Load Balancer
-- Distributes traffic across servers — LB is single point of failure (use redundant LBs)
-  - Layer 4 (TCP): faster, IP-based. Layer 7 (HTTP): slower, but can route by path/header/cookie
-  - Algorithms: round-robin, least connections, IP hash, consistent hashing, weighted
-  - Health checks: verify backend servers are alive before sending traffic
+### Load Balancing Algorithms
 
-### Caching
-- Store frequently accessed data in fast storage (memory > SSD > network)
-  - Client-side: browser cache (HTTP caching headers), CDN cache (static assets)
-  - Server-side: in-memory cache (Redis, Memcached), CDN, reverse proxy cache (Varnish, Nginx)
-- **Cache-aside (lazy loading)**: check cache first → miss → load from DB → write to cache. Good for read-heavy, handles cache misses gracefully
-- **Write-through**: write to cache then DB — cache always consistent but slower writes
-- **Write-behind (write-back)**: write to cache, async write to DB — fast writes, risk of data loss if cache fails
-- **Eviction policies**: LRU (least recently used), LFU (least frequently used), TTL (time-to-live), FIFO (first in first out)
-- **Cache invalidation**: one of the hardest problems in CS — "there are only two hard problems in computer science: cache invalidation and naming things"
+```
+Round Robin:        A → B → C → A → B → C
+Weighted Round Robin: A(3) → A(3) → A(3) → B(1) → C(1) → A...
+Least Connections:  Route to server with fewest active connections
+Least Response Time: Route to server with lowest latency
+IP Hash:            hash(client_ip) % servers → consistent routing
+Consistent Hashing: Ring-based, minimal reshuffle on node changes
+```
 
-### Database Scaling
-- **Read replicas**: copies of DB for read queries — master handles writes, replicas handle reads (reduce load on master)
-  - Replication lag: replicas may be slightly behind master (eventual consistency)
-- **Sharding (horizontal partitioning)**: split data across multiple databases by shard key (user_id, geo, hash)
-  - Sharding key is critical — bad choice = hotspots (one shard has all the traffic)
-  - Re-sharding is painful — plan capacity ahead (consistent hashing helps redistribute)
-- **Vertical scaling**: bigger server — easier but has limits (max hardware size)
-- **Connection pooling**: reuse database connections instead of opening/closing per request — critical for performance
+## Caching Strategies
 
-### Message Queues
-- Async communication between services — producer sends message, consumer processes when ready
-  - Benefits: decoupling, load smoothing (buffer spikes), fault tolerance (retry failed messages), ordering
-  - Kafka: high throughput, persistent (disk), supports replay, best for event streaming and log processing
-  - RabbitMQ: flexible routing, low latency, good for task queues and RPC
-  - SQS (AWS): fully managed, at-least-once delivery, simple API
-  - Pub/Sub pattern: one message → multiple subscribers (fan-out)
+### Cache Patterns
 
-### Microservices vs Monolith
-- **Monolith**: all code in one deployable unit — simpler, faster development early, easier debugging, lower latency
-  - Good for: small teams, early stage, simple domains. Bad for: large teams, scaling independently, different technologies per component
-- **Microservices**: independent deployable services, each owns its data — independent scaling, tech diversity, fault isolation, team autonomy
-  - Costs: inter-service communication (network latency), distributed tracing, eventual consistency, data duplication, orchestration
-  - Service mesh (Istio, Linkerd): handles service-to-service communication (retries, circuit breaking, observability) — adds complexity
-  - **Strangler fig pattern**: gradually replace monolith features with microservices, one at a time
-  - Don't start with microservices — start monolith, extract services when the monolith hurts (Conway's Law: systems mirror communication structures)
+```python
+# Cache-Aside (Lazy Loading)
+async def get_user(user_id: str) -> User:
+    # 1. Check cache
+    user = await cache.get(f"user:{user_id}")
+    if user:
+        return user
+    
+    # 2. Fetch from DB
+    user = await db.get_user(user_id)
+    
+    # 3. Populate cache
+    await cache.set(f"user:{user_id}", user, ttl=300)
+    return user
 
-### API Design (for scale)
-- **REST**: resources, HTTP methods, stateless — simple, cacheable, familiar. Limits: over-fetching (too much data), under-fetching (too little, need multiple requests)
-- **GraphQL**: client specifies exactly what data it needs, single endpoint — solves over/under-fetching, but caching is harder, query complexity can be dangerous (deeply nested queries kill server)
-- **gRPC**: protobuf binary format, HTTP/2, streaming, strongly typed, code generation — fast, efficient, great for internal services. Harder debugging, limited browser support
-- **Rate limiting**: token bucket, leaky bucket, sliding window — prevent abuse, ensure fair usage
-  - Return 429 Too Many Requests + Retry-After header
+# Write-Through
+async def update_user(user_id: str, data: dict) -> User:
+    user = await db.update_user(user_id, data)
+    await cache.set(f"user:{user_id}", user, ttl=300)
+    return user
 
-### Observability
-- **Logging**: structured logs (JSON), correlation IDs (trace through services), log levels (DEBUG, INFO, WARN, ERROR)
-- **Metrics**: request rate, error rate, latency (p50, p95, p99), service health, business metrics
-  - USE method (Brendan Gregg): Utilization, Saturation, Errors for every resource
-  - RED method (Tom Wilkie): Rate, Errors, Duration for every service
-  - Prometheus + Grafana: most common open-source stack
-- **Tracing**: follow a single request across services (Jaeger, Zipkin, OpenTelemetry)
-  - Each request gets a trace ID propagated through all services
-- **Alerting**: alert on symptoms (high error rate, high latency) not causes (CPU high). On-call rotation, escalation policy, runbooks
-- **SLO/SLA/SLI**: Service Level Indicator (what you measure), Objective (target: 99.9% uptime), Agreement (contract with customer)
+# Write-Behind (Write-Back)
+async def update_user_async(user_id: str, data: dict):
+    await cache.set(f"user:{user_id}", data, ttl=300)
+    # Async write to DB
+    task_queue.enqueue("db.update_user", user_id, data)
 
-## Example: URL Shortener Design
-- **Requirements**: create short URLs, redirect, analytics (click count, referrer, geo), 100M URLs, 10K reads/s, 1K writes/s
-- **Key decisions**: use a distributed DB (Cassandra/DynamoDB) for scale, base62 encoding for short keys (7 chars = 62⁷ = 3.5T URLs), cache popular URLs in Redis
-- **API**: POST /shorten (create), GET /{short_code} (redirect 301 to long URL)
-- **Scale**: reads >> writes, so cache heavy (Redis), read replicas. Generate unique IDs (Snowflake/Twitter-style) or use DB sequence
-- **Cleanup**: TTL for old URLs or archive to cold storage
+# Refresh-Ahead
+async def get_user_predictive(user_id: str):
+    # Check if near expiry
+    ttl = await cache.ttl(f"user:{user_id}")
+    if ttl < 60:  # Less than 1 min
+        asyncio.create_task(refresh_user_cache(user_id))
+    return await cache.get(f"user:{user_id}")
+```
+
+### Cache Invalidation
+
+```python
+# TTL-based (simple)
+await cache.set(key, value, ttl=300)
+
+# Event-based (precise)
+async def on_user_updated(user_id: str):
+    await cache.delete(f"user:{user_id}")
+    await cache.delete(f"user:profile:{user_id}")
+    await cache.delete_pattern(f"user:posts:{user_id}:*")
+
+# Write-through with versioning
+async def get_user_v2(user_id: str):
+    version = await cache.get(f"user:version:{user_id}")
+    cached = await cache.get(f"user:{user_id}:{version}")
+    if cached:
+        return cached
+    
+    user = await db.get_user(user_id)
+    new_version = uuid.uuid4().hex[:8]
+    await cache.set(f"user:version:{user_id}", new_version)
+    await cache.set(f"user:{user_id}:{new_version}", user, ttl=3600)
+    return user
+```
+
+## Database Scaling
+
+### Read Replicas
+
+```yaml
+# Primary: writes + critical reads
+# Replicas: read-heavy queries
+```
+
+```python
+# Application-level routing
+class DatabaseRouter:
+    def __init__(self, primary: Pool, replicas: list[Pool]):
+        self.primary = primary
+        self.replicas = replicas
+        self._rr_index = 0
+    
+    async def execute_read(self, query: str, *args):
+        # Round-robin across replicas
+        replica = self.replicas[self._rr_index % len(self.replicas)]
+        self._rr_index += 1
+        return await replica.fetch(query, *args)
+    
+    async def execute_write(self, query: str, *args):
+        return await self.primary.execute(query, *args)
+```
+
+### Sharding
+
+```python
+# Shard by user_id
+SHARD_COUNT = 16
+
+def get_shard(user_id: str) -> int:
+    return hash(user_id) % SHARD_COUNT
+
+class ShardedDatabase:
+    def __init__(self, shards: list[Pool]):
+        self.shards = shards
+    
+    def _get_shard(self, user_id: str) -> Pool:
+        return self.shards[get_shard(user_id)]
+    
+    async def get_user(self, user_id: str):
+        return await self._get_shard(user_id).fetchrow(
+            "SELECT * FROM users WHERE id = $1", user_id
+        )
+    
+    async def get_users_batch(self, user_ids: list[str]):
+        # Group by shard
+        by_shard = defaultdict(list)
+        for uid in user_ids:
+            by_shard[get_shard(uid)].append(uid)
+        
+        results = []
+        for shard_id, ids in by_shard.items():
+            rows = await self.shards[shard_id].fetch(
+                "SELECT * FROM users WHERE id = ANY($1)", ids
+            )
+            results.extend(rows)
+        return results
+```
+
+### Connection Pooling
+
+```python
+# PgBouncer / PgPool-II / Built-in pool
+pool = asyncpg.create_pool(
+    host="pgbouncer",
+    port=6432,
+    min_size=10,
+    max_size=50,
+    command_timeout=30,
+    # Prepared statements work with pgbouncer in transaction mode
+)
+```
+
+## Message Queues
+
+### Patterns
+
+```python
+# Publish-Subscribe (Fanout)
+await exchange.publish(
+    message=json.dumps(event),
+    routing_key="",  # Fanout ignores routing key
+)
+
+# Work Queue (Competing Consumers)
+await channel.default_exchange.publish(
+    Message(body=json.dumps(task).encode()),
+    routing_key="tasks",
+)
+
+# Priority Queue
+await channel.default_exchange.publish(
+    Message(
+        body=json.dumps(task).encode(),
+        priority=10,  # High priority
+    ),
+    routing_key="tasks",
+)
+
+# Delayed/Scheduled
+await channel.default_exchange.publish(
+    Message(
+        body=json.dumps(task).encode(),
+        headers={"x-delay": 60000},  # 60 seconds (ms)
+    ),
+    routing_key="delayed_tasks",
+)
+
+# Dead Letter Queue
+await channel.declare_queue("tasks", arguments={
+    "x-dead-letter-exchange": "dlx",
+    "x-dead-letter-routing-key": "failed",
+})
+```
+
+### Exactly-Once Processing
+
+```python
+async def process_with_idempotency(message: Message):
+    msg_id = message.headers.get("message_id")
+    
+    # Check if already processed
+    processed = await redis.set(
+        f"processed:{msg_id}", 
+        "1", 
+        nx=True,  # Only set if not exists
+        ex=86400  # 24h TTL
+    )
+    
+    if not processed:
+        logger.info(f"Duplicate message {msg_id}, skipping")
+        return
+    
+    try:
+        await do_work(message.body)
+    except Exception:
+        # Don't delete idempotency key on failure
+        # Allows retry
+        raise
+```
+
+## API Design
+
+### RESTful Principles
+
+```
+GET    /users              # List
+POST   /users              # Create
+GET    /users/{id}         # Get
+PUT    /users/{id}         # Replace
+PATCH  /users/{id}         # Partial update
+DELETE /users/{id}         # Delete
+
+# Nested resources
+GET    /users/{id}/posts
+POST   /users/{id}/posts
+
+# Actions (use sparingly)
+POST   /users/{id}/activate
+POST   /orders/{id}/cancel
+```
+
+### Pagination
+
+```python
+# Cursor-based (preferred for large datasets)
+@app.get("/users")
+async def list_users(
+    limit: int = Query(20, le=100),
+    cursor: str | None = None,
+    sort: str = "created_at"
+):
+    query = "SELECT * FROM users ORDER BY created_at DESC"
+    params = [limit + 1]  # Fetch one extra
+    
+    if cursor:
+        decoded = base64.b64decode(cursor).decode()
+        query += " AND created_at < $2"
+        params.append(decoded)
+    
+    rows = await db.fetch(query, *params)
+    
+    has_more = len(rows) > limit
+    if has_more:
+        rows = rows[:limit]
+        next_cursor = base64.b64encode(rows[-1]["created_at"].isoformat().encode()).decode()
+    else:
+        next_cursor = None
+    
+    return {
+        "data": rows,
+        "next_cursor": next_cursor,
+        "has_more": has_more,
+    }
+```
+
+### Rate Limiting
+
+```python
+# Token Bucket (Redis)
+async def rate_limit(key: str, limit: int, window: int) -> tuple[bool, dict]:
+    now = time.time()
+    pipeline = redis.pipeline()
+    
+    # Remove expired tokens
+    pipeline.zremrangebyscore(key, 0, now - window)
+    
+    # Count current
+    pipeline.zcard(key)
+    
+    # Add new token
+    pipeline.zadd(key, {str(now): now})
+    pipeline.expire(key, window)
+    
+    results = await pipeline.execute()
+    current_count = results[1]
+    
+    if current_count >= limit:
+        return False, {
+            "limit": limit,
+            "remaining": 0,
+            "reset": int(now + window),
+        }
+    
+    return True, {
+        "limit": limit,
+        "remaining": limit - current_count - 1,
+        "reset": int(now + window),
+    }
+```
+
+## Consistency Patterns
+
+### CAP Theorem
+
+```
+Consistency ──────────────── Availability
+     │                          │
+     │    Partition             │
+     │    Tolerance ────────────┘
+     
+CP: Consistency + Partition Tolerance (e.g., etcd, ZooKeeper)
+AP: Availability + Partition Tolerance (e.g., Cassandra, DynamoDB)
+CA: Consistency + Availability (single node, no partitions)
+```
+
+### Eventual Consistency
+
+```python
+# Saga Pattern for distributed transactions
+class OrderSaga:
+    def __init__(self, event_bus: EventBus):
+        self.event_bus = event_bus
+    
+    async def create_order(self, command: CreateOrder):
+        order = Order.create(command)
+        
+        try:
+            # Step 1: Reserve inventory
+            await self.event_bus.publish(ReserveInventory(
+                order_id=order.id,
+                items=command.items
+            ))
+            
+            # Step 2: Process payment
+            await self.event_bus.publish(ProcessPayment(
+                order_id=order.id,
+                amount=order.total,
+                payment_method=command.payment_method
+            ))
+            
+            # Step 3: Confirm order
+            order.confirm()
+            await order_repo.save(order)
+            
+        except InventoryUnavailable:
+            order.fail("Inventory unavailable")
+            await order_repo.save(order)
+            # Trigger compensation
+            await self.event_bus.publish(ReleaseInventory(order_id=order.id))
+        
+        except PaymentFailed:
+            order.fail("Payment failed")
+            await order_repo.save(order)
+            await self.event_bus.publish(ReleaseInventory(order_id=order.id))
+```
+
+### Conflict Resolution
+
+```python
+# Last-Writer-Wins (LWW)
+def merge_lww(local: dict, remote: dict, timestamp_key: str) -> dict:
+    return remote if remote[timestamp_key] > local[timestamp_key] else local
+
+# Vector Clocks
+@dataclass
+class VectorClock:
+    clocks: dict[str, int]  # node_id -> counter
+    
+    def increment(self, node_id: str) -> "VectorClock":
+        new_clocks = self.clocks.copy()
+        new_clocks[node_id] = new_clocks.get(node_id, 0) + 1
+        return VectorClock(new_clocks)
+    
+    def merge(self, other: "VectorClock") -> "VectorClock":
+        all_nodes = set(self.clocks) | set(other.clocks)
+        return VectorClock({
+            node: max(self.clocks.get(node, 0), other.clocks.get(node, 0))
+            for node in all_nodes
+        })
+    
+    def happens_before(self, other: "VectorClock") -> bool:
+        """True if self is ancestor of other"""
+        return all(
+            self.clocks.get(node, 0) <= other.clocks.get(node, 0)
+            for node in set(self.clocks) | set(other.clocks)
+        ) and any(
+            self.clocks.get(node, 0) < other.clocks.get(node, 0)
+            for node in set(self.clocks) | set(other.clocks)
+        )
+
+# CRDT (Conflict-free Replicated Data Type)
+class GCounter:
+    """Grow-only counter"""
+    def __init__(self):
+        self.counts: dict[str, int] = defaultdict(int)
+    
+    def increment(self, node_id: str):
+        self.counts[node_id] += 1
+    
+    def value(self) -> int:
+        return sum(self.counts.values())
+    
+    def merge(self, other: "GCounter"):
+        for node, count in other.counts.items():
+            self.counts[node] = max(self.counts[node], count)
+```
+
+## Observability
+
+### Three Pillars
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    METRICS                          │
+│  - Latency (p50, p95, p99)                         │
+│  - Error rate                                       │
+│  - Throughput (RPS)                                 │
+│  - Saturation (CPU, memory, disk, network)         │
+├─────────────────────────────────────────────────────┤
+│                    LOGS                             │
+│  - Structured JSON                                  │
+│  - Correlation IDs                                  │
+│  - Log levels (DEBUG, INFO, WARN, ERROR)           │
+├─────────────────────────────────────────────────────┤
+│                    TRACES                           │
+│  - Request flow across services                     │
+│  - Span: operation + duration + tags                │
+│  - Parent-child relationships                       │
+└─────────────────────────────────────────────────────┘
+```
+
+### SLO/SLI/SLA
+
+```
+SLI (Service Level Indicator): 
+  - Latency < 200ms for 95% of requests
+  - Error rate < 0.1%
+  - Availability > 99.9%
+
+SLO (Service Level Objective):
+  - Target: 99.9% availability over 30 days
+  - Target: 95th percentile latency < 200ms
+
+SLA (Service Level Agreement):
+  - Contract with customer
+  - Penalties for breach
+  - Usually looser than SLO
+```
+
+### Error Budget
+
+```
+Error Budget = (1 - SLO) * Time Period
+
+Example: 99.9% availability over 30 days
+  Total minutes = 30 * 24 * 60 = 43,200
+  Error budget = 0.001 * 43,200 = 43.2 minutes downtime allowed
+
+Alerting:
+  - Burn rate 1x: 43 min/month → Alert in 24h
+  - Burn rate 2x: 21 min/month → Alert in 6h
+  - Burn rate 10x: 4 min/month → Alert in 1h
+```
+
+## Architecture Patterns
+
+### CQRS (Command Query Responsibility Segregation)
+
+```python
+# Write Model (Commands)
+class OrderCommandHandler:
+    def __init__(self, event_store: EventStore):
+        self.event_store = event_store
+    
+    async def handle(self, command: CreateOrder):
+        order = Order.create(command)
+        await self.event_store.append(order.events)
+
+# Read Model (Queries)
+class OrderReadModel:
+    def __init__(self, read_db: Pool):
+        self.db = read_db
+    
+    async def get_order_summary(self, order_id: str) -> OrderSummary:
+        return await self.db.fetchrow("""
+            SELECT o.*, c.name as customer_name, 
+                   SUM(oi.quantity * oi.price) as total
+            FROM orders o
+            JOIN customers c ON o.customer_id = c.id
+            LEFT JOIN order_items oi ON o.id = oi.order_id
+            WHERE o.id = $1
+            GROUP BY o.id, c.name
+        """, order_id)
+
+# Event Processor (Sync read model)
+class OrderEventProcessor:
+    async def process(self, event: Event):
+        if isinstance(event, OrderCreated):
+            await self.db.execute("""
+                INSERT INTO order_summary (id, customer_id, status, total, created_at)
+                VALUES ($1, $2, $3, $4, $5)
+            """, event.order_id, event.customer_id, "pending", event.total, event.timestamp)
+```
+
+### Event Sourcing
+
+```python
+# Event Store
+class EventStore:
+    async def append(self, aggregate_id: str, events: list[Event], expected_version: int):
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                # Check version
+                current = await conn.fetchval(
+                    "SELECT version FROM aggregates WHERE id = $1", aggregate_id
+                )
+                if current != expected_version:
+                    raise ConcurrentModificationError()
+                
+                # Append events
+                for i, event in enumerate(events):
+                    await conn.execute("""
+                        INSERT INTO events (aggregate_id, version, type, data, timestamp)
+                        VALUES ($1, $2, $3, $4, $5)
+                    """, aggregate_id, expected_version + i + 1, 
+                        type(event).__name__, json.dumps(event.to_dict()), datetime.utcnow())
+                
+                # Update aggregate version
+                await conn.execute("""
+                    INSERT INTO aggregates (id, version) VALUES ($1, $2)
+                    ON CONFLICT (id) DO UPDATE SET version = $2
+                """, aggregate_id, expected_version + len(events))
+
+# Aggregate Base
+class Aggregate:
+    def __init__(self):
+        self._events: list[Event] = []
+        self._version = 0
+    
+    @property
+    def version(self) -> int:
+        return self._version
+    
+    @property
+    def events(self) -> list[Event]:
+        return self._events
+    
+    def _add_event(self, event: Event):
+        self._events.append(event)
+        self._version += 1
+    
+    @classmethod
+    def from_events(cls, events: list[Event]) -> "Aggregate":
+        aggregate = cls()
+        for event in events:
+            aggregate.apply(event)
+            aggregate._version += 1
+        return aggregate
+    
+    def apply(self, event: Event):
+        handler = getattr(self, f"apply_{type(event).__name__}", None)
+        if handler:
+            handler(event)
+```
+
+## Capacity Planning
+
+### Little's Law
+
+```
+L = λ × W
+
+L = Average number of requests in system
+λ = Average arrival rate (requests/sec)
+W = Average time in system (seconds)
+
+Example:
+  Target: 1000 RPS, 100ms avg latency
+  L = 1000 × 0.1 = 100 concurrent requests
+  
+  With 3x headroom: 300 concurrent
+  Thread pool size: 300
+  Connection pool: 300
+```
+
+### Queue Sizing
+
+```
+M/M/c queue (c servers, exponential service time)
+
+Utilization ρ = λ / (c × μ)
+Where μ = service rate (requests/sec per server)
+
+Queue length Lq = (ρ^c / (c! × (1-ρ))) × P0 / (1-ρ)^2
+
+Rule of thumb: Keep ρ < 0.7 for low latency variance
+```
+
+## Checklist for New Services
+
+- [ ] Define SLIs/SLOs
+- [ ] Implement health checks (liveness, readiness, startup)
+- [ ] Add structured logging with correlation IDs
+- [ ] Export Prometheus metrics
+- [ ] Add distributed tracing
+- [ ] Configure rate limiting
+- [ ] Set up alerting on error budget burn
+- [ ] Document API with OpenAPI
+- [ ] Load test before launch
+- [ ] Run chaos engineering experiments
+- [ ] Define runbooks for common failures
+- [ ] Plan capacity with 3x headroom

@@ -1,367 +1,511 @@
-# Python Async
+# Python Async Programming
 
 ## Overview
+Async programming in Python enables concurrent execution of I/O-bound tasks using `async/await` syntax and the `asyncio` event loop. It's essential for high-performance network services, web scrapers, and any application with significant I/O wait time.
 
-`asyncio` is Python's built-in library for **concurrent** (not parallel) execution using cooperative multitasking via an **event loop**. Uses `async/await` syntax (Python 3.5+). Best for I/O-bound work: network requests, file I/O, database queries, web servers. Not for CPU-bound tasks (use `multiprocessing` or threads with GIL release).
+## Core Concepts
 
-## Coroutines
-
-The core async building block. Defined with `async def`, executed via `await`.
-
+### The Event Loop
 ```python
 import asyncio
 
-async def fetch_data(url: str) -> dict:
-    # simulated async work
-    await asyncio.sleep(1)
-    return {"url": url, "status": 200}
-
-# Calling a coroutine returns a coroutine object — does NOT execute
-coro = fetch_data("https://example.com")
-
-# Run in event loop
-result = asyncio.run(fetch_data("https://example.com"))
-```
-
-- `asyncio.run(coro)` — creates event loop, runs coroutine to completion, closes loop. Python 3.7+. Should be called once per script entry point.
-- `await coro` — suspend current coroutine until coro completes, then resume.
-- A coroutine is an **awaitable**. Other awaitables: Tasks, Futures.
-
-## Awaitables
-
-### Coroutines
-
-```python
-async def say_hello():
-    return "hello"
-
-result = await say_hello()  # "hello"
-```
-
-### Tasks
-
-Schedule coroutines for **concurrent execution**:
-
-```python
 async def main():
-    task1 = asyncio.create_task(fetch_data("/a"))  # starts immediately
-    task2 = asyncio.create_task(fetch_data("/b"))
-    r1 = await task1   # wait for task1
-    r2 = await task2   # already running concurrently
-    return [r1, r2]
+    print("Hello")
+    await asyncio.sleep(1)  # Yield control
+    print("World")
+
+asyncio.run(main())  # Creates and runs event loop
 ```
 
-- `asyncio.create_task(coro)` — wrap coroutine in a Task, schedule it on the event loop. Python 3.7+.
-- Task runs as soon as event loop gets control (after `await`/`return` in current coroutine).
-- `task.cancel()` — raises `CancelledError` inside the task.
-- `task.done()`, `task.result()`, `task.exception()`
+### Coroutines vs Functions
+| Aspect | Regular Function | Coroutine (async def) |
+|--------|------------------|----------------------|
+| **Definition** | `def func():` | `async def func():` |
+| **Call** | `func()` | `await func()` or `asyncio.create_task()` |
+| **Execution** | Immediate | Returns coroutine object |
+| **Suspension** | Cannot yield | Can `await` other coroutines |
+| **Return** | Direct value | Returns value when awaited |
 
-### Futures
+### Awaitables
+- **Coroutines**: `async def` functions
+- **Tasks**: `asyncio.create_task(coro)` - schedules on loop
+- **Futures**: Low-level awaitable representing result
+- **Awaitable objects**: Objects with `__await__()` method
 
-Lower-level awaitable representing a future result. Usually not used directly — Tasks are Futures. `loop.create_future()` for manual resolution.
+## Basic Patterns
 
-## Event Loop
-
+### Sequential vs Concurrent
 ```python
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-loop.run_until_complete(main())
-loop.close()
-```
+# Sequential (slow)
+async def sequential():
+    await fetch_user(1)
+    await fetch_user(2)
+    await fetch_user(3)
 
-- `asyncio.get_running_loop()` — get current loop (from within coroutine). Python 3.7+.
-- `loop.run_in_executor(None, sync_fn, *args)` — run blocking code in thread pool
-- `loop.call_later(1, callback)`, `loop.call_soon(callback)` — schedule callbacks
-- Python 3.10+: `asyncio.Runner` — context manager for running async code
-
-## asyncio.gather — Running Tasks Concurrently
-
-```python
-async def main():
-    results = await asyncio.gather(
-        fetch_data("/a"),
-        fetch_data("/b"),
-        fetch_data("/c"),
-        return_exceptions=True,  # return exceptions as values instead of raising
+# Concurrent (fast) - gather
+async def concurrent_gather():
+    await asyncio.gather(
+        fetch_user(1),
+        fetch_user(2),
+        fetch_user(3)
     )
-    return results
+
+# Concurrent - create_task (fire and forget)
+async def concurrent_tasks():
+    task1 = asyncio.create_task(fetch_user(1))
+    task2 = asyncio.create_task(fetch_user(2))
+    task3 = asyncio.create_task(fetch_user(3))
+    await task1
+    await task2
+    await task3
 ```
 
-- Runs all awaitables **concurrently** (not in parallel). Order of results matches input order.
-- If one raises and `return_exceptions=False` (default), others are **cancelled** immediately.
-- Nested gathers work. For dynamic lists: `asyncio.gather(*[task(i) for i in range(10)])`
-
-## asyncio.wait & asyncio.as_completed
-
-### asyncio.wait
-
+### Task Groups (Python 3.11+)
 ```python
-done, pending = await asyncio.wait(
-    [task1, task2, task3],
-    timeout=5.0,
-    return_when=asyncio.FIRST_COMPLETED,  # or ALL_COMPLETED, FIRST_EXCEPTION
-)
-for t in done:
-    result = t.result()
+async def with_task_group():
+    async with asyncio.TaskGroup() as tg:
+        task1 = tg.create_task(fetch_user(1))
+        task2 = tg.create_task(fetch_user(2))
+        task3 = tg.create_task(fetch_user(3))
+    # All completed or exception raised
+    results = [task1.result(), task2.result(), task3.result()]
 ```
 
-### asyncio.as_completed
+## Synchronization Primitives
 
-Yields completed futures as they finish (like iterator):
-
+### Locks
 ```python
-for coro in asyncio.as_completed([fetch("/a"), fetch("/b"), fetch("/c")]):
-    result = await coro
-    print(result)
+lock = asyncio.Lock()
+
+async def safe_increment():
+    async with lock:
+        # Critical section
+        shared_counter += 1
 ```
 
-## Semaphores & Rate Limiting
-
-Limit concurrency to N simultaneous tasks:
-
+### Semaphores (Limit Concurrency)
 ```python
-sem = asyncio.Semaphore(5)
+semaphore = asyncio.Semaphore(10)  # Max 10 concurrent
 
-async def fetch_with_limit(url: str) -> dict:
-    async with sem:
-        return await fetch_data(url)
-
-async def main():
-    tasks = [fetch_with_limit(url) for url in urls]
-    return await asyncio.gather(*tasks)
+async def limited_fetch(url):
+    async with semaphore:
+        return await fetch(url)
 ```
 
-- `Semaphore(value)` — max N concurrent acquisitions
-- `BoundedSemaphore(value)` — raises ValueError if released too many times
-- Use for: API rate limits, DB connection pools, file descriptor limits
-
-## Async Context Managers
-
-For resources that need async setup/teardown:
-
+### Events
 ```python
-class AsyncSession:
-    async def __aenter__(self):
-        print("opening connection")
-        return self
+event = asyncio.Event()
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        print("closing connection")
+async def waiter():
+    await event.wait()
+    print("Event triggered!")
 
-async def use():
-    async with AsyncSession() as session:
-        pass  # use session
-
-# Built-in: aiohttp.ClientSession
-async with aiohttp.ClientSession() as session:
-    async with session.get("https://api.example.com") as resp:
-        data = await resp.json()
+async def setter():
+    await asyncio.sleep(1)
+    event.set()
 ```
 
-## Async Generators
-
-Yield values asynchronously (Python 3.6+):
-
+### Conditions
 ```python
-async def ticker(delay: float, count: int):
-    for i in range(count):
-        await asyncio.sleep(delay)
-        yield i
+condition = asyncio.Condition()
 
-async def main():
-    async for tick in ticker(0.5, 10):
-        print(tick)
+async def consumer():
+    async with condition:
+        await condition.wait()
+        # Process item
+
+async def producer():
+    async with condition:
+        # Add item
+        condition.notify()
 ```
 
-- Use `async for` to iterate. Generator can use `await`, `async for`, `async with`.
-- Must implement `__aiter__` and `__anext__`.
-- Cleanup via `aclose()`, `asend()`, `athrow()` — mirror sync generators.
-
-## Async Comprehensions
-
-```python
-results = [await fetch(url) for url in urls]        # sequential
-results = await asyncio.gather(*[fetch(url) for url in urls])  # concurrent
-```
-
-No special syntax — careful to not accidentally sequentialize with list comprehensions.
-
-## aiohttp (HTTP Client)
-
-```python
-import aiohttp
-
-async def fetch_json(session: aiohttp.ClientSession, url: str) -> dict:
-    async with session.get(url) as resp:
-        resp.raise_for_status()
-        return await resp.json()
-
-async def main():
-    async with aiohttp.ClientSession() as session:
-        results = await asyncio.gather(*[
-            fetch_json(session, f"https://api.example.com/page/{i}")
-            for i in range(100)
-        ])
-        return results
-```
-
-- Connection pooling: `ClientSession` reuses connections internally (default limit: 100)
-- `session.get()`, `.post()`, `.put()`, `.delete()` — return `ClientResponse`
-- `resp.text()`, `.json()`, `.read()`, `.content` (streaming)
-- Timeouts: `timeout=aiohttp.ClientTimeout(total=10)`
-- Session reuse essential — do not create new session per request
-- Alternative HTTP libs: `httpx.AsyncClient`, `aiofiles` (file I/O), `aiosqlite` (SQLite)
-
-## asyncio in Web Frameworks
-
-Popular async web frameworks built on asyncio:
-
-- **FastAPI**: `async def` endpoints, Pydantic validation, auto OpenAPI docs
-- **Starlette**: low-level async framework (FastAPI is built on it)
-- **Sanic**: Flask-like, async-first
-- **aiohttp server**: `web.Application`, `web.RouteTableDef`
-
-```python
-# FastAPI
-from fastapi import FastAPI
-import httpx
-
-app = FastAPI()
-
-@app.get("/users")
-async def get_users():
-    async with httpx.AsyncClient() as client:
-        resp = await client.get("https://jsonplaceholder.typicode.com/users")
-        return resp.json()
-```
-
-## asyncio vs Threading vs Multiprocessing
-
-| Aspect | asyncio | threading | multiprocessing |
-|--------|---------|-----------|-----------------|
-| Concurrency type | Cooperative (single thread) | Preemptive (OS threads) | True parallelism (processes) |
-| GIL | Not an issue (no parallelism) | Limited by GIL (CPU-bound) | No GIL (separate processes) |
-| CPU-bound | ❌ Bad | ❌ Bad (GIL contention) | ✅ Good |
-| I/O-bound | ✅ Excellent | ✅ Good | ⚠️ Overkill (IPC cost) |
-| Memory | Single process (low) | Shared memory | Separate memory per process |
-| Number of tasks | 100k+ (lightweight) | ~1k (stack per thread) | CPU cores only |
-| Race conditions | Rare (cooperative) | Common (preemptive) | IPC complexity |
-| Debugging | Easy (deterministic) | Hard (race conditions) | Moderate |
-| Syntax | `async/await` | Standard Python | Standard Python |
-| Libraries needed | Async-specific (aiohttp) | Standard lib fine | Standard lib fine |
-
-## Common Patterns & Pitfalls
-
-### Blocking the Event Loop
-
-```python
-# BAD — blocks the event loop
-async def bad():
-    time.sleep(5)  # blocks ALL coroutines
-    result = requests.get("https://example.com")  # also blocking
-
-# GOOD — use async sleep & HTTP
-async def good():
-    await asyncio.sleep(5)
-    async with aiohttp.ClientSession() as s:
-        async with s.get("https://example.com") as r:
-            return await r.text()
-
-# For unavoidable blocking code:
-loop = asyncio.get_running_loop()
-result = await loop.run_in_executor(None, requests.get, url)
-```
-
-### Timeouts
-
-```python
-try:
-    result = await asyncio.wait_for(fetch_data(url), timeout=5.0)
-except asyncio.TimeoutError:
-    print("Request timed out")
-
-# Alternative via asyncio.timeout (Python 3.11+)
-async with asyncio.timeout(5.0):
-    result = await fetch_data(url)
-```
-
-### Task Cancellation
-
-```python
-async def worker():
-    try:
-        while True:
-            await asyncio.sleep(1)
-    except asyncio.CancelledError:
-        await cleanup()
-        raise  # must re-raise to propagate cancellation
-
-async def main():
-    task = asyncio.create_task(worker())
-    await asyncio.sleep(3)
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        print("cancelled")
-```
-
-### Error Handling in Gather
-
-```python
-# Catch individual failures
-async def safe_fetch(url: str):
-    try:
-        return await fetch_data(url)
-    except Exception as e:
-        return {"error": str(e), "url": url}
-
-results = await asyncio.gather(*[safe_fetch(u) for u in urls])
-```
-
-### Queue (Consumer/Producer)
-
+### Queues
 ```python
 queue = asyncio.Queue(maxsize=100)
 
 async def producer():
-    for i in range(1000):
+    for i in range(100):
         await queue.put(i)
-    await queue.put(None)  # sentinel
 
 async def consumer():
     while True:
         item = await queue.get()
-        if item is None:
-            break
         await process(item)
-```
+        queue.task_done()
 
-## Python Version Differences
-
-| Feature | Min Python | Notes |
-|---------|-----------|-------|
-| `async/await` | 3.5 | `@asyncio.coroutine` deprecated |
-| `asyncio.run()` | 3.7 | Preferred entry point |
-| `asyncio.create_task()` | 3.7 | Replaces `ensure_future` |
-| `asyncio.CancelledError` subclass of `BaseException` | 3.8 | Won't be caught by bare `except Exception` |
-| `asyncio.Runner` | 3.11 | Context manager for loop |
-| `TaskGroup` | 3.11 | Structured concurrency |
-| `asyncio.timeout()` | 3.11 | Context manager timeout |
-| `TaskGroup` / `ExceptionGroup` | 3.11 | `except*` syntax for groups |
-| `Barrier` | 3.11 | Synchronization primitive |
-| Optimized asyncio performance | 3.12 | Lower overhead, faster loop |
-
-## Structured Concurrency (Python 3.11+)
-
-```python
 async def main():
-    async with asyncio.TaskGroup() as tg:
-        t1 = tg.create_task(fetch("/a"))
-        t2 = tg.create_task(fetch("/b"))
-        t3 = tg.create_task(fetch("/c"))
-    # All tasks complete here. Any failure cancels others + raises ExceptionGroup.
+    await asyncio.gather(producer(), consumer())
+    await queue.join()  # Wait for all tasks done
 ```
 
-- `TaskGroup`: if any child task fails, others are cancelled. Ensures no orphaned tasks.
-- `ExceptionGroup`: collects multiple exceptions (native in 3.11+)
+## Timeouts & Cancellation
+
+### wait_for (Timeout)
+```python
+try:
+    result = await asyncio.wait_for(slow_operation(), timeout=5.0)
+except asyncio.TimeoutError:
+    print("Operation timed out")
+```
+
+### wait (Multiple with Timeout)
+```python
+done, pending = await asyncio.wait(
+    [task1, task2, task3],
+    timeout=5.0,
+    return_when=asyncio.FIRST_COMPLETED
+)
+for task in pending:
+    task.cancel()
+```
+
+### Shield (Protect from Cancellation)
+```python
+# This won't be cancelled even if parent is
+result = await asyncio.shield(critical_operation())
+```
+
+### Cancellation Handling
+```python
+async def long_running():
+    try:
+        while True:
+            await do_work()
+    except asyncio.CancelledError:
+        await cleanup()  # Always cleanup!
+        raise  # Re-raise to properly cancel
+```
+
+## Async I/O Patterns
+
+### HTTP Clients
+```python
+import aiohttp
+
+async def fetch_all(urls):
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch(session, url) for url in urls]
+        return await asyncio.gather(*tasks)
+
+async def fetch(session, url):
+    async with session.get(url) as response:
+        return await response.json()
+
+# Connection pooling, retries, timeouts built-in
+```
+
+### Database (asyncpg, aiomysql, motor)
+```python
+import asyncpg
+
+pool = await asyncpg.create_pool(
+    host='localhost',
+    database='mydb',
+    user='user',
+    password='pass',
+    min_size=10,
+    max_size=20
+)
+
+async def get_user(user_id):
+    async with pool.acquire() as conn:
+        return await conn.fetchrow(
+            "SELECT * FROM users WHERE id = $1", user_id
+        )
+```
+
+### File I/O (aiofiles)
+```python
+import aiofiles
+
+async def read_config():
+    async with aiofiles.open('config.json') as f:
+        content = await f.read()
+    return json.loads(content)
+
+async def write_log(entry):
+    async with aiofiles.open('app.log', 'a') as f:
+        await f.write(json.dumps(entry) + '\n')
+```
+
+## Advanced Patterns
+
+### Rate Limiting
+```python
+class RateLimiter:
+    def __init__(self, rate: float, per: float):
+        self.rate = rate
+        self.per = per
+        self.tokens = rate
+        self.last = time.monotonic()
+        self.lock = asyncio.Lock()
+    
+    async def acquire(self):
+        async with self.lock:
+            now = time.monotonic()
+            since_last = now - self.last
+            self.tokens = min(self.rate, self.tokens + since_last * self.rate / self.per)
+            if self.tokens < 1:
+                wait = (1 - self.tokens) * self.per / self.rate
+                await asyncio.sleep(wait)
+                self.tokens = 0
+            else:
+                self.tokens -= 1
+            self.last = time.monotonic()
+```
+
+### Retry with Exponential Backoff
+```python
+async def retry_with_backoff(
+    func, 
+    max_attempts=3, 
+    base_delay=1.0, 
+    max_delay=60.0,
+    exceptions=(Exception,)
+):
+    for attempt in range(max_attempts):
+        try:
+            return await func()
+        except exceptions as e:
+            if attempt == max_attempts - 1:
+                raise
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            delay += random.uniform(0, 0.1 * delay)  # Jitter
+            await asyncio.sleep(delay)
+```
+
+### Circuit Breaker
+```python
+class CircuitBreaker:
+    def __init__(self, failure_threshold=5, timeout=60):
+        self.failure_threshold = failure_threshold
+        self.timeout = timeout
+        self.failures = 0
+        self.last_failure = None
+        self.state = "closed"  # closed, open, half-open
+    
+    async def call(self, func, *args, **kwargs):
+        if self.state == "open":
+            if time.time() - self.last_failure > self.timeout:
+                self.state = "half-open"
+            else:
+                raise CircuitOpenError()
+        
+        try:
+            result = await func(*args, **kwargs)
+            if self.state == "half-open":
+                self.state = "closed"
+                self.failures = 0
+            return result
+        except Exception as e:
+            self.failures += 1
+            self.last_failure = time.time()
+            if self.failures >= self.failure_threshold:
+                self.state = "open"
+            raise
+```
+
+### Batch Processing
+```python
+async def process_in_batches(items, batch_size=100, processor=None):
+    results = []
+    for i in range(0, len(items), batch_size):
+        batch = items[i:i + batch_size]
+        if processor:
+            batch_results = await asyncio.gather(*[
+                processor(item) for item in batch
+            ]
+            results.extend(batch_results)
+        else:
+            results.extend(batch)
+    return results
+```
+
+## Testing Async Code
+
+### pytest-asyncio
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_fetch_user():
+    user = await fetch_user(1)
+    assert user["id"] == 1
+
+@pytest.mark.asyncio
+async def test_concurrent_fetches():
+    users = await asyncio.gather(fetch_user(1), fetch_user(2))
+    assert len(users) == 2
+```
+
+### Mocking Async
+```python
+from unittest.mock import AsyncMock, patch
+
+@pytest.mark.asyncio
+async def test_with_mock():
+    with patch('module.fetch_user', new_callable=AsyncMock) as mock:
+        mock.return_value = {"id": 1, "name": "Test"}
+        user = await fetch_user(1)
+        assert user["name"] == "Test"
+```
+
+### Testing Timeouts
+```python
+@pytest.mark.asyncio
+async def test_timeout():
+    async def slow():
+        await asyncio.sleep(10)
+    
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(slow(), timeout=0.1)
+```
+
+## Integration with Sync Code
+
+### Running Sync in Executor
+```python
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+def blocking_cpu_work(data):
+    return heavy_computation(data)
+
+async def main():
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as pool:
+        result = await loop.run_in_executor(pool, blocking_cpu_work, data)
+```
+
+### Sync to Async Bridge
+```python
+from asgiref.sync import sync_to_async, async_to_sync
+
+# Django ORM example
+user = await sync_to_async(User.objects.get)(id=1)
+
+# Call async from sync
+result = async_to_sync(async_function)()
+```
+
+## Performance Tips
+
+### 1. Reuse Connections
+```python
+# BAD: New session per request
+async def bad():
+    async with aiohttp.ClientSession() as session:
+        await fetch(session, url)
+
+# GOOD: Reuse session
+session = aiohttp.ClientSession()
+async def good():
+    await fetch(session, url)
+```
+
+### 2. Limit Concurrency
+```python
+# Prevent overwhelming services
+semaphore = asyncio.Semaphore(50)
+
+async def fetch_all(urls):
+    async def limited_fetch(url):
+        async with semaphore:
+            return await fetch(url)
+    return await asyncio.gather(*[limited_fetch(u) for u in urls])
+```
+
+### 3. Use Connection Pools
+```python
+# Database
+pool = await asyncpg.create_pool(min_size=10, max_size=20)
+
+# HTTP
+connector = aiohttp.TCPConnector(limit=100, limit_per_host=30)
+session = aiohttp.ClientSession(connector=connector)
+```
+
+### 4. Avoid Blocking Calls
+```python
+# BAD
+await asyncio.sleep(1)  # OK
+time.sleep(1)           # BLOCKS EVENT LOOP!
+
+# BAD
+requests.get(url)       # BLOCKS!
+# GOOD
+await aiohttp.get(url)
+```
+
+## Debugging
+
+### Enable Debug Mode
+```python
+asyncio.run(main(), debug=True)
+# Or
+loop = asyncio.get_event_loop()
+loop.set_debug(True)
+```
+
+### Slow Callback Detection
+```python
+loop.slow_callback_duration = 0.1  # Log callbacks > 100ms
+```
+
+### Task Inspection
+```python
+# Print all running tasks
+for task in asyncio.all_tasks():
+    print(task.get_name(), task.get_coro())
+
+# Current task
+task = asyncio.current_task()
+print(task.get_name())
+```
+
+### Profiling
+```python
+import cProfile
+import asyncio
+
+async def profiled_main():
+    profiler = cProfile.Profile()
+    profiler.enable()
+    await main()
+    profiler.disable()
+    profiler.print_stats(sort='cumulative')
+
+asyncio.run(profiled_main())
+```
+
+## Common Pitfalls
+
+| Pitfall | Solution |
+|---------|----------|
+| Forgetting `await` | Coroutine never runs, warning issued |
+| Blocking the loop | Use `run_in_executor` for CPU/blocking I/O |
+| Not handling exceptions | Use `try/except` in each task, `TaskGroup` |
+| Creating too many tasks | Use `Semaphore` or batch processing |
+| Mixing sync/async incorrectly | Use `sync_to_async` / `async_to_sync` |
+| Not closing resources | Use `async with` context managers |
+| Cancellation not propagated | Re-raise `CancelledError` after cleanup |
+
+## Modern Async Libraries (2024)
+
+| Category | Library | Use Case |
+|----------|---------|----------|
+| **HTTP** | `httpx`, `aiohttp` | Client/server |
+| **Web Framework** | `FastAPI`, `Starlette`, `Quart` | APIs |
+| **Database** | `asyncpg`, `aiomysql`, `motor`, `Tortoise ORM` | PostgreSQL, MySQL, MongoDB |
+| **Redis** | `redis-py` (async), `fakeredis` | Caching, pub/sub |
+| **Message Queue** | `aio-pika`, `aiokafka` | RabbitMQ, Kafka |
+| **Testing** | `pytest-asyncio`, `anyio` | Async testing |
+| **Structured Concurrency** | `asyncio.TaskGroup` (3.11+), `anyio` | Task management |
+
+## Resources
+- **Official**: docs.python.org/3/library/asyncio.html
+- **AsyncIO Best Practices**: github.com/timofonic/asyncio-best-practices
+- **Real Python**: realpython.com/async-io-python/
+- **FastAPI Docs**: fastapi.tiangolo.com/async/
+- **AnyIO**: anyio.readthedocs.io/ (structured concurrency)

@@ -1,154 +1,306 @@
 # Linux Package Management
 
-## APT (Debian, Ubuntu, Mint, Pop!_OS)
-```
-apt update              — refresh package index
-apt upgrade             — upgrade all packages
-apt full-upgrade        — upgrade with dependency resolution
-apt install <pkg>       — install package
-apt remove <pkg>        — remove package (leave config)
-apt purge <pkg>         — remove package and config
-apt autoremove          — remove unused dependencies
-apt search <term>       — search packages
-apt show <pkg>          — show package details
-apt list --installed    — list installed packages
-apt list --upgradable   — list upgradable packages
-apt policy <pkg>        — show version/apt pin info
-apt edit-sources        — edit sources.list
-apt-mark hold <pkg>     — prevent upgrade
-apt-mark unhold <pkg>   — allow upgrade
-dpkg -i <file.deb>      — install local .deb
-dpkg -r <pkg>           — remove package
-dpkg -l                 — list installed packages
-dpkg -L <pkg>           — list files owned by package
-dpkg -S /path/to/file   — find which package owns file
-dpkg --configure -a     — fix broken installs
-apt-get -f install      — fix broken dependencies
+## apt (Debian/Ubuntu)
+
+### Basic Operations
+```bash
+apt update                    # Update package lists
+apt upgrade                   # Upgrade installed packages
+apt full-upgrade              # Upgrade with dependency resolution (may remove)
+apt install package           # Install package
+apt install package=version   # Install specific version
+apt remove package            # Remove package (keep config)
+apt purge package             # Remove package + config
+apt autoremove                # Remove unused dependencies
+apt clean                     # Clear downloaded .deb files
+apt autoclean                 # Clear old .deb files
 ```
 
-## DNF (Fedora, RHEL 8+, CentOS Stream)
-```
-dnf install <pkg>       — install package
-dnf remove <pkg>        — remove package
-dnf update              — upgrade all packages
-dnf upgrade <pkg>       — upgrade specific package
-dnf search <term>       — search packages
-dnf info <pkg>          — show package details
-dnf list installed      — list installed packages
-dnf provides /path      — find which package owns file
-dnf group list          — list package groups
-dnf group install "gnome" — install group
-dnf autoremove          — remove unused dependencies
-dnf clean all           — clean cache
-dnf repolist            — list enabled repos
-dnf history             — show transaction history
-dnf history undo <n>    — revert transaction
-dnf downgrade <pkg>     — downgrade to older version
-dnf reinstall <pkg>     — reinstall package
-rpm -ivh <file.rpm>     — install local RPM
-rpm -e <pkg>            — erase package
-rpm -qa                 — query all packages
-rpm -ql <pkg>           — list files in package
-rpm -qf /path/to/file   — find owning package
+### Search & Info
+```bash
+apt search keyword            # Search packages
+apt show package              # Show package details
+apt policy package            # Show versions available/installed
+apt list --installed          # List installed packages
+apt list --upgradable         # List upgradable packages
+apt depends package           # Show dependencies
+apt rdepends package          # Show reverse dependencies
 ```
 
-## Pacman (Arch Linux, Manjaro, EndeavourOS)
-```
-pacman -Syu             — full system upgrade
-pacman -S <pkg>         — install package
-pacman -R <pkg>         — remove package
-pacman -Rs <pkg>        — remove + dependencies
-pacman -Rn <pkg>        — remove + config
-pacman -Ss <term>       — search packages
-pacman -Si <pkg>        — show package info
-pacman -Q               — list installed packages
-pacman -Qe              — list explicitly installed
-pacman -Qo /path        — find owning package
-pacman -Qi <pkg>        — show local package info
-pacman -Qdt             — orphaned packages
-pacman -Rns $(pacman -Qdtq) — remove orphans
-pacman -Sw <pkg>        — download only
-pacman -U <file.pkg.tar.zst> — install local package
-pacman -Sc              — clean package cache
-pacman -Scc             — clean all cached packages
+### Package File Operations
+```bash
+dpkg -i package.deb           # Install .deb file
+dpkg -l                       # List all installed
+dpkg -L package               # List files in package
+dpkg -S /path/to/file         # Find package owning file
+dpkg --configure -a           # Fix interrupted installs
+apt install -f                # Fix broken dependencies
 ```
 
-## AUR Helpers (yay, paru)
-```
-yay -S <pkg>            — install from AUR or repos
-yay -Syu                — full system upgrade + AUR
-yay -Ss <term>          — search AUR and repos
-yay -Qi <pkg>           — show AUR package info
-yay -Yc                 — clean orphaned AUR deps
-paru -S <pkg>           — install (Rust-based, fast)
-paru -G <pkg>           — download PKGBUILD only
+### Hold/Pin Packages
+```bash
+apt-mark hold package         # Prevent upgrades
+apt-mark unhold package       # Allow upgrades
+apt-mark showhold             # List held packages
+
+# Pinning (/etc/apt/preferences.d/)
+Package: nginx
+Pin: version 1.18.*
+Pin-Priority: 1000
 ```
 
-## Zypper (openSUSE)
-```
-zypper install <pkg>    — install package
-zypper remove <pkg>     — remove package
-zypper update           — upgrade packages
-zypper dup              — distribution upgrade
-zypper search <term>    — search packages
-zypper info <pkg>       — show package info
-zypper lp               — list needed patches
-zypper pt               — list patch categories
+### Repositories
+```bash
+add-apt-repository ppa:user/ppa
+add-apt-repository "deb [arch=amd64] https://repo.example.com/ubuntu jammy main"
+# Then: apt update
+
+# Keys
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys KEYID
+# Modern: gpg --dearmor -o /etc/apt/trusted.gpg.d/keyring.gpg < key.pub
 ```
 
-## Snap (Cross-distro, Canonical)
-```
-snap install <pkg>      — install snap
-snap remove <pkg>       — remove snap
-snap refresh             — update all snaps
-snap list               — list installed snaps
-snap find <term>        — search snaps
-snap info <pkg>         — show snap details
-snap revert <pkg>       — revert to previous version
-snap changes            — show recent changes
+### Offline/Debian Based
+```bash
+# Download without installing
+apt download package
+apt-get install --download-only package
+
+# Create local repo
+apt-ftparchive packages . > Packages
+gzip -c Packages > Packages.gz
+# In sources.list: deb [trusted=yes] file:/path/to/repo ./
 ```
 
-## Flatpak (Cross-distro, Red Hat)
-```
-flatpak install <remote> <pkg>  — install
-flatpak remove <pkg>            — remove
-flatpak update                  — update all
-flatpak list                    — list installed
-flatpak search <term>           — search
-flatpak info <pkg>              — show details
-flatpak run <pkg>               — run application
-flatpak override <pkg> --user   — user overrides
-flatpak remote-add --if-not-exists flathub \
-  https://dl.flathub.org/repo/flathub.flatpakrepo
+## dnf/yum (RHEL/Fedora/CentOS)
+
+### Basic Operations
+```bash
+dnf update                    # Update all
+dnf upgrade                   # Same as update
+dnf install package           # Install
+dnf remove package            # Remove
+dnf autoremove                # Remove unused deps
+dnf clean all                 # Clean cache
 ```
 
-## AppImage
-- `.AppImage` files are portable, self-contained executables
-- `chmod +x app.AppImage && ./app.AppImage` to run
-- Extract: `./app.AppImage --appimage-extract`
-- Integration: `./app.AppImage --appimage-extract-and-run`
-- Tools: `appimaged` for desktop integration
-
-## Build from Source
-```
-./configure (--prefix=/usr)
-make
-sudo make install
-```
-Or CMake:
-```
-mkdir build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr
-make -j$(nproc)
-sudo make install
+### Search & Info
+```bash
+dnf search keyword
+dnf info package
+dnf list installed
+dnf list updates
+dnf repoquery --requires package
+dnf repoquery --whatrequires package
+dnf provides /path/to/file    # Find package owning file
 ```
 
-## Cleaning Disk Space
-- Debian: `apt autoremove && apt autoclean`
-- Arch: `pacman -Sc && pacman -Rns $(pacman -Qdtq)`
-- Fedora: `dnf autoremove`
-- Snap: `snap list --all | grep disabled | awk '{print $1}' | xargs -r snap remove`
-- Flatpak: `flatpak uninstall --unused`
-- Logs: `journalctl --vacuum-size=100M`
-- Docker: `docker system prune -a`
-- npm: `npm cache clean --force`
+### Modules (AppStream)
+```bash
+dnf module list
+dnf module install nodejs:18
+dnf module switch-to nodejs:20
+dnf module reset nodejs
+```
+
+### Repositories
+```bash
+dnf config-manager --add-repo https://repo.example.com/repo.repo
+dnf config-manager --set-enabled repo-name
+dnf config-manager --set-disabled repo-name
+```
+
+## pacman (Arch Linux)
+
+### Basic Operations
+```bash
+pacman -Syu                   # Update system
+pacman -S package             # Install
+pacman -R package             # Remove
+pacman -Rs package            # Remove + unused deps
+pacman -Rns package           # Remove + deps + config
+pacman -Sc                    # Clean cache (keep 3 versions)
+pacman -Scc                   # Clean all cache
+```
+
+### Search & Info
+```bash
+pacman -Ss keyword            # Search
+pacman -Si package            # Info (remote)
+pacman -Qi package            # Info (local)
+pacman -Ql package            # List files
+pacman -Qo /path/to/file      # Owns file
+pacman -Q                     # List installed
+pacman -Qe                    # Explicitly installed
+pacman -Qd                    # Dependencies
+```
+
+### AUR Helpers
+```bash
+yay -S package                # Install from AUR
+yay -Syu                      # Update system + AUR
+paru -S package               # Alternative AUR helper
+```
+
+## zypper (openSUSE)
+
+```bash
+zypper refresh                # Update repos
+zypper update                 # Update packages
+zypper install package
+zypper remove package
+zypper search keyword
+zypper info package
+zypper packages --orphaned    # Unused packages
+zypper packages --unneeded    # Not required by others
+```
+
+## nix (NixOS / Nix Package Manager)
+
+### Basic Operations
+```bash
+nix-env -iA nixpkgs.package   # Install
+nix-env -e package            # Uninstall
+nix-env -u                    # Upgrade all
+nix-env -q                    # List installed
+nix-env -qa package           # Search available
+```
+
+### Nix Flakes (Modern)
+```bash
+nix profile install nixpkgs#package
+nix profile list
+nix profile remove 1
+nix profile upgrade
+
+# Run without installing
+nix run nixpkgs#package
+nix shell nixpkgs#package     # Enter shell with package
+```
+
+### NixOS Configuration
+```nix
+# /etc/nixos/configuration.nix
+{ config, pkgs, ... }:
+{
+  environment.systemPackages = with pkgs; [
+    vim git htop firefox
+  ];
+  
+  services.nginx.enable = true;
+  services.postgresql.enable = true;
+  
+  users.users.me = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" "docker" ];
+    packages = with pkgs; [ vscode ];
+  };
+}
+```
+
+```bash
+sudo nixos-rebuild switch     # Apply config
+sudo nixos-rebuild test       # Test without boot entry
+sudo nixos-rebuild build-vm   # Build VM for testing
+nixos-rebuild list-generations
+sudo nixos-rebuild switch --upgrade  # Upgrade + rebuild
+```
+
+## Flatpak / Snap
+
+### Flatpak
+```bash
+flatpak install flathub org.gimp.GIMP
+flatpak run org.gimp.GIMP
+flatpak update
+flatpak uninstall org.gimp.GIMP
+flatpak list
+flatpak search gimp
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+```
+
+### Snap
+```bash
+snap install package
+snap refresh                  # Update all
+snap remove package
+snap list
+snap info package
+snap changes                  # Recent operations
+```
+
+## Container Package Managers
+
+### Docker
+```bash
+docker pull image:tag
+docker run --rm image:tag command
+docker build -t myimage .
+docker images
+docker rmi image
+docker system prune           # Clean unused
+```
+
+### Podman (Rootless)
+```bash
+podman pull image:tag
+podman run --rm image:tag command
+podman images
+podman rmi image
+podman system prune
+```
+
+## Version Comparison
+
+| Feature | apt | dnf | pacman | zypper | nix |
+|---------|-----|-----|--------|--------|-----|
+| Atomic upgrades | No | No | No | Yes (transactional) | Yes |
+| Rollback | Manual | `dnf history undo` | `pacman -U /var/cache/pacman/pkg/old.pkg` | `snapper rollback` | Generations |
+| Multiple versions | No | Limited (modules) | No | No | Yes |
+| Reproducible | No | No | No | Partial | Yes |
+| Config management | Manual | Manual | Manual | YaST | Declarative |
+
+## Troubleshooting
+
+### apt Lock Errors
+```bash
+# "Could not get lock /var/lib/dpkg/lock-frontend"
+lsof /var/lib/dpkg/lock-frontend
+# Kill process, then:
+rm /var/lib/dpkg/lock-frontend
+rm /var/lib/apt/lists/lock
+dpkg --configure -a
+```
+
+### dnf "Error: Failed to synchronize cache"
+```bash
+dnf clean all
+rm -rf /var/cache/dnf
+dnf makecache
+```
+
+### pacman Key Issues
+```bash
+pacman-key --init
+pacman-key --populate archlinux
+pacman-key --refresh-keys
+```
+
+### Nix "error: corrupted path"
+```bash
+nix-store --verify --check-contents --repair
+nix-collect-garbage -d
+```
+
+## Cross-Distro Package Search
+
+```bash
+# pkcon (PackageKit) - works on most distros
+pkcon search name package
+pkcon install package
+
+# distrobox - run other distro's package manager
+distrobox create -n ubuntu -i ubuntu:22.04
+distrobox enter ubuntu
+apt install package
+```

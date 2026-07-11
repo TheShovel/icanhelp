@@ -10,14 +10,14 @@ echo "Target: $KNOWLEDGE_DIR"
 echo ""
 
 # 1. Fetch common Linux command cheatsheets
-echo "[1/5] Fetching Linux command references..."
+echo "[1/6] Fetching Linux command references..."
 mkdir -p "$KNOWLEDGE_DIR/linux"
 
 # tldr-pages collection (simplified man pages)
-if [ ! -f "$KNOWLEDGE_DIR/linux/tldr-collection.md" ]; then
+if [ ! -f "$KNOWLEDGE_DIR/linux/tldr-cmds.md" ]; then
   echo "  Downloading tldr-pages..."
   # Fetch common tldr pages as reference
-  for cmd in find grep sed awk tar rsync ssh scp curl wget crontab fdisk mkfs ln chown chmod; do
+  for cmd in find grep sed awk tar rsync ssh scp curl wget crontab fdisk mkfs ln chown chmod git du nmap; do
     echo "    $cmd"
     curl -sL "https://raw.githubusercontent.com/tldr-pages/tldr/main/pages/common/$cmd.md" \
       2>/dev/null >> "$KNOWLEDGE_DIR/linux/tldr-cmds.md.tmp" || true
@@ -27,15 +27,15 @@ if [ ! -f "$KNOWLEDGE_DIR/linux/tldr-collection.md" ]; then
   echo "  Done."
 fi
 
-# 2. Fetch systemd service list
-echo "[2/5] Fetching systemd documentation..."
+# 2. Fetch systemd service + timer documentation
+echo "[2/6] Fetching systemd documentation..."
 # systemd man page summaries are available in markdown
 curl -sL "https://raw.githubusercontent.com/systemd/systemd/main/man/systemd.service.xml" \
   2>/dev/null | sed 's/<[^>]*>//g' | sed '/^$/d' | head -200 \
   > "$KNOWLEDGE_DIR/linux/systemd-service-guide.md" 2>/dev/null || true
 
 # 3. Fetch Python standard library overview
-echo "[3/5] Fetching programming references..."
+echo "[3/6] Fetching programming references..."
 curl -sL "https://docs.python.org/3/tutorial/stdlib.html" \
   2>/dev/null | python3 -c "
 import sys, re, html
@@ -48,7 +48,7 @@ print('\n'.join(lines[:500]))
 " > "$KNOWLEDGE_DIR/programming/python-stdlib.md" 2>/dev/null || true
 
 # 4. Fetch common API status codes reference
-echo "[4/5] Fetching HTTP reference..."
+echo "[4/6] Fetching HTTP reference..."
 cat > "$KNOWLEDGE_DIR/general/http-status-codes.md" << 'HTTPEOF'
 # HTTP Status Codes Reference
 
@@ -127,8 +127,20 @@ cat > "$KNOWLEDGE_DIR/general/http-status-codes.md" << 'HTTPEOF'
 HTTPEOF
 echo "  Done."
 
-# 5. Generate a summary of the knowledge base structure
-echo "[5/5] Building knowledge index..."
+# 5. Fetch authoritative measurement & standards reference (NIST-style facts)
+echo "[5/6] Fetching science/measurement reference..."
+mkdir -p "$KNOWLEDGE_DIR/science"
+# SI prefix + unit facts are stable; fetch a concise public reference if available
+curl -sL "https://raw.githubusercontent.com/tldr-pages/tldr/main/pages/common/units.md" \
+  2>/dev/null >> "$KNOWLEDGE_DIR/science/units-tldr.md.tmp" || true
+if [ -s "$KNOWLEDGE_DIR/science/units-tldr.md.tmp" ]; then
+  mv "$KNOWLEDGE_DIR/science/units-tldr.md.tmp" "$KNOWLEDGE_DIR/science/units-tldr.md"
+else
+  rm -f "$KNOWLEDGE_DIR/science/units-tldr.md.tmp"
+fi
+
+# 6. Generate a summary of the knowledge base structure
+echo "[6/6] Building knowledge index..."
 find "$KNOWLEDGE_DIR" -name "*.md" -exec basename {} \; | sort | while read -r f; do
   echo "- ${f%.md}"
 done > /tmp/kb-index.txt
