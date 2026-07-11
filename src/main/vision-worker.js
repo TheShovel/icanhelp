@@ -23,9 +23,35 @@ const IMAGE_SIZE = 384;
 const MAX_NEW_TOKENS = 50;
 const MAX_REPETITION_RATIO = 0.4;
 const MAX_RETRIES = 3;
+const CHUNK_DOWNLOAD_TIMEOUT = 600000;
 
 function send(msg) {
   if (process.send) process.send(msg);
+}
+
+async function downloadChunk(url, destPath, start, end, onChunkReceived) {
+  const res = await fetch(url, {
+    headers: { Range: `bytes=${start}-${end}` },
+    signal: AbortSignal.timeout(CHUNK_DOWNLOAD_TIMEOUT),
+  });
+
+  if (!res.ok && res.status !== 206) {
+    throw new Error("Chunk download failed: HTTP " + res.status);
+  }
+
+  const reader = res.body.getReader();
+  const fd = fs.openSync(destPath, "r+");
+  let offset = start;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    fs.writeSync(fd, value, 0, value.length, offset);
+    offset += value.length;
+    if (onChunkReceived) onChunkReceived(value.length);
+  }
+
+  fs.closeSync(fd);
 }
 
 async function downloadFile(filename, progressCb) {
@@ -40,36 +66,79 @@ async function downloadFile(filename, progressCb) {
   var url = HF_BASE + "/" + filename;
   send({ type: "log", message: "Downloading " + filename });
 
-  var res = await fetch(url, { redirect: "follow" });
-  if (!res.ok)
-    throw new Error("Download failed: " + res.status + " " + filename);
+  var headRes = await fetch(url, { method: "HEAD" });
+  var total = parseInt(headRes.headers.get("content-length") || "0", 10);
 
-  var total = parseInt(res.headers.get("content-length") || "0", 10);
-  var reader = res.body.getReader();
-  var loaded = 0;
-  var fd = fs.openSync(dest, "w");
+  if (total > 100 * 1024 * 1024) {
+      // Use parallel chunked download for files > 100MB
+      var destPath = dest + ".part";
+      var fd = fs.openSync(destPath, "w");
+      fs.ftruncateSync(fd, total);
+      fs.closeSync(fd);
+    
+    var numChunks = 4;
+    var chunkSize = Math.ceil(total / numChunks);
+    var downloads = [];
+    var totalReceived = 0;
 
-  while (true) {
-    var result = await reader.read();
-    if (result.done) break;
-    fs.writeSync(fd, Buffer.from(result.value));
-    loaded += result.value.length;
-    if (progressCb && total > 0) {
-      progressCb({ file: filename, loaded: loaded, total: total });
+    for (var i = 0; i < numChunks; i++) {
+      var start = i * chunkSize;
+      var end = Math.min(start + chunkSize - 1, total - 1);
+      if (start >= total) break;
+
+      downloads.push(
+        downloadChunk(
+          url,
+          destPath,
+          start,
+          end,
+          function (received) {
+            totalReceived += received;
+            if (progressCb) {
+              progressCb({ file: filename, loaded: totalReceived, total: total });
+            }
+          },
+        ),
+      );
     }
+
+    await Promise.all(downloads);
+    fs.renameSync(destPath, dest);
+  } else {
+    // Regular sequential download for smaller files
+    var res = await fetch(url, { redirect: "follow" });
+    if (!res.ok)
+      throw new Error("Download failed: " + res.status + " " + filename);
+
+    var reader = res.body.getReader();
+    var loaded = 0;
+    var fd = fs.openSync(dest, "w");
+
+    while (true) {
+      var result = await reader.read();
+      if (result.done) break;
+      fs.writeSync(fd, Buffer.from(result.value));
+      loaded += result.value.length;
+      if (progressCb && total > 0) {
+        progressCb({ file: filename, loaded: loaded, total: total });
+      }
+    }
+
+    fs.closeSync(fd);
   }
 
-  fs.closeSync(fd);
-  send({ type: "log", message: "Downloaded " + filename + " (" + Math.round(loaded / 1024 / 1024) + " MB)" });
+  send({ type: "log", message: "Downloaded " + filename + " (" + Math.round(total / 1024 / 1024) + " MB)" });
   return dest;
 }
 
 async function downloadAll() {
-  for (var i = 0; i < FILES.length; i++) {
-    await downloadFile(FILES[i], function (p) {
+  // Download all files in parallel for faster speed
+  var downloads = FILES.map(function (file) {
+    return downloadFile(file, function (p) {
       send({ type: "progress", progress: p });
     });
-  }
+  });
+  await Promise.all(downloads);
 }
 
 function loadTokenizer() {
