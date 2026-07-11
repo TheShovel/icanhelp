@@ -279,5 +279,4 @@ module.exports = {
   getSystemInfo,
   getCompatibleModels,
   MODELS_DIR,
-  appPath,
 };

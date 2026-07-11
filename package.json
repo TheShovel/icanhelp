@@ -60,5 +60,13 @@
     "marked": "^12.0.2",
     "node-llama-cpp": "^3.19.0",
     "tesseract.js": "^5.1.1"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "electron-winstaller@5.4.0": true,
+    "node-llama-cpp@3.19.0": true,
+    "protobufjs@6.11.6": true,
+    "sharp@0.32.6": true,
+    "tesseract.js@5.1.1": true
   }
 }
