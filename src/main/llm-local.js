@@ -33,7 +33,9 @@ async function getOrLoadModel(resolvedPath, config) {
   cachedLlama = await getLlama();
   cachedModel = await cachedLlama.loadModel({
       modelPath: resolvedPath,
-      gpuLayers: 0,
+      // "max" offloads as many layers as fit in VRAM and keeps the
+      // remainder in system RAM when there isn't enough VRAM.
+      gpuLayers: "max",
     });
   cachedModelPath = resolvedPath;
   return { model: cachedModel, llama: cachedLlama };
