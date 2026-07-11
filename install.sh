@@ -239,28 +239,12 @@ ok "curl     $(curl --version 2>/dev/null | head -1 | awk '{print $2}' || echo '
 ok "unzip    $(unzip -v 2>/dev/null | head -1 | awk '{print $2}' || echo '?')"
 
 # ── locate source ───────────────────────────────────────────────
-# If this script is run from inside a local checkout of the repo (the
-# install.sh and scripts/ live next to it), use that tree directly instead of
-# cloning from the network. This lets local edits take effect during testing.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-if [ -f "$SCRIPT_DIR/scripts/ingest-knowledge.js" ] && [ -d "$SCRIPT_DIR/knowledge" ]; then
-  SRC_DIR="$SCRIPT_DIR"
-  log "Using local source tree: ${DIM}$SRC_DIR${RST}"
-else
-  SRC_DIR=""
-fi
-
 # ── download ─────────────────────────────────────────────────────
 heading "Downloading"
 
-if [ -n "$SRC_DIR" ]; then
-  log "Local checkout detected — skipping clone"
-  CLONE_DIR="$SRC_DIR"
-else
-  rm -rf "$CLONE_DIR"
-  spinner "Cloning repository …" git clone --depth=1 "$REPO" "$CLONE_DIR"
-  ok "Source fetched"
-fi
+rm -rf "$CLONE_DIR"
+spinner "Cloning repository …" git clone --depth=1 "$REPO" "$CLONE_DIR"
+ok "Source fetched"
 
 # ── install ──────────────────────────────────────────────────────
 cd "$CLONE_DIR"
@@ -550,11 +534,7 @@ fi
 ok "System icon cache updated"
 
 # ── cleanup ──────────────────────────────────────────────────────
-# Only remove the clone if we created a temporary one. When installing from a
-# local source tree, never delete the user's working directory.
-if [ -z "$SRC_DIR" ]; then
-  rm -rf "$CLONE_DIR"
-fi
+rm -rf "$CLONE_DIR"
 
 # ── done ─────────────────────────────────────────────────────────
 echo ""
