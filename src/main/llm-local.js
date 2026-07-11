@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs");
-const { getSkillContext } = require("./skills");
 const { modelsDir } = require("./paths");
 
 function defaultModelPath() {
@@ -31,9 +30,9 @@ async function getOrLoadModel(resolvedPath, config) {
   var { getLlama } = await import("node-llama-cpp");
   cachedLlama = await getLlama();
   cachedModel = await cachedLlama.loadModel({
-    modelPath: resolvedPath,
-    gpuLayers: config.gpu !== false ? 99 : 0,
-  });
+      modelPath: resolvedPath,
+      gpuLayers: 0,
+    });
   cachedModelPath = resolvedPath;
   return { model: cachedModel, llama: cachedLlama };
 }
@@ -65,43 +64,16 @@ function buildSystemPrompt() {
     "- Use run_bash() to execute commands on the user's Linux system.",
     "- Use store_knowledge() when the user teaches you something new.",
     "- Use search_knowledge() before guessing. Look it up first.",
+    "- Use list_skills() to discover available skills for specific tasks.",
+    "- Use start_skill(name) to load a skill when the user's request matches.",
     "",
   ];
-
-  var skillCtx = getSkillContext();
-  if (skillCtx) {
-    parts.push(skillCtx);
-    parts.push("");
-    parts.push(
-      "When a skill matches the user's request, use the start_skill tool to load its instructions. " +
-        "Skills provide expert guidance for specific tasks.",
-    );
-    parts.push("");
-  }
 
   parts.push("Be helpful, accurate, and thorough.");
   return parts.join("\n");
 }
 
-function buildInlinePrompt(history, currentPrompt) {
-  if (history.length === 0) return currentPrompt;
 
-  var lines = [];
-  for (var i = 0; i < history.length; i++) {
-    var item = history[i];
-    if (item.type === "user") {
-      lines.push("User: " + item.text);
-    } else if (item.type === "model") {
-      var resp = item.response && item.response[0] ? item.response[0] : "";
-      lines.push("Assistant: " + resp);
-    }
-  }
-
-  lines.push("User: " + currentPrompt);
-  lines.push("Assistant:");
-
-  return lines.join("\n");
-}
 
 function RepetitionDetector() {
   var buf = "";
@@ -291,30 +263,55 @@ async function runLocalChatLoop({
 
   var { getLlama, LlamaChatSession } = await import("node-llama-cpp");
 
+  console.log("[llm-local] Loading model from:", resolvedPath);
   var model;
   try {
     var loaded = await getOrLoadModel(resolvedPath, config);
     model = loaded.model;
+    console.log("[llm-local] Model loaded successfully");
   } catch (e) {
+    console.error("[llm-local] Failed to load model:", e);
     onChunk({ error: "Failed to load model: " + (e.message || String(e)) });
     return;
   }
 
-  var context = await model.createContext({
-    contextSize: config.contextSize || 8192,
-    batchSize: config.batchSize || 512,
-  });
+  console.log("[llm-local] Creating context with contextSize=" + (config.contextSize || 8192));
+  var context;
+  try {
+    context = await model.createContext({
+      contextSize: config.contextSize || 8192,
+      batchSize: config.batchSize || 512,
+    });
+    console.log("[llm-local] createContext returned");
+  } catch (e) {
+    console.error("[llm-local] createContext failed:", e);
+    throw e;
+  }
 
+  var contextSize = context.contextSize;
+  console.log("[llm-local] Context size:", contextSize);
+
+  console.log("[llm-local] Creating session...");
   var session = new LlamaChatSession({
     contextSequence: context.getSequence(),
     systemPrompt: buildSystemPrompt(),
   });
+  console.log("[llm-local] Session created, wrapper:", session.chatWrapper?.wrapperName);
 
   console.log(
     "[llm-local] System prompt (" + buildSystemPrompt().length + " chars):",
   );
   console.log(buildSystemPrompt());
   console.log("[llm-local] Chat wrapper:", session.chatWrapper?.wrapperName);
+
+  console.log("[llm-local] Incoming messages:", messages.length);
+  for (var mi = 0; mi < messages.length; mi++) {
+    var m = messages[mi];
+    console.log(
+      "[llm-local]   msg[" + mi + "] " + m.role + ": " +
+        String(m.content || "").slice(0, 80),
+    );
+  }
 
   var history = [];
   for (var i = 0; i < messages.length; i++) {
@@ -331,7 +328,7 @@ async function runLocalChatLoop({
     }
   }
 
-  history = compressHistory(history, config.contextSize || 8192);
+  history = compressHistory(history, contextSize);
 
   var currentPrompt = "";
   if (history.length > 0) {
@@ -341,9 +338,21 @@ async function runLocalChatLoop({
       history.pop();
     }
   }
+  if (!currentPrompt) {
+    console.log(
+      "[llm-local] WARNING: currentPrompt empty, history last type: " +
+        (history.length ? history[history.length - 1].type : "none"),
+    );
+  }
 
-  var inlinePrompt = buildInlinePrompt(history, currentPrompt);
-  session.setChatHistory([{ type: "system", text: buildSystemPrompt() }]);
+  // Feed the conversation as structured chat history so the chat wrapper
+  // formats each turn correctly. The current prompt is sent separately to
+  // promptWithMeta, which appends it as a new user turn.
+  var chatHistory = [{ type: "system", text: buildSystemPrompt() }];
+  for (var hi = 0; hi < history.length; hi++) {
+    chatHistory.push(history[hi]);
+  }
+  session.setChatHistory(chatHistory);
 
   console.log("[llm-local] History items:", history.length);
   for (var hi = 0; hi < history.length; hi++) {
@@ -388,9 +397,7 @@ async function runLocalChatLoop({
     var opts = {
       functions: functions,
       documentFunctionParams: true,
-      maxTokens: config.contextSize
-        ? Math.floor(config.contextSize * 0.75)
-        : 6144,
+      maxTokens: Math.floor(contextSize * 0.75),
       temperature: 0.7,
       signal: internalAbort.signal,
       stopOnAbortSignal: true,
@@ -420,17 +427,23 @@ async function runLocalChatLoop({
       },
     };
 
-    var result = await session.promptWithMeta(inlinePrompt, opts);
-    console.log("[llm-local] Response:", result.responseText);
+    console.log("[llm-local] Starting session.promptWithMeta...");
+    var result = await session.promptWithMeta(currentPrompt, opts);
+    console.log("[llm-local] Response received:", result.responseText);
   } catch (e) {
-    if (e.message === "REPETITION_DETECTED") {
-      console.log("[llm-local] Repetition loop detected, requesting retry");
-      onChunk({ error: "Model got stuck in a loop. Please try again." });
-    } else if (e.name === "AbortError" || (signal && signal.aborted)) {
-      console.log("[llm-local] Aborted");
-    } else {
-      onChunk({ error: e.message });
-    }
+      if (e.message === "REPETITION_DETECTED") {
+        console.log("[llm-local] Repetition loop detected, requesting retry");
+        onChunk({ error: "Model got stuck in a loop. Please try again." });
+      } else if (e.name === "AbortError" || (signal && signal.aborted)) {
+        console.log("[llm-local] Aborted");
+      } else if (e.message && e.message.includes("context shift strategy")) {
+        console.log("[llm-local] Context size exceeded");
+        onChunk({
+          error: "Message too large. Try removing file attachments or reducing context size in settings.",
+        });
+      } else {
+        onChunk({ error: e.message });
+      }
   }
 
   console.log("[llm-local] Returning");

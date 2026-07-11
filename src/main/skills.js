@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const { addKnowledge, addKnowledgeBatch } = require("./rag");
 
 var SKILL_DIRS = null;
 
@@ -146,6 +147,20 @@ function refreshCache() {
   SKILL_DIRS = null;
 }
 
+async function ingestSkillsIntoKnowledge() {
+  const all = getAllSkills();
+  if (all.length === 0) return JSON.stringify({ ingested: 0 });
+  
+  const items = all.map(function(skill) {
+    return {
+      text: "Skill: " + skill.name + "\n\n" + skill.description + "\n\n" + (skill.body || ""),
+      metadata: { source: "skills", skill: skill.name, path: skill.dirName },
+    };
+  });
+  
+  return await addKnowledgeBatch(items);
+}
+
 module.exports = {
   loadAllSkills,
   getAllSkills,
@@ -153,4 +168,5 @@ module.exports = {
   getSkillContext,
   getSkillInstructions,
   refreshCache,
+  ingestSkillsIntoKnowledge,
 };

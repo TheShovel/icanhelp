@@ -57,6 +57,7 @@ const {
   getSkillInstructions,
   findSkills,
   refreshCache,
+  ingestSkillsIntoKnowledge,
 } = require("./skills");
 
 marked.use({ breaks: true, gfm: true });
@@ -201,8 +202,10 @@ function createWindow() {
   });
 
   async function runLocalLLMLoop(event, messages, effort, signal) {
+    console.log("[main] runLocalLLMLoop started");
     if (signal && signal.aborted) return;
     var cfg = loadConfig() || {};
+    console.log("[main] Config loaded:", cfg);
     const { tools } = require("./tools/registry");
     const { executeToolCall } = require("./tools/registry");
 
@@ -214,7 +217,9 @@ function createWindow() {
         })
         .pop();
       if (lastUser && lastUser.content) {
+        console.log("[main] Searching knowledge base...");
         var kbResult = await searchKnowledge(lastUser.content, 5);
+        console.log("[main] Knowledge search done");
         var kbParsed = JSON.parse(kbResult);
         if (kbParsed.results && kbParsed.results.length > 0) {
           var highValue = kbParsed.results.filter(function (r) {
@@ -406,8 +411,7 @@ function createWindow() {
     return cfg
       ? {
           modelPath: cfg.modelPath || "",
-          gpu: cfg.gpu !== false,
-          contextSize: cfg.contextSize || 8192,
+          batchSize: cfg.batchSize || 512,
         }
       : null;
   });
@@ -466,10 +470,16 @@ function createWindow() {
     return matched[0];
   });
 
-  ipcMain.handle("refresh-skills", function () {
-    refreshCache();
-    return true;
-  });
+  ipcMain.handle("refresh-skills", async function () {
+      refreshCache();
+      try {
+        await ingestSkillsIntoKnowledge();
+        console.log("[main] Skills ingested into knowledge base");
+      } catch (e) {
+        console.log("[main] Failed to ingest skills:", e.message);
+      }
+      return true;
+    });
 
   ipcMain.handle("load-active-theme", function () {
     var name = loadActiveTheme();
