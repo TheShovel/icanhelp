@@ -49,7 +49,7 @@ const {
   prepareAttachment,
   supportedAttachmentExtensions,
 } = require("./attachments");
-const { searchKnowledge } = require("./rag");
+const { searchKnowledge, preloadEmbeddings } = require("./rag");
 const { appPath, knowledgeFile, visionLog, ocrLog } =
   require("./paths");
 const {
@@ -134,6 +134,7 @@ function createWindow() {
 
   setTimeout(function () {
     loadPipeline();
+    preloadEmbeddings();
   }, 500);
 
   mainWindow.webContents.on("did-finish-load", function () {

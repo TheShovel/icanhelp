@@ -7,6 +7,25 @@ const STORE_PATH = knowledgeFile();
 let pipeline = null;
 let store = null;
 
+// Embedding model load + inference can be slow on first use (it downloads and
+// initializes an ONNX model). Bound it so a tool call can never hang forever
+// and leave the UI stuck on "Working".
+const EMBEDDING_TIMEOUT_MS = 60 * 1000;
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        reject(new Error(message));
+      }, timeoutMs);
+    }),
+  ]).finally(function () {
+    clearTimeout(timer);
+  });
+}
+
 function loadStore() {
   if (store) return store;
   try {
@@ -69,14 +88,19 @@ async function getEmbeddings(texts) {
   const { pipeline: transformersPipeline } =
     await import("@xenova/transformers");
   if (!pipeline) {
-    pipeline = await transformersPipeline(
-      "feature-extraction",
-      "Xenova/all-MiniLM-L6-v2",
+    pipeline = await withTimeout(
+      transformersPipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2"),
+      EMBEDDING_TIMEOUT_MS,
+      "Embedding model failed to load in time.",
     );
   }
   const isArray = Array.isArray(texts);
   const input = isArray ? texts : [texts];
-  const output = await pipeline(input, { pooling: "mean", normalize: true });
+  const output = await withTimeout(
+    pipeline(input, { pooling: "mean", normalize: true }),
+    EMBEDDING_TIMEOUT_MS,
+    "Embedding timed out.",
+  );
 
   const dims = output.dims;
   let vectors;
@@ -91,6 +115,17 @@ async function getEmbeddings(texts) {
     }
   }
   return isArray ? vectors : vectors[0];
+}
+
+// Warm up the embedding pipeline at startup so the first search_knowledge call
+// doesn't block on a slow model download/initialization.
+async function preloadEmbeddings() {
+  try {
+    await getEmbeddings(["warmup"]);
+    console.log("[rag] embedding pipeline preloaded");
+  } catch (e) {
+    console.error("[rag] embedding preload failed:", e.message);
+  }
 }
 
 async function addKnowledge(text, metadata) {
@@ -224,4 +259,5 @@ module.exports = {
   listKnowledge,
   clearKnowledge,
   chunkText,
+  preloadEmbeddings,
 };

@@ -219,7 +219,16 @@ function compressHistory(history, contextSize) {
 }
 
 function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
-  var state = { consecutive: 0 };
+  // consecutiveFailures: tool calls that returned an error/refusal without the
+  //   model ever producing a real result. Reset on any successful call.
+  // total: hard cap on tool calls in a single turn, so a model that calls
+  //   tools successfully forever (e.g. reading a huge file) is still bounded.
+  // recentCalls: signatures of recent calls, to detect the model repeating the
+  //   exact same call (a common loop). Reset when a different call is made.
+  var state = { consecutiveFailures: 0, total: 0, lastSig: null, lastSigCount: 0 };
+  var MAX_CONSECUTIVE_FAILURES = 5;
+  var MAX_TOTAL_CALLS = 60;
+  var MAX_SAME_CALL_REPEATS = 2;
   var functions = {};
 
   for (var i = 0; i < tools.length; i++) {
@@ -229,17 +238,47 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
       params: fn.parameters || { type: "object", properties: {} },
       handler: (function (name) {
         return async function (params) {
-          if (state.consecutive >= 3) {
-            return "Too many consecutive tool calls. Respond directly to the user now.";
+          if (state.total >= MAX_TOTAL_CALLS) {
+            return (
+              "Stop calling tools. You have made " + state.total +
+              " tool calls this turn. Respond directly to the user now with what you know."
+            );
           }
-          state.consecutive++;
+          var sig = name + "\x1f" + JSON.stringify(params || {});
+          if (sig === state.lastSig) {
+            state.lastSigCount++;
+          } else {
+            state.lastSig = sig;
+            state.lastSigCount = 1;
+          }
+          if (state.lastSigCount > MAX_SAME_CALL_REPEATS) {
+            return (
+              "You have already called " + name + " with these exact arguments " +
+              state.lastSigCount + " times and it is not helping. Do NOT call the " +
+              "same tool with the same arguments again. Respond directly to the " +
+              "user, or try a clearly different tool or arguments."
+            );
+          }
+          state.total++;
           await onToolStart({ name: name, args: params });
           try {
             var result = await executeTool(name, params);
             var resultStr = String(result);
             onToolEnd({ name: name, output: resultStr });
+            // A successful call means progress was made; don't count it as a
+            // failure. This lets legitimate multi-call sequences (like reading
+            // a large file in chunks) proceed without tripping the guard.
+            state.consecutiveFailures = 0;
             return resultStr;
           } catch (e) {
+            state.consecutiveFailures++;
+            if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+              return (
+                "Too many consecutive failing tool calls. Do not retry the same " +
+                "call. Respond directly to the user now, or try a clearly " +
+                "different approach."
+              );
+            }
             var errorStr = JSON.stringify({ error: e.message });
             onToolEnd({ name: name, output: errorStr });
             return errorStr;
