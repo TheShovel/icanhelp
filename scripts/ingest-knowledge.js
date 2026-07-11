@@ -7,15 +7,17 @@ const CATEGORIES = fs.readdirSync(KNOWLEDGE_DIR).filter((d) => {
   return fs.statSync(p).isDirectory() && !d.startsWith(".");
 });
 
+const { addKnowledgeBatch, listKnowledge } = require("../src/main/rag");
+
+const BATCH_SIZE = 200;
+
 async function main() {
   console.log("=== Knowledge Ingestion ===\n");
   console.log("Knowledge directory:", KNOWLEDGE_DIR);
   console.log("Categories found:", CATEGORIES.join(", "), "\n");
 
-  const { addKnowledge, listKnowledge } = require("../src/main/rag");
-
+  const items = [];
   let totalFiles = 0;
-  let totalChunks = 0;
 
   for (const category of CATEGORIES) {
     const catDir = path.join(KNOWLEDGE_DIR, category);
@@ -26,19 +28,32 @@ async function main() {
       const filePath = path.join(catDir, file);
       const content = fs.readFileSync(filePath, "utf-8");
       const topic = path.basename(file, ".md");
-
-      const result = await addKnowledge(content, {
-        source: "knowledge-base",
-        category,
-        topic,
-        file: `knowledge/${category}/${file}`,
+      items.push({
+        text: content,
+        metadata: {
+          source: "knowledge-base",
+          category,
+          topic,
+          file: `knowledge/${category}/${file}`,
+        },
       });
-
-      const parsed = JSON.parse(result);
       totalFiles++;
-      totalChunks += parsed.chunks || 0;
-      console.log(`  ${file} → ${parsed.chunks} chunks (total: ${parsed.total})`);
     }
+  }
+
+  let totalChunks = 0;
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const slice = items.slice(i, i + BATCH_SIZE);
+    const result = await addKnowledgeBatch(slice);
+    const parsed = JSON.parse(result);
+    if (parsed.error) {
+      console.error("Embedding failed:", parsed.error);
+      process.exit(1);
+    }
+    totalChunks += parsed.chunks;
+    console.log(
+      `  batch ${Math.floor(i / BATCH_SIZE) + 1}: +${parsed.chunks} chunks (total: ${parsed.total})`,
+    );
   }
 
   console.log(`\n=== Done ===`);

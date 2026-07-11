@@ -79,12 +79,23 @@ async function getEmbeddings(texts) {
       "Xenova/all-MiniLM-L6-v2",
     );
   }
-  const results = [];
-  for (const text of texts) {
-    const output = await pipeline(text, { pooling: "mean", normalize: true });
-    results.push(Array.from(output.data));
+  const isArray = Array.isArray(texts);
+  const input = isArray ? texts : [texts];
+  const output = await pipeline(input, { pooling: "mean", normalize: true });
+
+  const dims = output.dims;
+  let vectors;
+  if (dims.length === 1) {
+    vectors = [Array.from(output.data)];
+  } else {
+    const dim = dims[dims.length - 1];
+    const batch = dims[0];
+    vectors = [];
+    for (let i = 0; i < batch; i++) {
+      vectors.push(Array.from(output.data.slice(i * dim, (i + 1) * dim)));
+    }
   }
-  return results;
+  return isArray ? vectors : vectors[0];
 }
 
 async function addKnowledge(text, metadata) {
@@ -114,6 +125,49 @@ async function addKnowledge(text, metadata) {
   return JSON.stringify({
     ok: true,
     chunks: chunks.length,
+    total: s.entries.length,
+  });
+}
+
+async function addKnowledgeBatch(items) {
+  const s = loadStore();
+  const allChunks = [];
+  const chunkMeta = [];
+  for (const item of items) {
+    const chunks = chunkText(item.text);
+    for (let i = 0; i < chunks.length; i++) {
+      allChunks.push(chunks[i]);
+      chunkMeta.push({
+        metadata: item.metadata,
+        chunkIndex: i,
+        totalChunks: chunks.length,
+      });
+    }
+  }
+
+  let embeddings;
+  try {
+    embeddings = await getEmbeddings(allChunks);
+  } catch (e) {
+    return JSON.stringify({ error: "Embedding failed: " + e.message });
+  }
+
+  const timestamp = new Date().toISOString();
+  for (let i = 0; i < allChunks.length; i++) {
+    s.entries.push({
+      text: allChunks[i],
+      embedding: embeddings[i],
+      metadata: chunkMeta[i].metadata || {},
+      timestamp,
+      chunkIndex: chunkMeta[i].chunkIndex,
+      totalChunks: chunkMeta[i].totalChunks,
+    });
+  }
+
+  saveStore();
+  return JSON.stringify({
+    ok: true,
+    chunks: allChunks.length,
     total: s.entries.length,
   });
 }
@@ -170,7 +224,9 @@ async function clearKnowledge() {
 
 module.exports = {
   addKnowledge,
+  addKnowledgeBatch,
   searchKnowledge,
   listKnowledge,
   clearKnowledge,
+  chunkText,
 };

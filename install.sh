@@ -32,10 +32,10 @@ progress_bar() {
   local label=$2
   local count=0
   local width=40
-  
+
   # hide cursor
   printf "\033[?25l"
-  
+
   while IFS= read -r line; do
     ((count++))
     local pct=0
@@ -47,10 +47,10 @@ progress_bar() {
     for ((i=filled; i<width; i++)); do bar+="░"; done
     printf "\r  ${CYAN}%s${RST} ${DIM}[%s]${RST} %3d%% (%d/%d)" "$label" "$bar" "$pct" "$count" "$total"
   done
-  
+
   # show cursor, newline
   printf "\033[?25h\n"
-  
+
   # if we didn't reach total, show completion
   if [ $count -lt $total ]; then
     printf "  ${GREEN}✓${RST} ${DIM}%s${RST} (completed %d of %d)\n" "$label" "$count" "$total"
@@ -105,7 +105,7 @@ progress_cmd() {
   local total=$1
   local label=$2
   shift 2
-  
+
   # run command, pipe output through progress bar
   set +e
   "$@" 2>&1 | progress_bar "$total" "$label"
@@ -134,7 +134,7 @@ progress_bar() {
     local bar=""
     for ((i=0; i<filled; i++)); do bar+="█"; done
     for ((i=filled; i<width; i++)); do bar+="░"; done
-    printf "  ${CYAN}%s${RST} ${DIM}[%s]${RST} %3d%% (%d/%d)" "$label" "$bar" "$pct" "$count" "$total"
+    printf "\r  ${CYAN}%s${RST} ${DIM}[%s]${RST} %3d%% (%d/%d)" "$label" "$bar" "$pct" "$count" "$total"
   done
 
   # show cursor, newline
@@ -337,6 +337,7 @@ if [ "$TOTAL_DOCS" -eq 0 ]; then
   warn "No knowledge documents found"
 else
   log "Embedding $TOTAL_DOCS documents …"
+  warn "This can take a while the first time, depending on your hardware."
   progress_cmd "$TOTAL_DOCS" "Ingesting knowledge base …" npm run ingest
   ok "Knowledge base ready"
 fi
