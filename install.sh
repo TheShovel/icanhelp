@@ -3,7 +3,6 @@
 # Run: curl -fsSL https://raw.githubusercontent.com/TheShovel/icanhelp/main/install.sh | bash
 set -euo pipefail
 
-# ── terminal colors ──────────────────────────────────────────────
 RST='\033[0m'
 BOLD='\033[1m'
 DIM='\033[2m'
