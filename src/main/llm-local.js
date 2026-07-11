@@ -2,6 +2,8 @@ const path = require("path");
 const fs = require("fs");
 const { modelsDir } = require("./paths");
 
+var CONTEXT_SIZE = 32768;
+
 function defaultModelPath() {
   return modelsDir();
 }
@@ -45,7 +47,19 @@ function resolveModelPath(config) {
 function buildSystemPrompt() {
   var parts = [
     "You are Canhelpy, a Linux desktop AI assistant.",
-    "You have access to a vector knowledge base via search_knowledge().",
+    "",
+    "## Context Window Limit",
+    "- Your context window is " + (CONTEXT_SIZE / 1024) + "K tokens (" + CONTEXT_SIZE + " tokens total).",
+    "- This is a HARD limit. If you exceed it, generation fails. Keep the total of the system prompt, conversation history, file contents, and tool results under this budget.",
+    "- Never paste a large file into the chat. If a file or tool result is large, read or fetch it in chunks.",
+    "",
+    "## Reading Files",
+    "- For SMALL files (< ~64 KB) use read_file().",
+    "- For LARGE files or when you only need part of a file, use read_file_lines(path, startLine, maxLines).",
+    "  It returns at most 500 lines per call and tells you the next startLine to continue reading.",
+    "- read_file_lines ONLY works on TEXT files (code, logs, CSV, markdown, JSON, etc.).",
+    "  Do NOT use it for images or binary files - use ocr_image for images instead.",
+    "- When a user attaches a file, if its content is large, do not try to hold it all in context. Read it in chunks with read_file_lines.",
     "",
     "## Knowledge Base Rules",
     "- BEFORE answering any question, ALWAYS call search_knowledge() to find relevant information.",
@@ -122,7 +136,7 @@ function estimateTokens(history) {
 }
 
 function compressHistory(history, contextSize) {
-  var maxTokens = contextSize || 8192;
+  var maxTokens = contextSize || CONTEXT_SIZE;
   var threshold = Math.floor(maxTokens * 0.7);
 
   if (estimateTokens(history) <= threshold) return history;
@@ -275,11 +289,11 @@ async function runLocalChatLoop({
     return;
   }
 
-  console.log("[llm-local] Creating context with contextSize=" + (config.contextSize || 8192));
+  console.log("[llm-local] Creating context with contextSize=" + (config.contextSize || CONTEXT_SIZE));
   var context;
   try {
     context = await model.createContext({
-      contextSize: config.contextSize || 8192,
+      contextSize: config.contextSize || CONTEXT_SIZE,
       batchSize: config.batchSize || 512,
     });
     console.log("[llm-local] createContext returned");

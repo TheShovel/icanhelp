@@ -1,5 +1,5 @@
 const { runBash } = require("./bash");
-const { readFile, writeFile, listDirectory } = require("./fs");
+const { readFile, readFileLines, writeFile, listDirectory } = require("./fs");
 const { ocrImage } = require("../ocr");
 const {
   addKnowledge,
@@ -119,11 +119,44 @@ var tools = [
     type: "function",
     function: {
       name: "read_file",
-      description: "Read the contents of a file from the filesystem.",
+      description:
+        "Read the contents of a SMALL file from the filesystem. Only use this for files under ~64 KB. " +
+        "For larger files (or any text file you want to read incrementally) use read_file_lines instead, " +
+        "which reads a bounded range of lines so you never blow past your context limit.",
       parameters: {
         type: "object",
         properties: {
           path: { type: "string", description: "Absolute path to the file" },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_file_lines",
+      description:
+        "Read a bounded range of lines from a TEXT file (source code, logs, CSV, markdown, etc.). " +
+        "Use this for large files or when you only need part of a file. It returns at most " +
+        "500 lines per call and tells you how to fetch the next chunk. " +
+        "IMPORTANT: only use this for text files. Do NOT use it for images or binaries " +
+        "(use ocr_image for images). Line numbers are 1-based.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Absolute path to the text file" },
+          startLine: {
+            type: "number",
+            description: "1-based line number to start reading from (default 1)",
+            default: 1,
+          },
+          maxLines: {
+            type: "number",
+            description:
+              "Maximum number of lines to return. Capped at 500. Use the returned next startLine to continue.",
+            default: 500,
+          },
         },
         required: ["path"],
       },
@@ -346,6 +379,7 @@ var handlers = {
   search_web: searchWeb,
   run_bash: runBash,
   read_file: readFile,
+  read_file_lines: readFileLines,
   write_file: writeFile,
   list_directory: listDirectory,
   ocr_image: ocrImage,
