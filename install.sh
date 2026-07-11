@@ -435,9 +435,11 @@ else
     printf 'Knowledge'
   }
 
-  # selected[c]=1 means include. Default: all selected.
+  # selected[c]=1 means include. Default: only the core categories
+  # (linux, programming, general) are enabled; the rest can be toggled on.
   declare -A selected
-  for ((i=0;i<ncat;i++)); do selected["${CATS[i]}"]=1; done
+  for ((i=0;i<ncat;i++)); do selected["${CATS[i]}"]=0; done
+  for c in linux programming general; do selected["$c"]=1; done
 
   render_menu() {
     local kept=0 keptb=0
@@ -549,7 +551,11 @@ fi
 ok "System icon cache updated"
 
 # ── cleanup ──────────────────────────────────────────────────────
-rm -rf "$CLONE_DIR"
+# Only remove the clone if we created a temporary one. When installing from a
+# local source tree, never delete the user's working directory.
+if [ -z "$SRC_DIR" ]; then
+  rm -rf "$CLONE_DIR"
+fi
 
 # ── done ─────────────────────────────────────────────────────────
 echo ""
