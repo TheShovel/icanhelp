@@ -39,9 +39,12 @@ progress_bar() {
   while IFS= read -r line; do
     ((count++))
     local pct=0
-    [ $total -gt 0 ] && pct=$(( count * 100 / total ))
-    local filled=$(( count * width / total ))
-    [ $filled -gt $width ] && filled=$width
+    local filled=0
+    if [ $total -gt 0 ]; then
+      pct=$(( count * 100 / total ))
+      filled=$(( count * width / total ))
+      [ $filled -gt $width ] && filled=$width
+    fi
     local bar=""
     for ((i=0; i<filled; i++)); do bar+="█"; done
     for ((i=filled; i<width; i++)); do bar+="░"; done
@@ -106,9 +109,10 @@ progress_cmd() {
   local label=$2
   shift 2
 
-  # run command, pipe output through progress bar
+  # Count stdout lines only for progress; stderr is surfaced separately so
+  # diagnostic output doesn't throw off the bar.
   set +e
-  "$@" 2>&1 | progress_bar "$total" "$label"
+  "$@" 2> >(cat >&2) | progress_bar "$total" "$label"
   local rc=${PIPESTATUS[0]}
   set -e
   return $rc
@@ -123,14 +127,17 @@ progress_bar() {
   local width=40
 
   # hide cursor
-  printf "[?25l"
+  printf "\033[?25l"
 
   while IFS= read -r line; do
     ((count++))
     local pct=0
-    [ $total -gt 0 ] && pct=$(( count * 100 / total ))
-    local filled=$(( count * width / total ))
-    [ $filled -gt $width ] && filled=$width
+    local filled=0
+    if [ $total -gt 0 ]; then
+      pct=$(( count * 100 / total ))
+      filled=$(( count * width / total ))
+      [ $filled -gt $width ] && filled=$width
+    fi
     local bar=""
     for ((i=0; i<filled; i++)); do bar+="█"; done
     for ((i=filled; i<width; i++)); do bar+="░"; done
@@ -158,6 +165,43 @@ warn()    { printf "${YELLOW}  ⚠${RST} %b\n" "$*" >&2; }
 fail()    { printf "${RED}  ✘${RST} %b\n" "$*" >&2; exit 1; }
 heading() { printf "\n${BOLD}${BLUE}▸ %b${RST}\n" "$*"; }
 sub()     { printf "${DIM}    %b${RST}\n" "$*"; }
+
+# prompt_yn <question> [default y|n]
+# prints the question with [Y/n] or [y/N] and reads one char
+prompt_yn() {
+  local q="$1" def="${2:-y}"
+  local hint
+  [ "$def" = "y" ] && hint="${BOLD}Y${RST}/${DIM}n${RST}" || hint="${DIM}y${RST}/${BOLD}N${RST}"
+  printf "  ${BOLD}%b${RST} ${GRAY}[%b]${RST} " "$q" "$hint"
+  local ans
+  read -r ans </dev/tty
+  ans="${ans:-$def}"
+  case "$ans" in
+    y|Y|yes|YES|Yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# prompt_choice <prompt> <options...>
+# options are "key:label"; echoes the chosen key
+prompt_choice() {
+  local q="$1"; shift
+  printf "\n  ${BOLD}%b${RST}\n" "$q"
+  local keys=()
+  local i=1
+  for opt in "$@"; do
+    local key="${opt%%:*}" label="${opt#*:}"
+    keys+=("$key")
+    printf "    ${CYAN}%s${RST}) %s\n" "$key" "$label"
+    i=$((i+1))
+  done
+  printf "  ${GRAY}choice:${RST} "
+  local ans; read -r ans </dev/tty
+  for k in "${keys[@]}"; do
+    [ "$ans" = "$k" ] && { printf '%s' "$k"; return; }
+  done
+  printf '%s' "${keys[0]}"
+}
 
 # ── banner ───────────────────────────────────────────────────────
 clear 2>/dev/null || true
@@ -195,12 +239,29 @@ ok "rsync    $(rsync --version 2>/dev/null | head -1 | sed 's/.*version //' | cu
 ok "curl     $(curl --version 2>/dev/null | head -1 | awk '{print $2}' || echo '?')"
 ok "unzip    $(unzip -v 2>/dev/null | head -1 | awk '{print $2}' || echo '?')"
 
+# ── locate source ───────────────────────────────────────────────
+# If this script is run from inside a local checkout of the repo (the
+# install.sh and scripts/ live next to it), use that tree directly instead of
+# cloning from the network. This lets local edits take effect during testing.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+if [ -f "$SCRIPT_DIR/scripts/ingest-knowledge.js" ] && [ -d "$SCRIPT_DIR/knowledge" ]; then
+  SRC_DIR="$SCRIPT_DIR"
+  log "Using local source tree: ${DIM}$SRC_DIR${RST}"
+else
+  SRC_DIR=""
+fi
+
 # ── download ─────────────────────────────────────────────────────
 heading "Downloading"
 
-rm -rf "$CLONE_DIR"
-spinner "Cloning repository …" git clone --depth=1 "$REPO" "$CLONE_DIR"
-ok "Source fetched"
+if [ -n "$SRC_DIR" ]; then
+  log "Local checkout detected — skipping clone"
+  CLONE_DIR="$SRC_DIR"
+else
+  rm -rf "$CLONE_DIR"
+  spinner "Cloning repository …" git clone --depth=1 "$REPO" "$CLONE_DIR"
+  ok "Source fetched"
+fi
 
 # ── install ──────────────────────────────────────────────────────
 cd "$CLONE_DIR"
@@ -328,18 +389,127 @@ fi
 
 ok "Dependencies installed"
 
-# ── ingest knowledge base ──────────────────────────────────────────
-heading "Building knowledge base"
-log "Counting documents …"
-# Count total markdown files for progress bar
-TOTAL_DOCS=$(find "$INSTALL_DIR/knowledge" -type f -name "*.md" 2>/dev/null | wc -l)
-if [ "$TOTAL_DOCS" -eq 0 ]; then
-  warn "No knowledge documents found"
+# ── knowledge base selection ─────────────────────────────────────
+heading "Knowledge base"
+
+KNOWLEDGE_DIR="$INSTALL_DIR/knowledge"
+if [ ! -d "$KNOWLEDGE_DIR" ]; then
+  warn "No knowledge directory found, skipping"
 else
-  log "Embedding $TOTAL_DOCS documents …"
-  warn "This can take a while the first time, depending on your hardware."
-  progress_cmd "$TOTAL_DOCS" "Ingesting knowledge base …" npm run ingest
-  ok "Knowledge base ready"
+  # Build a sorted list of categories with file count + byte size.
+  CATS=()
+  CAT_FILES=()
+  CAT_BYTES=()
+  CAT_DESC=(
+    "linux:Linux commands, systemd, networking, shell"
+    "programming:Code, git, APIs, databases, web dev"
+    "daily:Productivity, habits, cooking, travel, finance tips"
+    "health:Nutrition, first aid, sleep, exercise"
+    "home:DIY, cleaning, gardening, appliances"
+    "creative:Writing, music, art, design"
+    "science:Biology, physics, chemistry, earth science"
+    "general:Troubleshooting, learning, communication"
+    "finance:Budgeting, investing, taxes"
+    "green-living:Sustainability, energy, zero-waste"
+  )
+  for d in "$KNOWLEDGE_DIR"/*/; do
+    [ -d "$d" ] || continue
+    c="$(basename "$d")"
+    [ "${c#*.}" != "$c" ] && continue
+    nf=$(find "$d" -maxdepth 1 -name '*.md' | wc -l)
+    nb=$(find "$d" -maxdepth 1 -name '*.md' -printf '%s\n' | awk '{s+=$1} END{print s+0}')
+    [ "$nf" -eq 0 ] && continue
+    CATS+=("$c"); CAT_FILES+=("$nf"); CAT_BYTES+=("$nb")
+  done
+  ncat=${#CATS[@]}
+  TOTAL_BYTES=0; TOTAL_FILES=0
+  for ((i=0;i<ncat;i++)); do TOTAL_BYTES=$((TOTAL_BYTES+${CAT_BYTES[i]})); TOTAL_FILES=$((TOTAL_FILES+${CAT_FILES[i]})); done
+  CHUNK_BYTES=300
+  TOTAL_CHUNKS=$(( (TOTAL_BYTES + CHUNK_BYTES - 1) / CHUNK_BYTES ))
+
+  desc_for() {
+    local c="$1"
+    for e in "${CAT_DESC[@]}"; do
+      [ "${e%%:*}" = "$c" ] && { printf '%s' "${e#*:}"; return; }
+    done
+    printf 'Knowledge'
+  }
+
+  # selected[c]=1 means include. Default: all selected.
+  declare -A selected
+  for ((i=0;i<ncat;i++)); do selected["${CATS[i]}"]=1; done
+
+  render_menu() {
+    local kept=0 keptb=0
+    for ((i=0;i<ncat;i++)); do
+      if [ "${selected[${CATS[i]}]}" = 1 ]; then kept=$((kept+${CAT_FILES[i]})); keptb=$((keptb+${CAT_BYTES[i]})); fi
+    done
+    local keptc=$(( (keptb + CHUNK_BYTES - 1) / CHUNK_BYTES ))
+    printf "\n  ${DIM}%-12s %-5s %8s   %s${RST}\n" "CATEGORY" "FILES" "~CHUNKS" "DESCRIPTION"
+    local c on cb cf cc
+    for ((i=0;i<ncat;i++)); do
+      c="${CATS[i]}"; on="${selected[$c]}"; cb="${CAT_BYTES[i]}"; cf="${CAT_FILES[i]}"
+      cc=$(( (cb + CHUNK_BYTES - 1) / CHUNK_BYTES ))
+      if [ "$on" = 1 ]; then
+        printf "    ${GREEN}✔${RST} ${BOLD}%-12s${RST} %-5s %8s   ${DIM}%s${RST}\n" "$c" "$cf" "$cc" "$(desc_for "$c")"
+      else
+        printf "    ${GRAY}✘${RST} ${GRAY}%-12s %-5s %8s   %s${RST}\n" "$c" "$cf" "$cc" "$(desc_for "$c")"
+      fi
+    done
+    printf "\n  ${BOLD}Included:${RST} %s files / ~%s chunks of %s total (~%s%%)" "$kept" "$keptc" "$TOTAL_CHUNKS" "$(( keptc * 100 / (TOTAL_CHUNKS>0?TOTAL_CHUNKS:1) ))"
+  }
+
+  printf "\n  ${BOLD}Choose which knowledge to embed.${RST} More knowledge = better answers but slower first-time setup.\n"
+  clear
+  render_menu
+
+  while true; do
+    printf "\n  ${CYAN}a${RST}) all   ${CYAN}n${RST}) none (minimal/fast)   ${CYAN}t${RST}) toggle a category   ${CYAN}c${RST}) confirm\n"
+    printf "  ${GRAY}choice:${RST} "
+    read -r -n1 action </dev/tty
+    printf "\n"
+    case "$action" in
+      a|A) for ((i=0;i<ncat;i++)); do selected["${CATS[i]}"]=1; done ; clear; render_menu ;;
+      n|N) for ((i=0;i<ncat;i++)); do selected["${CATS[i]}"]=0; done ; clear; render_menu ;;
+      c|C) break ;;
+      t|T)
+        printf "  ${GRAY}category to toggle:${RST} "
+        read -r tc </dev/tty
+        for ((i=0;i<ncat;i++)); do
+          if [ "${CATS[i]}" = "$tc" ]; then
+            if [ "${selected[$tc]}" = 1 ]; then selected["$tc"]=0; else selected["$tc"]=1; fi
+          fi
+        done
+        clear; render_menu ;;
+      *) [ -z "$action" ] && continue; printf "  ${YELLOW}unknown: %s${RST}\n" "$action" ;;
+    esac
+  done
+
+  # Build INGEST_IGNORE from unselected categories.
+  INGEST_IGNORE=""
+  for ((i=0;i<ncat;i++)); do
+    if [ "${selected[${CATS[i]}]}" != 1 ]; then
+      [ -n "$INGEST_IGNORE" ] && INGEST_IGNORE="$INGEST_IGNORE,"
+      INGEST_IGNORE="${INGEST_IGNORE}${CATS[i]}/"
+    fi
+  done
+  export INGEST_IGNORE
+
+  kept_files=0; kept_bytes=0
+  for ((i=0;i<ncat;i++)); do
+    if [ "${selected[${CATS[i]}]}" = 1 ]; then kept_files=$((kept_files+${CAT_FILES[i]})); kept_bytes=$((kept_bytes+${CAT_BYTES[i]})); fi
+  done
+  kept_chunks=$(( (kept_bytes + CHUNK_BYTES - 1) / CHUNK_BYTES ))
+
+  echo ""
+  if [ "$kept_files" -eq 0 ]; then
+    warn "No knowledge selected — skipping ingestion (the assistant will have no local knowledge)."
+  else
+    log "Embedding $kept_files documents (~$kept_chunks chunks) …"
+    warn "This can take a while the first time, depending on your hardware."
+    progress_cmd "$kept_files" "Ingesting knowledge base …" env INGEST_IGNORE="$INGEST_IGNORE" npm run ingest
+    ok "Knowledge base ready"
+  fi
 fi
 
 NPM_BIN="$(command -v npm)"
