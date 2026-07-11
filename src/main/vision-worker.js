@@ -21,6 +21,8 @@ let textSession = null;
 let tokenizer = null;
 const IMAGE_SIZE = 384;
 const MAX_NEW_TOKENS = 50;
+const MAX_REPETITION_RATIO = 0.4;
+const MAX_RETRIES = 3;
 
 function send(msg) {
   if (process.send) process.send(msg);
@@ -153,7 +155,22 @@ function argmax(arr) {
   return bestIdx;
 }
 
-async function describeImage(imagePath) {
+function isRepetitive(caption, generated) {
+  if (!caption || generated.length === 0) return false;
+  var words = caption.split(/\s+/);
+  if (words.length < 3) return false;
+  var uniqueWords = new Set(words);
+  var ratio = uniqueWords.size / words.length;
+  return ratio < MAX_REPETITION_RATIO;
+}
+
+async function describeImage(imagePath, retryCount) {
+  retryCount = retryCount || 0;
+  if (retryCount >= MAX_RETRIES) {
+    send({ type: "log", message: "Max retries reached for image description" });
+    return null;
+  }
+
   if (!(await loadModels())) return null;
 
   var pixelValues = await preprocessImage(imagePath);
@@ -164,6 +181,7 @@ async function describeImage(imagePath) {
 
   var inputIds = [tokenizer.clsId];
   var generated = [];
+  var usedTokens = new Set();
 
   for (var step = 0; step < MAX_NEW_TOKENS; step++) {
     var idsData = new BigInt64Array(inputIds.length);
@@ -180,10 +198,22 @@ async function describeImage(imagePath) {
     var vocabSize = logits.dims[2];
     var offset = (inputIds.length - 1) * vocabSize;
     var scores = logits.data.slice(offset, offset + vocabSize);
-    var nextToken = argmax(scores);
+
+    // Apply repetition penalty
+    var penalizedScores = new Float32Array(vocabSize);
+    for (var i = 0; i < vocabSize; i++) {
+      if (usedTokens.has(i)) {
+        penalizedScores[i] = scores[i] / 2;
+      } else {
+        penalizedScores[i] = scores[i];
+      }
+    }
+
+    var nextToken = argmax(penalizedScores);
 
     if (nextToken === tokenizer.sepId) break;
     generated.push(nextToken);
+    usedTokens.add(nextToken);
     inputIds.push(nextToken);
   }
 
@@ -197,6 +227,12 @@ async function describeImage(imagePath) {
     }
   }
   caption = caption.trim();
+
+  // Check for repetition and retry if needed
+  if (isRepetitive(caption, generated)) {
+    send({ type: "log", message: "Repetitive output detected, retrying (" + (retryCount + 1) + ")" });
+    return describeImage(imagePath, retryCount + 1);
+  }
 
   return caption || null;
 }
