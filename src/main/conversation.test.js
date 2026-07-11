@@ -1,15 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("path");
-const os = require("os");
+const { modelsDir } = require("./paths");
 
-const MODEL_PATH = path.join(
-  os.homedir(),
-  ".cache",
-  "icanhelp",
-  "models",
-  "Qwen_Qwen3.5-2B-Q4_K_M.gguf",
-);
+const MODEL_PATH = path.join(modelsDir(), "Qwen_Qwen3.5-2B-Q4_K_M.gguf");
 
 const SYSTEM_PROMPT =
   "You are a helpful assistant. Answer directly without reasoning.";

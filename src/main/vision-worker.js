@@ -1,17 +1,11 @@
 const ort = require("onnxruntime-node");
 const sharp = require("sharp");
 const path = require("path");
-const os = require("os");
 const fs = require("fs");
+const { visionModelDir } = require("./paths");
 
 const MODEL_ID = "ningpp/blip-image-captioning-base-ONNX";
-const CACHE_DIR = path.join(
-  os.homedir(),
-  ".cache",
-  "icanhelp",
-  "transformers",
-  "ningpp--blip",
-);
+const CACHE_DIR = visionModelDir();
 const HF_BASE = "https://huggingface.co/" + MODEL_ID + "/resolve/main";
 
 const FILES = [

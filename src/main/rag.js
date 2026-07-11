@@ -1,13 +1,8 @@
 const fs = require("fs");
 const path = require("path");
-const os = require("os");
+const { knowledgeFile } = require("./paths");
 
-const STORE_PATH = path.join(
-  os.homedir(),
-  ".cache",
-  "icanhelp",
-  "knowledge.json",
-);
+const STORE_PATH = knowledgeFile();
 
 let pipeline = null;
 let store = null;

@@ -3,7 +3,9 @@ const path = require("path");
 const os = require("os");
 const { execFile, execSync } = require("child_process");
 
-const MODELS_DIR = path.join(os.homedir(), ".cache", "icanhelp", "models");
+const { modelsDir } = require("./paths");
+
+const MODELS_DIR = modelsDir();
 
 function getSystemInfo() {
   var totalRam = os.totalmem();
@@ -277,4 +279,5 @@ module.exports = {
   getSystemInfo,
   getCompatibleModels,
   MODELS_DIR,
+  appPath,
 };

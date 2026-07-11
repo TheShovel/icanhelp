@@ -1,8 +1,4 @@
-const { createWorker } = require("tesseract.js");
-const { describeImage } = require("./vision");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
+const { appPath, ocrLog, tesseractCache } = require("./paths");
 
 const IMAGE_EXTENSIONS = new Set([
   ".png",
@@ -33,10 +29,10 @@ function isSupportedImage(imagePath) {
 
 function log(msg) {
   try {
-    var dir = path.join(os.homedir(), ".cache", "icanhelp");
+    var dir = appPath();
     fs.mkdirSync(dir, { recursive: true });
     fs.appendFileSync(
-      path.join(dir, "ocr.log"),
+      ocrLog(),
       new Date().toISOString() + " " + msg + "\n",
     );
   } catch {}
@@ -61,7 +57,7 @@ async function getWorker() {
   if (!workerPromise) {
     var generation = workerGeneration;
     workerPromise = createWorker("eng", 1, {
-      cachePath: path.join(os.homedir(), ".cache", "icanhelp", "tesseract"),
+      cachePath: tesseractCache(),
       logger: () => {},
     })
       .then(function (createdWorker) {

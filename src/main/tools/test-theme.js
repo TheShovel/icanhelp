@@ -1,14 +1,8 @@
 const path = require("path");
 const fs = require("fs");
-const os = require("os");
+const { modelsDir } = require("../paths");
 
-const MODEL_PATH = path.join(
-  os.homedir(),
-  ".cache",
-  "icanhelp",
-  "models",
-  "Qwen_Qwen3.5-2B-Q4_K_M.gguf",
-);
+const MODEL_PATH = path.join(modelsDir(), "Qwen_Qwen3.5-2B-Q4_K_M.gguf");
 const { tools, executeToolCall } = require("../tools/registry");
 
 const PROMPT =

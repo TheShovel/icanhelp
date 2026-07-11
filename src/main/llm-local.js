@@ -1,10 +1,10 @@
 const path = require("path");
 const fs = require("fs");
-const os = require("os");
 const { getSkillContext } = require("./skills");
+const { modelsDir } = require("./paths");
 
 function defaultModelPath() {
-  return path.join(os.homedir(), ".cache", "icanhelp", "models");
+  return modelsDir();
 }
 
 function defaultModelFile() {

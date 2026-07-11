@@ -1,5 +1,4 @@
 const path = require("path");
-const os = require("os");
 const fs = require("fs");
 const { fork } = require("child_process");
 
@@ -33,9 +32,11 @@ function emitAggregateProgress(status, pct) {
   progressCallback({ percent: pct, status: status });
 }
 
+const { appPath } = require("./paths");
+
 function log(msg) {
   try {
-    var dir = path.join(os.homedir(), ".cache", "icanhelp");
+    var dir = appPath();
     fs.mkdirSync(dir, { recursive: true });
     fs.appendFileSync(
       path.join(dir, "vision.log"),

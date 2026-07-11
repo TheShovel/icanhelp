@@ -50,6 +50,8 @@ const {
   supportedAttachmentExtensions,
 } = require("./attachments");
 const { searchKnowledge } = require("./rag");
+const { appPath, knowledgeFile, visionLog, ocrLog } =
+  require("./paths");
 const {
   loadAllSkills,
   getSkillInstructions,
@@ -545,10 +547,10 @@ function createWindow() {
   ipcMain.handle("reset-all-data", function () {
     const dirs = [
       path.join(os.homedir(), ".config", "icanhelp"),
-      path.join(os.homedir(), ".cache", "icanhelp", "models"),
-      path.join(os.homedir(), ".cache", "icanhelp", "knowledge.json"),
-      path.join(os.homedir(), ".cache", "icanhelp", "vision.log"),
-      path.join(os.homedir(), ".cache", "icanhelp", "ocr.log"),
+      appPath("models"),
+      knowledgeFile(),
+      visionLog(),
+      ocrLog(),
     ];
     var errors = [];
     for (var p of dirs) {
@@ -604,13 +606,13 @@ function createWindow() {
         folder = path.join(__dirname, "..", "..", ".agents", "skills");
         break;
       case "knowledge":
-        folder = path.join(os.homedir(), ".cache", "icanhelp");
+        folder = appPath();
         break;
       case "config":
         folder = path.join(os.homedir(), ".config", "icanhelp");
         break;
       case "models":
-        folder = path.join(os.homedir(), ".cache", "icanhelp", "models");
+        folder = appPath("models");
         break;
       case "buddy-art":
         folder = path.join(__dirname, "..", "..", "assets", "buddyArt");

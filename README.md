@@ -79,7 +79,7 @@ The AI assistant has a local RAG (Retrieval-Augmented Generation) knowledge base
 - `src/main/rag.js` - chunks, embeds (all-MiniLM-L6-v2), and performs cosine similarity search over the knowledge base
 - Auto-search in `src/main/main.js` injects relevant knowledge entries before every user prompt
 - The system prompt in `src/main/llm-local.js` instructs the model to always search before answering
-- Data persists to `~/.cache/icanhelp/knowledge.json`
+- Data persists to `~/.local/share/icanhelp/knowledge.json`
 
 ### Adding Knowledge
 
@@ -106,15 +106,16 @@ The screenshot feature tries these tools in order. Install at least one:
 
 ## Vision Model
 
-Downloads automatically on first launch (~950 MB, cached at `~/.cache/icanhelp/transformers/`). Uses local ONNX inference.
+Downloads automatically on first launch (~950 MB, cached at `~/.local/share/icanhelp/transformers/`). Uses local ONNX inference.
 
 ## Files
 
 - Config: `~/.config/icanhelp/config.enc` (encrypted)
-- Models: `~/.cache/icanhelp/models/`
-- Vision model cache: `~/.cache/icanhelp/transformers/`
-- Knowledge base: `~/.cache/icanhelp/knowledge.json`
-- Logs: `~/.cache/icanhelp/vision.log`, `ocr.log`
+- App data: `~/.local/share/icanhelp/` (models, knowledge base, vision model, logs)
+  - Models: `~/.local/share/icanhelp/models/`
+  - Vision model cache: `~/.local/share/icanhelp/transformers/`
+  - Knowledge base: `~/.local/share/icanhelp/knowledge.json`
+  - Logs: `~/.local/share/icanhelp/vision.log`, `ocr.log`
 
 ## Dev
 
