@@ -54,6 +54,8 @@ removeAttachment.innerHTML = iconSvg("close", 14);
 
 let currentAttachment = null;
 let attachmentToken = 0;
+let selectedBackend = "gpu";
+let isSetupScreen = false;
 var toolFilePaths = [];
 
 function renderAttachment() {
@@ -809,11 +811,12 @@ window.electronAPI.onModelDownloadProgress(function (info) {
   chatPanel.classList.add("hidden");
   sendBtn.classList.add("hidden");
 
-  var sysInfo = await window.electronAPI.getSystemInfo();
-  var allModels = await window.electronAPI.getRecommendedModels();
-  var compatModels = await window.electronAPI.getCompatibleModels();
+    isSetupScreen = true;
+    var sysInfo = await window.electronAPI.getSystemInfo();
+    var allModels = await window.electronAPI.getRecommendedModels();
+    var compatModels = await window.electronAPI.getCompatibleModels();
 
-  renderModelPicker(allModels, compatModels, sysInfo);
+    renderModelPicker(allModels, compatModels, sysInfo);
 })();
 
 function renderModelPicker(allModels, compatModels, sysInfo) {
@@ -830,21 +833,88 @@ function renderModelPicker(allModels, compatModels, sysInfo) {
   }
 
   var ramNote = document.createElement("p");
-  ramNote.id = "install-ram-note";
-  ramNote.textContent =
-    "System: " +
-    sysInfo.totalRamGB +
-    " GB RAM" +
-    (sysInfo.freeRamGB < sysInfo.totalRamGB
-      ? " (" + sysInfo.freeRamGB + " GB free)"
-      : "") +
-    " · " +
-    sysInfo.cpuCores +
-    " cores · " +
-    sysInfo.gpuInfo;
-  installModelList.appendChild(ramNote);
+    ramNote.id = "install-ram-note";
+    ramNote.textContent =
+      "System: " +
+      sysInfo.totalRamGB +
+      " GB RAM" +
+      (sysInfo.freeRamGB < sysInfo.totalRamGB
+        ? " (" + sysInfo.freeRamGB + " GB free)"
+        : "") +
+      " · " +
+      sysInfo.cpuCores +
+      " cores · " +
+      sysInfo.gpuInfo +
+      (sysInfo.gpuVramGB > 0 ? " (" + sysInfo.gpuVramGB.toFixed(1) + " GB VRAM)" : "");
+    installModelList.appendChild(ramNote);
 
-  var hasCompatible = false;
+    var gpuVramGB = sysInfo.gpuVramGB || 0;
+    var gpuAvailable = gpuVramGB >= 7.5;
+    if (!gpuAvailable) selectedBackend = "cpu";
+
+    var backendWrap = document.createElement("div");
+    backendWrap.className = "backend-selector";
+
+    var backendTitle = document.createElement("p");
+    backendTitle.className = "backend-title";
+    backendTitle.textContent = "Run model on:";
+    backendWrap.appendChild(backendTitle);
+
+    var backendOptions = document.createElement("div");
+    backendOptions.className = "backend-options";
+
+    var gpuBtn = document.createElement("button");
+    gpuBtn.type = "button";
+    gpuBtn.className =
+      "backend-option" + (selectedBackend === "gpu" ? " selected" : "");
+    gpuBtn.disabled = !gpuAvailable;
+    gpuBtn.innerHTML =
+      '<span class="backend-name">GPU' +
+      (gpuAvailable ? '<span class="install-model-badge">Recommended</span>' : "") +
+      "</span>" +
+      '<span class="backend-desc">Uses VRAM. Faster responses, but needs ≥8 GB VRAM.</span>';
+    if (!gpuAvailable) {
+      var gpuWarn = document.createElement("span");
+      gpuWarn.className = "backend-warn";
+      gpuWarn.textContent =
+        "Disabled: only " +
+        gpuVramGB.toFixed(1) +
+        " GB VRAM detected (need ≥8 GB)";
+      gpuBtn.appendChild(gpuWarn);
+    }
+    function selectBackend(backend) {
+      if (selectedBackend === backend) return;
+      selectedBackend = backend;
+      gpuBtn.classList.toggle("selected", backend === "gpu");
+      cpuBtn.classList.toggle("selected", backend === "cpu");
+      var config = { gpuLayers: backend === "gpu" ? "max" : 0 };
+      window.electronAPI.saveConfig(config).then(function () {
+        if (!isSetupScreen) window.electronAPI.restartApp();
+      });
+    }
+    gpuBtn.addEventListener("click", function () {
+      selectBackend("gpu");
+    });
+    backendOptions.appendChild(gpuBtn);
+
+    var cpuBtn = document.createElement("button");
+    cpuBtn.type = "button";
+    cpuBtn.className =
+      "backend-option" + (selectedBackend === "cpu" ? " selected" : "");
+    cpuBtn.innerHTML =
+      '<span class="backend-name">CPU' +
+      (gpuAvailable ? "" : '<span class="install-model-badge">Recommended</span>') +
+      "</span>" +
+      '<span class="backend-desc">Uses RAM. Works everywhere, but slower than GPU.</span>';
+    cpuBtn.addEventListener("click", function () {
+      selectBackend("cpu");
+    });
+    backendOptions.appendChild(cpuBtn);
+
+    backendWrap.appendChild(backendOptions);
+    installModelList.appendChild(backendWrap);
+
+    var hasCompatible = false;
   for (var i = 0; i < allModels.length; i++) {
     var m = allModels[i];
     var isCompatible = !!compatIds[m.id];
@@ -931,15 +1001,23 @@ async function openModelPicker() {
   installPct.classList.add("hidden");
   installSize.classList.add("hidden");
   installScreen.classList.remove("hidden");
-  chatPanel.classList.add("hidden");
+    chatPanel.classList.add("hidden");
 
-  window.electronAPI.resizeWindow(340, 580);
+    isSetupScreen = false;
+    window.electronAPI.resizeWindow(340, 580);
 
-  var sysInfo = await window.electronAPI.getSystemInfo();
-  var allModels = await window.electronAPI.getRecommendedModels();
-  var compatModels = await window.electronAPI.getCompatibleModels();
+    var sysInfo = await window.electronAPI.getSystemInfo();
+    var allModels = await window.electronAPI.getRecommendedModels();
+    var compatModels = await window.electronAPI.getCompatibleModels();
 
-  renderModelPicker(allModels, compatModels, sysInfo);
+    try {
+      var saved = await window.electronAPI.getConfig();
+      if (saved && saved.gpuLayers != null) {
+        selectedBackend = saved.gpuLayers === "max" ? "gpu" : "cpu";
+      }
+    } catch (_) {}
+
+    renderModelPicker(allModels, compatModels, sysInfo);
 }
 
 function closeModelPicker() {
@@ -978,8 +1056,9 @@ async function startModelDownload(modelId, modelName) {
   }
 
   var config = {
-    modelPath: result.path,
-  };
+      modelPath: result.path,
+      gpuLayers: selectedBackend === "gpu" ? "max" : 0,
+    };
   await window.electronAPI.saveConfig(config);
 
   installScreen.classList.add("hidden");

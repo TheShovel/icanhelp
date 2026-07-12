@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
   openFile: (filePath) => ipcRenderer.invoke("open-file", filePath),
   quitApp: () => ipcRenderer.send("quit-app"),
+  restartApp: () => ipcRenderer.send("restart-app"),
   onVisionProgress: (callback) => {
     const handler = (_event, info) => callback(info);
     ipcRenderer.on("vision-download-progress", handler);

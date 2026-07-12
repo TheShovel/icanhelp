@@ -159,6 +159,74 @@
     margin-top: 2px;
 }
 
+.backend-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 0 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.backend-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--fg-dim);
+    margin: 0;
+}
+
+.backend-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.backend-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--fg);
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.backend-option:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+
+.backend-option.selected {
+    border-color: var(--accent);
+    background: var(--bg-list-item-active);
+}
+
+.backend-option:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.backend-name {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.backend-desc {
+    font-size: 10px;
+    color: var(--fg-muted);
+}
+
+.backend-warn {
+    font-size: 10px;
+    color: var(--danger);
+    margin-top: 2px;
+}
 .install-model-top {
     display: flex;
     align-items: center;
@@ -167,6 +235,8 @@
 }
 
 .install-model-badge {
+    display: inline-flex;
+    align-items: center;
     font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
@@ -177,6 +247,8 @@
     color: var(--accent-fg);
     line-height: 1.4;
     flex-shrink: 0;
+    margin-left: 6px;
+    vertical-align: middle;
 }
 
 .install-model-meta {
@@ -687,9 +759,10 @@ body {
     font-size: 13px;
     line-height: 1.4;
     word-wrap: break-word;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
     word-break: break-word;
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
     user-select: text;
     -webkit-user-select: text;
@@ -931,6 +1004,8 @@ body {
     margin: 4px 0;
     border-left: 2px solid var(--tool-border);
     padding-left: 8px;
+    max-width: 100%;
+    overflow-x: hidden;
 }
 .tool-block.tool-working {
     animation: tool-working-pulse 0.8s ease infinite;
@@ -945,6 +1020,11 @@ body {
     display: flex;
     align-items: center;
     gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    word-break: break-all;
+    overflow-wrap: anywhere;
 }
 
 .tool-header:hover {
@@ -968,6 +1048,9 @@ body {
     max-height: 500px;
     opacity: 1;
     overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-width: 100%;
 }
 
 .tool-block.collapsed .tool-content {
@@ -986,9 +1069,13 @@ body {
     color: var(--tool-text-fg);
     white-space: pre-wrap;
     word-break: break-word;
+    overflow-wrap: anywhere;
     overflow: hidden;
     user-select: text;
     -webkit-user-select: text;
+    max-height: 240px;
+    overflow-y: auto;
+    max-width: 100%;
 }
 
 .tool-output {
@@ -1002,9 +1089,13 @@ body {
     color: var(--fg-dim);
     white-space: pre-wrap;
     word-break: break-word;
+    overflow-wrap: anywhere;
     overflow: hidden;
     user-select: text;
     -webkit-user-select: text;
+    max-height: 240px;
+    overflow-y: auto;
+    max-width: 100%;
 }
 
 /* ---- File Tool Capsules ---- */
@@ -1026,6 +1117,7 @@ body {
     color: var(--accent);
     cursor: pointer;
     user-select: none;
+    min-width: 0;
     transition:
         background 0.15s,
         border-color 0.15s;

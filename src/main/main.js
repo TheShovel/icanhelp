@@ -413,6 +413,7 @@ function createWindow() {
       ? {
           modelPath: cfg.modelPath || "",
           batchSize: cfg.batchSize || 512,
+          gpuLayers: cfg.gpuLayers != null ? cfg.gpuLayers : "max",
         }
       : null;
   });
@@ -602,6 +603,11 @@ function createWindow() {
   }
 
   ipcMain.on("quit-app", () => app.quit());
+
+  ipcMain.on("restart-app", () => {
+    app.relaunch({ args: process.argv.slice(1) });
+    app.quit();
+  });
 
   ipcMain.handle("open-file", async (_event, filePath) => {
     return await shell.openPath(filePath);

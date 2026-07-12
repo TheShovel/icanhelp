@@ -7,6 +7,68 @@ const { modelsDir } = require("./paths");
 
 const MODELS_DIR = modelsDir();
 
+function detectGpu() {
+  var info = "Unknown";
+  var vramBytes = 0;
+
+  try {
+    var nvidiaOut = execSync(
+      "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader",
+      { timeout: 5000, encoding: "utf-8" },
+    ).trim();
+    if (nvidiaOut) {
+      info = "NVIDIA: " + nvidiaOut;
+      var m = nvidiaOut.match(/([\d.]+)\s*MiB/i);
+      if (m) vramBytes = parseFloat(m[1]) * 1024 * 1024;
+    }
+  } catch (_) {}
+
+  if (info === "Unknown") {
+    try {
+      var drmDir = "/sys/class/drm";
+      if (fs.existsSync(drmDir)) {
+        var cards = fs
+          .readdirSync(drmDir)
+          .filter(function (f) {
+            return /^card\d+$/.test(f);
+          })
+          .sort();
+        var names = [];
+        for (var i = 0; i < cards.length; i++) {
+          var devDir = path.join(drmDir, cards[i], "device");
+          var vendorFile = path.join(devDir, "vendor");
+          var ueventFile = path.join(devDir, "uevent");
+          var label = "GPU";
+          try {
+            var ven = fs.readFileSync(vendorFile, "utf-8").trim();
+            if (ven === "0x1002" || ven === "0x1022") label = "AMD GPU";
+            else if (ven === "0x8086" || ven === "0x8087") label = "Intel GPU";
+            else if (ven === "0x10de") label = "NVIDIA GPU";
+          } catch (_) {}
+          try {
+            var uev = fs.readFileSync(ueventFile, "utf-8");
+            var drmMatch = uev.match(/DRIVER=(\w+)/);
+            if (drmMatch && drmMatch[1] !== "")
+              label += " (" + drmMatch[1] + ")";
+          } catch (_) {}
+          names.push(label);
+
+          var totalFile = path.join(devDir, "mem_info_vram_total");
+          if (fs.existsSync(totalFile)) {
+            try {
+              var bytes = parseInt(fs.readFileSync(totalFile, "utf-8").trim(), 10);
+              if (bytes > vramBytes) vramBytes = bytes;
+            } catch (_) {}
+          }
+        }
+        if (names.length > 0) info = names.join(", ");
+      }
+    } catch (_) {}
+  }
+
+  return { info: info, vramBytes: vramBytes };
+}
+
 function getSystemInfo() {
   var totalRam = os.totalmem();
   var freeRam = os.freemem();
@@ -16,30 +78,15 @@ function getSystemInfo() {
   var cpuModel = os.cpus()[0] ? os.cpus()[0].model : "Unknown";
 
   var gpuInfo = "Unknown";
+  var gpuVramBytes = 0;
   try {
-    var nvidiaOut = execSync(
-      "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader",
-      {
-        timeout: 5000,
-        encoding: "utf-8",
-      },
-    ).trim();
-    if (nvidiaOut) gpuInfo = "NVIDIA: " + nvidiaOut;
+    var gpu = detectGpu();
+    gpuInfo = gpu.info;
+    gpuVramBytes = gpu.vramBytes;
   } catch (_) {}
 
-  if (gpuInfo === "Unknown") {
-    try {
-      var drmDir = "/sys/class/drm";
-      if (fs.existsSync(drmDir)) {
-        var cards = fs.readdirSync(drmDir).filter(function (f) {
-          return /^card\d+$/.test(f);
-        });
-        if (cards.length > 0) gpuInfo = cards.length + " GPU(s) detected";
-      }
-    } catch (_) {}
-  }
-
   var usableRamGB = parseFloat(freeRamGB);
+  var gpuVramGB = gpuVramBytes / (1024 * 1024 * 1024);
 
   return {
     totalRamGB: parseFloat(totalRamGB),
@@ -47,6 +94,7 @@ function getSystemInfo() {
     cpuCores: cpuCores,
     cpuModel: cpuModel,
     gpuInfo: gpuInfo,
+    gpuVramGB: gpuVramGB,
   };
 }
 

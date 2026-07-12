@@ -15,15 +15,21 @@ function defaultModelFile() {
 var cachedModel = null;
 var cachedLlama = null;
 var cachedModelPath = null;
+var cachedGpuLayers = null;
 
 async function getOrLoadModel(resolvedPath, config) {
-  if (cachedModel && cachedModelPath === resolvedPath) {
-    console.log("[llm-local] Reusing cached model");
+  var gpuLayers = config && config.gpuLayers != null ? config.gpuLayers : "max";
+  if (
+    cachedModel &&
+    cachedModelPath === resolvedPath &&
+    cachedGpuLayers === gpuLayers
+  ) {
+    console.log("[llm-local] Reusing cached model (backend: " + gpuLayers + ")");
     return { model: cachedModel, llama: cachedLlama };
   }
 
   if (cachedModel) {
-    console.log("[llm-local] Disposing old model (path changed)");
+    console.log("[llm-local] Disposing old model (backend changed)");
     cachedModel.dispose();
     cachedModel = null;
     cachedLlama = null;
@@ -33,11 +39,10 @@ async function getOrLoadModel(resolvedPath, config) {
   cachedLlama = await getLlama();
   cachedModel = await cachedLlama.loadModel({
       modelPath: resolvedPath,
-      // "max" offloads as many layers as fit in VRAM and keeps the
-      // remainder in system RAM when there isn't enough VRAM.
-      gpuLayers: "max",
+      gpuLayers: gpuLayers,
     });
   cachedModelPath = resolvedPath;
+  cachedGpuLayers = gpuLayers;
   return { model: cachedModel, llama: cachedLlama };
 }
 
@@ -506,15 +511,21 @@ async function runLocalChatLoop({
 
 function disposeModel() {
   if (cachedModel) {
-    cachedModel.dispose();
+    try {
+      cachedModel.dispose();
+    } catch (e) {
+      console.error("[llm-local] dispose failed:", e && e.message);
+    }
     cachedModel = null;
     cachedLlama = null;
     cachedModelPath = null;
+    cachedGpuLayers = null;
   }
 }
 
 async function preloadModel(modelPath, config, onProgress) {
-  if (cachedModel && cachedModelPath === modelPath) {
+  var gpuLayers = config && config.gpuLayers != null ? config.gpuLayers : "max";
+  if (cachedModel && cachedModelPath === modelPath && cachedGpuLayers === gpuLayers) {
     if (onProgress) onProgress({ stage: "done" });
     return;
   }
