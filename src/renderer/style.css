@@ -1941,6 +1941,26 @@ body {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     animation: slideUp 0.12s ease;
 }
+#resize-handle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    z-index: 30;
+}
+#resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 7px;
+    height: 7px;
+    border-left: 2px solid var(--fg-muted);
+    border-top: 2px solid var(--fg-muted);
+}
+
 #attach-menu.hidden {
     display: none;
 }

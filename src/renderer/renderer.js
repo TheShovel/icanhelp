@@ -36,6 +36,7 @@ const installSubtitle = document.getElementById("install-subtitle");
 const installTitle = document.getElementById("install-title");
 const installBack = document.getElementById("install-back");
 const installModelList = document.getElementById("install-model-list");
+const resizeHandle = document.getElementById("resize-handle");
 
 avatarInner.src = window.electronAPI.buddyArt("idle");
 installAvatar.src = window.electronAPI.buddyArt("idle");
@@ -287,6 +288,12 @@ let dragStartX = 0;
 let dragStartY = 0;
 let conversation = [];
 let isProcessing = false;
+let lastChatSize = { width: 400, height: 550 };
+let isResizing = false;
+let resizeStartX = 0;
+let resizeStartY = 0;
+let resizeStartW = 0;
+let resizeStartH = 0;
 
 function setAvatarState(state) {
   var img = avatarInner;
@@ -319,6 +326,29 @@ document.addEventListener("mouseup", () => {
     isDragging = false;
     avatar.style.cursor = "pointer";
   }
+  if (isResizing) {
+    isResizing = false;
+    document.body.style.cursor = "";
+  }
+});
+
+resizeHandle.addEventListener("mousedown", function (e) {
+  isResizing = true;
+  resizeStartX = e.screenX;
+  resizeStartY = e.screenY;
+  resizeStartW = window.innerWidth;
+  resizeStartH = window.innerHeight;
+  document.body.style.cursor = "nwse-resize";
+  e.preventDefault();
+});
+
+document.addEventListener("mousemove", function (e) {
+  if (!isResizing) return;
+  var newW = Math.max(300, resizeStartW + (resizeStartX - e.screenX));
+  var newH = Math.max(400, resizeStartH + (resizeStartY - e.screenY));
+  lastChatSize.width = newW;
+  lastChatSize.height = newH;
+  window.electronAPI.resizeWindow(newW, newH);
 });
 
 // --- Chat Management ---
@@ -491,7 +521,7 @@ document
 function togglePanel() {
   chatOpen = !chatOpen;
   if (chatOpen) {
-    window.electronAPI.resizeWindow(400, 550);
+    window.electronAPI.resizeWindow(lastChatSize.width, lastChatSize.height);
     chatPanel.classList.remove("hidden");
     setTimeout(function () {
       chatInput.focus();
