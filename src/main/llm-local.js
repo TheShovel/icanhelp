@@ -81,7 +81,7 @@ function buildSystemPrompt() {
     "  creative (writing, photography, drawing, music, video editing), earth & space, and green living.",
     "",
     "## Tool Usage",
-    "- Use search_web() for current/live information (news, weather, latest docs).",
+    "- Use search_web() for current/live information (news, weather, latest docs). ALWAYS cite your sources with direct links from the search results.",
     "- Use run_bash() to execute commands on the user's Linux system.",
     "- Use store_knowledge() when the user teaches you something new.",
     "- Use search_knowledge() before guessing. Look it up first.",
