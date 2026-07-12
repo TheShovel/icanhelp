@@ -57,6 +57,7 @@ let attachmentToken = 0;
 let selectedBackend = "gpu";
 let isSetupScreen = false;
 var toolFilePaths = [];
+var webSources = [];
 
 function renderAttachment() {
   attachmentPreview.classList.remove("loading", "ready", "error");
@@ -811,12 +812,12 @@ window.electronAPI.onModelDownloadProgress(function (info) {
   chatPanel.classList.add("hidden");
   sendBtn.classList.add("hidden");
 
-    isSetupScreen = true;
-    var sysInfo = await window.electronAPI.getSystemInfo();
-    var allModels = await window.electronAPI.getRecommendedModels();
-    var compatModels = await window.electronAPI.getCompatibleModels();
+  isSetupScreen = true;
+  var sysInfo = await window.electronAPI.getSystemInfo();
+  var allModels = await window.electronAPI.getRecommendedModels();
+  var compatModels = await window.electronAPI.getCompatibleModels();
 
-    renderModelPicker(allModels, compatModels, sysInfo);
+  renderModelPicker(allModels, compatModels, sysInfo);
 })();
 
 function renderModelPicker(allModels, compatModels, sysInfo) {
@@ -833,88 +834,94 @@ function renderModelPicker(allModels, compatModels, sysInfo) {
   }
 
   var ramNote = document.createElement("p");
-    ramNote.id = "install-ram-note";
-    ramNote.textContent =
-      "System: " +
-      sysInfo.totalRamGB +
-      " GB RAM" +
-      (sysInfo.freeRamGB < sysInfo.totalRamGB
-        ? " (" + sysInfo.freeRamGB + " GB free)"
-        : "") +
-      " · " +
-      sysInfo.cpuCores +
-      " cores · " +
-      sysInfo.gpuInfo +
-      (sysInfo.gpuVramGB > 0 ? " (" + sysInfo.gpuVramGB.toFixed(1) + " GB VRAM)" : "");
-    installModelList.appendChild(ramNote);
+  ramNote.id = "install-ram-note";
+  ramNote.textContent =
+    "System: " +
+    sysInfo.totalRamGB +
+    " GB RAM" +
+    (sysInfo.freeRamGB < sysInfo.totalRamGB
+      ? " (" + sysInfo.freeRamGB + " GB free)"
+      : "") +
+    " · " +
+    sysInfo.cpuCores +
+    " cores · " +
+    sysInfo.gpuInfo +
+    (sysInfo.gpuVramGB > 0
+      ? " (" + sysInfo.gpuVramGB.toFixed(1) + " GB VRAM)"
+      : "");
+  installModelList.appendChild(ramNote);
 
-    var gpuVramGB = sysInfo.gpuVramGB || 0;
-    var gpuAvailable = gpuVramGB >= 7.5;
-    if (!gpuAvailable) selectedBackend = "cpu";
+  var gpuVramGB = sysInfo.gpuVramGB || 0;
+  var gpuAvailable = gpuVramGB >= 7.5;
+  if (!gpuAvailable) selectedBackend = "cpu";
 
-    var backendWrap = document.createElement("div");
-    backendWrap.className = "backend-selector";
+  var backendWrap = document.createElement("div");
+  backendWrap.className = "backend-selector";
 
-    var backendTitle = document.createElement("p");
-    backendTitle.className = "backend-title";
-    backendTitle.textContent = "Run model on:";
-    backendWrap.appendChild(backendTitle);
+  var backendTitle = document.createElement("p");
+  backendTitle.className = "backend-title";
+  backendTitle.textContent = "Run model on:";
+  backendWrap.appendChild(backendTitle);
 
-    var backendOptions = document.createElement("div");
-    backendOptions.className = "backend-options";
+  var backendOptions = document.createElement("div");
+  backendOptions.className = "backend-options";
 
-    var gpuBtn = document.createElement("button");
-    gpuBtn.type = "button";
-    gpuBtn.className =
-      "backend-option" + (selectedBackend === "gpu" ? " selected" : "");
-    gpuBtn.disabled = !gpuAvailable;
-    gpuBtn.innerHTML =
-      '<span class="backend-name">GPU' +
-      (gpuAvailable ? '<span class="install-model-badge">Recommended</span>' : "") +
-      "</span>" +
-      '<span class="backend-desc">Uses VRAM. Faster responses, but needs ≥8 GB VRAM.</span>';
-    if (!gpuAvailable) {
-      var gpuWarn = document.createElement("span");
-      gpuWarn.className = "backend-warn";
-      gpuWarn.textContent =
-        "Disabled: only " +
-        gpuVramGB.toFixed(1) +
-        " GB VRAM detected (need ≥8 GB)";
-      gpuBtn.appendChild(gpuWarn);
-    }
-    function selectBackend(backend) {
-      if (selectedBackend === backend) return;
-      selectedBackend = backend;
-      gpuBtn.classList.toggle("selected", backend === "gpu");
-      cpuBtn.classList.toggle("selected", backend === "cpu");
-      var config = { gpuLayers: backend === "gpu" ? "max" : 0 };
-      window.electronAPI.saveConfig(config).then(function () {
-        if (!isSetupScreen) window.electronAPI.restartApp();
-      });
-    }
-    gpuBtn.addEventListener("click", function () {
-      selectBackend("gpu");
+  var gpuBtn = document.createElement("button");
+  gpuBtn.type = "button";
+  gpuBtn.className =
+    "backend-option" + (selectedBackend === "gpu" ? " selected" : "");
+  gpuBtn.disabled = !gpuAvailable;
+  gpuBtn.innerHTML =
+    '<span class="backend-name">GPU' +
+    (gpuAvailable
+      ? '<span class="install-model-badge">Recommended</span>'
+      : "") +
+    "</span>" +
+    '<span class="backend-desc">Uses VRAM. Faster responses, but needs ≥8 GB VRAM.</span>';
+  if (!gpuAvailable) {
+    var gpuWarn = document.createElement("span");
+    gpuWarn.className = "backend-warn";
+    gpuWarn.textContent =
+      "Disabled: only " +
+      gpuVramGB.toFixed(1) +
+      " GB VRAM detected (need ≥8 GB)";
+    gpuBtn.appendChild(gpuWarn);
+  }
+  function selectBackend(backend) {
+    if (selectedBackend === backend) return;
+    selectedBackend = backend;
+    gpuBtn.classList.toggle("selected", backend === "gpu");
+    cpuBtn.classList.toggle("selected", backend === "cpu");
+    var config = { gpuLayers: backend === "gpu" ? "max" : 0 };
+    window.electronAPI.saveConfig(config).then(function () {
+      if (!isSetupScreen) window.electronAPI.restartApp();
     });
-    backendOptions.appendChild(gpuBtn);
+  }
+  gpuBtn.addEventListener("click", function () {
+    selectBackend("gpu");
+  });
+  backendOptions.appendChild(gpuBtn);
 
-    var cpuBtn = document.createElement("button");
-    cpuBtn.type = "button";
-    cpuBtn.className =
-      "backend-option" + (selectedBackend === "cpu" ? " selected" : "");
-    cpuBtn.innerHTML =
-      '<span class="backend-name">CPU' +
-      (gpuAvailable ? "" : '<span class="install-model-badge">Recommended</span>') +
-      "</span>" +
-      '<span class="backend-desc">Uses RAM. Works everywhere, but slower than GPU.</span>';
-    cpuBtn.addEventListener("click", function () {
-      selectBackend("cpu");
-    });
-    backendOptions.appendChild(cpuBtn);
+  var cpuBtn = document.createElement("button");
+  cpuBtn.type = "button";
+  cpuBtn.className =
+    "backend-option" + (selectedBackend === "cpu" ? " selected" : "");
+  cpuBtn.innerHTML =
+    '<span class="backend-name">CPU' +
+    (gpuAvailable
+      ? ""
+      : '<span class="install-model-badge">Recommended</span>') +
+    "</span>" +
+    '<span class="backend-desc">Uses RAM. Works everywhere, but slower than GPU.</span>';
+  cpuBtn.addEventListener("click", function () {
+    selectBackend("cpu");
+  });
+  backendOptions.appendChild(cpuBtn);
 
-    backendWrap.appendChild(backendOptions);
-    installModelList.appendChild(backendWrap);
+  backendWrap.appendChild(backendOptions);
+  installModelList.appendChild(backendWrap);
 
-    var hasCompatible = false;
+  var hasCompatible = false;
   for (var i = 0; i < allModels.length; i++) {
     var m = allModels[i];
     var isCompatible = !!compatIds[m.id];
@@ -1001,23 +1008,23 @@ async function openModelPicker() {
   installPct.classList.add("hidden");
   installSize.classList.add("hidden");
   installScreen.classList.remove("hidden");
-    chatPanel.classList.add("hidden");
+  chatPanel.classList.add("hidden");
 
-    isSetupScreen = false;
-    window.electronAPI.resizeWindow(340, 580);
+  isSetupScreen = false;
+  window.electronAPI.resizeWindow(340, 580);
 
-    var sysInfo = await window.electronAPI.getSystemInfo();
-    var allModels = await window.electronAPI.getRecommendedModels();
-    var compatModels = await window.electronAPI.getCompatibleModels();
+  var sysInfo = await window.electronAPI.getSystemInfo();
+  var allModels = await window.electronAPI.getRecommendedModels();
+  var compatModels = await window.electronAPI.getCompatibleModels();
 
-    try {
-      var saved = await window.electronAPI.getConfig();
-      if (saved && saved.gpuLayers != null) {
-        selectedBackend = saved.gpuLayers === "max" ? "gpu" : "cpu";
-      }
-    } catch (_) {}
+  try {
+    var saved = await window.electronAPI.getConfig();
+    if (saved && saved.gpuLayers != null) {
+      selectedBackend = saved.gpuLayers === "max" ? "gpu" : "cpu";
+    }
+  } catch (_) {}
 
-    renderModelPicker(allModels, compatModels, sysInfo);
+  renderModelPicker(allModels, compatModels, sysInfo);
 }
 
 function closeModelPicker() {
@@ -1056,9 +1063,9 @@ async function startModelDownload(modelId, modelName) {
   }
 
   var config = {
-      modelPath: result.path,
-      gpuLayers: selectedBackend === "gpu" ? "max" : 0,
-    };
+    modelPath: result.path,
+    gpuLayers: selectedBackend === "gpu" ? "max" : 0,
+  };
   await window.electronAPI.saveConfig(config);
 
   installScreen.classList.add("hidden");
@@ -1109,6 +1116,7 @@ async function sendMessage() {
   var responseContent = null;
   var buffer = "";
   var thinkingBuf = "";
+  webSources = [];
 
   sendBtn.classList.add("hidden");
   cancelBtn.classList.remove("hidden");
@@ -1177,11 +1185,16 @@ async function sendMessage() {
         }, 600);
       }
       var chat = getCurrentChat();
+      var sourcesToRender = webSources.slice();
+      webSources = [];
       toolFilePaths = [];
       if (chat) {
         chat.messages.push({ role: "assistant", content: buffer });
         chat.updatedAt = Date.now();
         saveChatsToStore();
+      }
+      if (sourcesToRender.length > 0) {
+        renderCitations(bubble, sourcesToRender);
       }
       return;
     }
@@ -1236,6 +1249,7 @@ async function sendMessage() {
           window.electronAPI.openFile(filePath);
         });
       } else if (toolName === "search_web") {
+        toolBlock.dataset.toolName = "search_web";
         var query = args.query || "search";
         toolHeader.innerHTML = iconSvg("search", 14) + " " + query;
         toolHeader.addEventListener("click", function () {
@@ -1284,6 +1298,29 @@ async function sendMessage() {
         var tcEnd = tbEnd.querySelector(".tool-content");
         if (tcEnd) {
           var existingOut = tcEnd.querySelector(".tool-output");
+
+          // Extract web sources from search_web results
+          if (tbEnd.dataset.toolName === "search_web" && !existingOut) {
+            try {
+              var results = JSON.parse(chunk.tool_end.output);
+              if (Array.isArray(results)) {
+                results.forEach(function (r) {
+                  if (
+                    r.url &&
+                    !webSources.some(function (s) {
+                      return s.url === r.url;
+                    })
+                  ) {
+                    webSources.push({
+                      url: r.url,
+                      title: r.title || r.url,
+                    });
+                  }
+                });
+              }
+            } catch (e) {}
+          }
+
           if (!existingOut) {
             var out = document.createElement("div");
             out.className = "tool-output";
@@ -1580,6 +1617,81 @@ async function renderContent(el, text) {
     el.innerHTML = await window.electronAPI.parseMarkdown(text);
   } catch (e) {
     el.textContent = text;
+  }
+}
+
+function renderCitations(bubble, sources) {
+  var citationsContainer = document.createElement("div");
+  citationsContainer.className = "citations-container collapsed";
+
+  var citationsLabel = document.createElement("div");
+  citationsLabel.className = "citations-label";
+  citationsLabel.innerHTML = iconSvg("globe", 14) + " Sources";
+  citationsLabel.addEventListener("click", function () {
+    citationsContainer.classList.toggle("collapsed");
+  });
+  citationsContainer.appendChild(citationsLabel);
+
+  var citationsList = document.createElement("div");
+  citationsList.className = "citations-list";
+
+  sources.forEach(function (source, index) {
+    var citation = document.createElement("a");
+    citation.className = "citation-item";
+    citation.href = source.url;
+    citation.target = "_blank";
+    citation.rel = "noopener noreferrer";
+
+    var favicon = document.createElement("img");
+    favicon.className = "citation-favicon";
+    favicon.src = getFaviconUrl(source.url);
+    favicon.alt = "";
+    favicon.width = 16;
+    favicon.height = 16;
+
+    var title = document.createElement("span");
+    title.className = "citation-title";
+    title.textContent = getDomain(source.url);
+    title.title = source.title || source.url;
+
+    citation.appendChild(favicon);
+    citation.appendChild(title);
+
+    // When collapsed, only show first 4 sources; show + indicator if more
+    if (index >= 4) {
+      citation.classList.add("citation-item-extra");
+    }
+
+    citationsList.appendChild(citation);
+  });
+
+  // Add + indicator if more than 4 sources
+  if (sources.length > 4) {
+    var moreIndicator = document.createElement("span");
+    moreIndicator.className = "citation-more";
+    moreIndicator.textContent = "+" + (sources.length - 4);
+    citationsList.appendChild(moreIndicator);
+  }
+
+  citationsContainer.appendChild(citationsList);
+  bubble.appendChild(citationsContainer);
+}
+
+function getFaviconUrl(url) {
+  var domain = getDomain(url);
+  return (
+    "https://www.google.com/s2/favicons?domain=" +
+    encodeURIComponent(domain) +
+    "&sz=16"
+  );
+}
+
+function getDomain(url) {
+  try {
+    var hostname = new URL(url).hostname;
+    return hostname.replace(/^www\./, "");
+  } catch (e) {
+    return url;
   }
 }
 

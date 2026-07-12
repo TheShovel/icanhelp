@@ -1158,6 +1158,101 @@ body {
     color: var(--accent-hover);
 }
 
+/* ---- Citations ---- */
+.citations-container {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.citations-container.collapsed .citation-item-extra,
+.citations-container.collapsed .citation-more {
+    display: none;
+}
+
+.citations-container.collapsed .citation-item {
+    padding: 3px;
+}
+
+.citations-container.collapsed .citation-title {
+    display: none;
+}
+
+.citations-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--fg-dim);
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+
+.citations-label:hover {
+    opacity: 0.8;
+}
+
+.citations-label::after {
+    content: "▼";
+    font-size: 9px;
+    transition: transform 0.15s;
+}
+
+.citations-container.collapsed .citations-label::after {
+    transform: rotate(-90deg);
+}
+
+.citations-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.citation-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--bg-tool);
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 12px;
+    color: var(--fg-dim);
+    transition: background 0.15s, color 0.15s;
+}
+
+.citation-item:hover {
+    background: var(--accent);
+    color: var(--accent-fg);
+}
+
+.citation-favicon {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.citation-title {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+
+.citation-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: var(--bg-tool);
+    border-radius: 12px;
+    font-size: 10px;
+    color: var(--fg-dim);
+}
+
 /* ---- Markdown Content ---- */
 .message .bubble pre {
     margin: 4px 0;
