@@ -71,7 +71,7 @@ function buildSystemPrompt() {
     "## Knowledge Base Rules",
     "- BEFORE answering any question, ALWAYS call search_knowledge() to find relevant information.",
     "- If search_knowledge returns results, use them to inform your answer.",
-    "- If the results are relevant, cite them. If they aren't, use your own knowledge or other tools.",
+    "- If the results are relevant, cite them. If they aren't or if nothing is found, use search_web() to find the answer online before guessing.",
     "- The knowledge base covers: Linux system administration, bash, networking, package management,",
     "  systemd, permissions, processes, desktop environments, troubleshooting, kernel/hardware,",
     "  security, programming (JavaScript, Python, TypeScript, Go, React, Git, Docker, SQL, regex, API design, testing),",
