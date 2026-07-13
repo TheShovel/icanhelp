@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="website/assets/textLogo.png" alt="icanhelp" width="240">
+  <img src="https://github.com/TheShovel/icanhelp/blob/website/website_assets/textLogo.png" alt="icanhelp" width="240">
 </div>
 
 <div align="center">
