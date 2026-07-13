@@ -1,4 +1,6 @@
-<img src="website/assets/textLogo.png" alt="icanhelp" width="240">
+<div align="center">
+  <img src="website/assets/textLogo.png" alt="icanhelp" width="240">
+</div>
 
 <div align="center">
   <img src="https://img.shields.io/github/languages/top/TheShovel/icanhelp?style=flat-square&logo=javascript&label=language" alt="Language">&nbsp;&nbsp;
