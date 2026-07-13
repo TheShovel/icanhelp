@@ -602,11 +602,15 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
-  ipcMain.on("quit-app", () => app.quit());
+  ipcMain.on("quit-app", () => process.kill(process.pid, "SIGKILL"));
 
   ipcMain.on("restart-app", () => {
+    // Schedule a relaunch, then hard-kill the process. A graceful quit runs
+    // the native model/llama teardown which can throw an uncaught Napi::Error
+    // (std::terminate) when switching GPU/CPU backends. SIGKILL skips that
+    // cleanup path entirely so the crash can't happen.
     app.relaunch({ args: process.argv.slice(1) });
-    app.quit();
+    process.kill(process.pid, "SIGKILL");
   });
 
   ipcMain.handle("open-file", async (_event, filePath) => {
@@ -777,7 +781,7 @@ function createWindow() {
       {
         label: "Quit",
         click: function () {
-          app.quit();
+          process.kill(process.pid, "SIGKILL");
         },
       },
     ];
@@ -811,7 +815,7 @@ app.on("before-quit", function () {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform !== "darwin") process.kill(process.pid, "SIGKILL");
 });
 
 app.on("activate", () => {
