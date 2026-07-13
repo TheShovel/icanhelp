@@ -1246,6 +1246,51 @@ a:hover {
   color: var(--accent);
 }
 
+.footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.footer-left {
+  margin: 0;
+}
+
+.footer-right {
+  margin: 0;
+  text-align: right;
+}
+
+.footer-made {
+  margin: 0;
+}
+
+.footer-contact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.footer-contact-label {
+  color: var(--fg-muted);
+  margin-right: 0.25rem;
+}
+
+.footer-contact a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.footer-contact a:hover {
+  text-decoration: underline;
+}
+
 .muted {
   color: var(--fg-muted);
   margin: 0.25rem 0 0;
