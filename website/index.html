@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>icanhelp</title>
+  <meta name="description" content="icanhelp is a Linux desktop AI assistant that runs as a transparent overlay and works mostly offline.">
+  <link rel="icon" type="image/png" href="assets/buddyArt/idle.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg-fx" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="#top">
+      <img src="assets/textLogo.png" alt="icanhelp" class="brand-logo">
+    </a>
+    <nav class="nav">
+      <a href="#features">Features</a>
+      <a href="#knowledge">Knowledge</a>
+      <a href="#install">Install</a>
+      <a class="nav-gh" href="https://github.com/TheShovel/icanhelp" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <section class="hero" id="top">
+    <img src="assets/banner.png" alt="" class="hero-banner">
+    <div class="hero-inner">
+      <h1>Your desktop AI assistant, always within reach.</h1>
+      <p class="lede">
+        icanhelp runs as a transparent overlay on your Linux desktop. It answers
+        questions, runs commands, reads your screen, and searches the web. All
+        running locally and fully offline, with no cloud bill and no GPU required.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#install">Get started</a>
+        <a class="btn btn-ghost" href="https://github.com/TheShovel/icanhelp" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <span class="hero-stat-num">~800 MB</span>
+          <span class="hero-stat-label">smallest model</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-num">0</span>
+          <span class="hero-stat-label">GPUs required</span>
+        </div>
+      </div>
+
+      <div class="demo-stage">
+        <div class="demo-window" aria-hidden="true">
+        <div id="demo-panel-header">
+          <span id="demo-panel-title">Chat</span>
+          <button class="demo-btn-icon demo-burger" title="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="demo-messages">
+          <div id="demo-typing" class="hidden">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+        <div id="demo-input-area">
+          <button class="demo-btn-icon demo-attach" title="Attach a file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <div id="demo-input">Ask me anything...</div>
+          <button class="demo-btn-icon demo-send" title="Send">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div id="demo-avatar" class="avatar-idle" title="icanhelp">
+          <img id="demo-avatar-inner" src="assets/buddyArt/idle.png" alt="" draggable="false" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="container">
+    <section id="features" class="section reveal">
+      <h2>Features</h2>
+      <div class="card-grid">
+        <div class="card reveal">
+          <h3>Lightweight by design</h3>
+          <p>Runs on your own hardware, CPU or your computer's GPU, with models as small as ~800 MB. No cloud, no subscription. Just a few hundred MB on disk.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Easy on the planet</h3>
+          <p>Fully offline and running on your own hardware, CPU or your computer's GPU, means no distant datacenters burning power for your questions. It extends the life of the machine you already own.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Runs fully offline</h3>
+          <p>Local models handle chat and vision. No account, no cloud lock-in, no internet needed for everyday use.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Model download manager</h3>
+          <p>Pick and fetch models from a built-in list. Qwen 3.5 2B is recommended to start.</p>
+        </div>
+        <div class="card reveal">
+          <h3>File &amp; screenshot capture</h3>
+          <p>Attach files or capture the screen so the assistant can see what you see.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Bash command execution</h3>
+          <p>Let it run commands on your behalf, with confirmation prompts for anything risky.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Web search &amp; vision</h3>
+          <p>Search the web when needed and use a local vision model to understand images.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Local knowledge base</h3>
+          <p>A curated RAG knowledge base across 9 categories answers without bigger weights.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Theme system</h3>
+          <p>Light and dark themes, with a custom theme editor to match your desktop.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="knowledge" class="section reveal">
+      <h2>Knowledge base</h2>
+      <p class="section-lede">
+        A local Retrieval-Augmented Generation store of markdown files. The
+        assistant searches it before every answer, so it stays useful on small
+        models.
+      </p>
+
+      <div class="kb-flow" aria-hidden="true">
+        <div class="kb-node">
+          <span class="kb-node-icon">?</span>
+          <span class="kb-node-label">Your question</span>
+        </div>
+        <div class="kb-arrow"></div>
+        <div class="kb-node">
+          <span class="kb-node-icon">&#9776;</span>
+          <span class="kb-node-label">Embed (MiniLM)</span>
+        </div>
+        <div class="kb-arrow"></div>
+        <div class="kb-node">
+          <span class="kb-node-icon">&#9737;</span>
+          <span class="kb-node-label">Cosine search</span>
+        </div>
+        <div class="kb-arrow"></div>
+        <div class="kb-node">
+          <span class="kb-node-icon">&#10003;</span>
+          <span class="kb-node-label">Grounded answer</span>
+        </div>
+      </div>
+
+      <h3>Explore the categories</h3>
+      <p class="section-lede">
+        Click a category to see what's inside and watch the assistant pull a
+        relevant snippet from it.
+      </p>
+      <div class="kb-explorer">
+        <div class="kb-chips" id="kb-chips"></div>
+        <div class="kb-detail" id="kb-detail">
+          <div class="kb-detail-head">
+            <span class="kb-detail-name" id="kb-detail-name">Select a category</span>
+            <span class="kb-detail-count" id="kb-detail-count"></span>
+          </div>
+          <p class="kb-detail-topics" id="kb-detail-topics">
+            Pick one of the 9 knowledge categories above to preview its contents.
+          </p>
+          <div class="kb-retrieval" id="kb-retrieval" hidden>
+            <div class="kb-retrieval-label">Retrieving match&hellip;</div>
+            <div class="kb-retrieval-bar"><div class="kb-retrieval-fill"></div></div>
+            <div class="kb-snippet" id="kb-snippet"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" class="section reveal">
+      <h2>Install</h2>
+      <p class="section-lede">
+        One command clones the repo, installs dependencies, generates icons, and
+        registers icanhelp as a system app.
+      </p>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="terminal-dot"></span>
+          <span class="terminal-dot"></span>
+          <span class="terminal-dot"></span>
+          <span class="terminal-title">bash</span>
+          <div class="terminal-tabs">
+            <button class="terminal-tab active" data-tab="quick" type="button">Quick</button>
+            <button class="terminal-tab" data-tab="manual" type="button">Manual</button>
+          </div>
+        </div>
+        <div class="terminal-body">
+          <div class="terminal-pane active" data-pane="quick">
+            <pre><code><span class="prompt">$ </span>curl -fsSL https://raw.githubusercontent.com/TheShovel/icanhelp/main/install.sh | bash</code></pre>
+            <button class="copy-btn" data-copy="curl -fsSL https://raw.githubusercontent.com/TheShovel/icanhelp/main/install.sh | bash">Copy</button>
+          </div>
+          <div class="terminal-pane" data-pane="manual">
+            <pre><code><span class="prompt">$ </span>git clone https://github.com/TheShovel/icanhelp.git
+<span class="prompt">$ </span>cd icanhelp
+<span class="prompt">$ </span>npm install
+<span class="prompt">$ </span>npm start</code></pre>
+            <button class="copy-btn" data-copy="git clone https://github.com/TheShovel/icanhelp.git&#10;cd icanhelp&#10;npm install&#10;npm start">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="install-meta">
+        <div class="install-meta-card">
+          <h3>Requirements</h3>
+          <ul class="dep-list">
+            <li>
+              <span class="dep-ic"><img src="https://cdn.simpleicons.org/nodedotjs/83cd29" alt="Node.js" width="14" height="14"></span>
+              Node.js 20+
+            </li>
+            <li>
+              <span class="dep-ic"><img src="https://cdn.simpleicons.org/npm/cb3837" alt="npm" width="14" height="14"></span>
+              npm
+            </li>
+            <li>
+              <span class="dep-ic"><img src="https://cdn.simpleicons.org/git/f05133" alt="git" width="14" height="14"></span>
+              git
+            </li>
+            <li>
+              <span class="dep-ic"><img src="https://cdn.simpleicons.org/syncthing/2d8cf0" alt="rsync" width="14" height="14"></span>
+              rsync
+            </li>
+            <li>
+              <span class="dep-ic"><img src="https://cdn.simpleicons.org/curl/ffffff" alt="curl" width="14" height="14"></span>
+              curl
+            </li>
+            <li>
+              <span class="dep-ic"><img src="https://cdn.simpleicons.org/gnu/e8a33d" alt="unzip" width="14" height="14"></span>
+              unzip
+            </li>
+          </ul>
+        </div>
+        <div class="install-meta-card">
+          <h3>Compatibility</h3>
+          <table class="compat-table">
+            <tbody>
+              <tr><td>Architecture</td><td><span class="ok">x86_64</span>, <span class="ok">ARM64</span></td></tr>
+              <tr><td>Libc</td><td><span class="ok">glibc</span>, <span class="no">musl</span></td></tr>
+              <tr><td>Distros</td><td>Ubuntu, Fedora, Debian, Arch, openSUSE</td></tr>
+              <tr><td>Desktop</td><td><span class="ok">required</span></td></tr>
+              <tr><td>Not supported</td><td>Alpine, WSL headless, 32-bit ARM</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="install-meta-card">
+          <h3>First launch</h3>
+          <p class="section-lede">
+            The setup panel appears. Pick a model from the download list
+            and you're ready.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <a href="https://github.com/TheShovel/icanhelp" target="_blank" rel="noopener">GitHub</a>
+      · MIT License
+    </p>
+    <p class="muted">icanhelp, a local-first Linux desktop AI assistant.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

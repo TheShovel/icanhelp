@@ -1,4 +1,4 @@
-# icanhelp
+<img src="website/assets/textLogo.png" alt="icanhelp" width="240">
 
 <div align="center">
   <img src="https://img.shields.io/github/languages/top/TheShovel/icanhelp?style=flat-square&logo=javascript&label=language" alt="Language">&nbsp;&nbsp;
@@ -46,7 +46,7 @@ On first launch the setup panel appears. Select a model from the download list (
 
 ## Features
 
-- Runs mostly offline
+- Runs fully offline
 - Model download manager
 - File attachments
 - Screenshot capture
@@ -116,9 +116,3 @@ Downloads automatically on first launch (~950 MB, cached at `~/.local/share/ican
   - Vision model cache: `~/.local/share/icanhelp/transformers/`
   - Knowledge base: `~/.local/share/icanhelp/knowledge.json`
   - Logs: `~/.local/share/icanhelp/vision.log`, `ocr.log`
-
-## Dev
-
-```bash
-ELECTRON_DEV=true npm start  # opens DevTools
-```
