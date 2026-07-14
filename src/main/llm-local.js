@@ -4,6 +4,23 @@ const { modelsDir } = require("./paths");
 
 var CONTEXT_SIZE = 32768;
 
+// Sampling defaults tuned to break small-model repetition loops at the
+// source (see guidance on repetition_penalty / no_repeat_ngram_size / min_p).
+// Each can be overridden via the saved config object.
+var SAMPLING_DEFAULTS = {
+  // repetition_penalty: lowers logits of already-seen tokens. 1.1-1.15 is the
+  // sweet spot for small models; >1.2 degrades formatting and coherence.
+  repeatPenalty: 1.1,
+  // no_repeat_ngram_size analog: DRY penalty bans repeating token sequences
+  // longer than allowedLength. 3 bans 4-token repeats (sweet spot 3-4).
+  dryAllowedLength: 3,
+  // DRY strength (0-1). 0.8 is the recommended value.
+  dryStrength: 0.8,
+  // min_p sampling: drop tokens below this fraction of the top token's
+  // probability. 0.05-0.1 strips low-probability garbage for small models.
+  minP: 0.05,
+};
+
 function defaultModelPath() {
   return modelsDir();
 }
@@ -459,6 +476,25 @@ async function runLocalChatLoop({
       documentFunctionParams: true,
       maxTokens: Math.floor(contextSize * 0.75),
       temperature: 0.7,
+      // Repetition-loop prevention at the sampling level.
+      repeatPenalty: {
+        penalty:
+          config.repeatPenalty != null
+            ? config.repeatPenalty
+            : SAMPLING_DEFAULTS.repeatPenalty,
+      },
+      dryRepeatPenalty: {
+        strength:
+          config.dryStrength != null
+            ? config.dryStrength
+            : SAMPLING_DEFAULTS.dryStrength,
+        allowedLength:
+          config.dryAllowedLength != null
+            ? config.dryAllowedLength
+            : SAMPLING_DEFAULTS.dryAllowedLength,
+      },
+      minP:
+        config.minP != null ? config.minP : SAMPLING_DEFAULTS.minP,
       signal: internalAbort.signal,
       stopOnAbortSignal: true,
       onTextChunk: function (chunk) {
