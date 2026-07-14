@@ -21,6 +21,9 @@ Linux desktop AI assistant that runs as a transparent overlay, answers questions
 
 ## Install
 
+> [!WARNING]
+> This project is **Linux only**. The installer and app require a glibc-based Linux desktop environment and will not run on macOS, Windows, or musl-based systems like Alpine Linux.
+
 Run this single command:
 
 ```bash
