@@ -73,6 +73,7 @@ The AI assistant has a local RAG (Retrieval-Augmented Generation) knowledge base
 | `knowledge/daily/` | 60 | Life skills, travel, parenting, relationships, career, fitness, car maintenance |
 | `knowledge/finance/` | 12 | Budgeting, investing, taxes, retirement, credit, small business |
 | `knowledge/general/` | 27 | History, philosophy, economics, politics, world religions, ethics |
+| `knowledge/green-living/` | 14 | Water conservation, renewable energy, sustainable transport, plastic reduction, eco cleaning, food systems, green building, eco landscaping, e-waste, community action |
 | `knowledge/health/` | 50 | Mental health, nutrition, exercise, first aid, sleep, child development |
 | `knowledge/home/` | 37 | Gardening, plumbing, woodworking, electrical, home security, cleaning |
 | `knowledge/linux/` | 16 | Bash, systemd, kernel, networking, package management, troubleshooting |
