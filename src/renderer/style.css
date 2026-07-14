@@ -791,6 +791,25 @@ body {
     margin-bottom: 0;
 }
 
+.message .bubble ul,
+.message .bubble ol {
+    margin: 4px 0;
+    padding-left: 20px;
+}
+.message .bubble li {
+    margin: 2px 0;
+    line-height: 1.4;
+}
+.message .bubble li:first-child {
+    margin-top: 0;
+}
+.message .bubble li:last-child {
+    margin-bottom: 0;
+}
+.message .bubble li > p {
+    margin: 2px 0;
+}
+
 .message.streaming .bubble {
     border-left: 2px solid var(--accent);
 }
