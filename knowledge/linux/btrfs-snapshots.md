@@ -1,12 +1,8 @@
 # Btrfs Snapshots and Recovery
 
-## Core Concepts
-- Btrfs snapshots are cheap, copy-on-write views of a subvolume at a point in time.
-- Snapshots are not backups by themselves: they usually live on the same disk and disappear if the disk fails.
-- Use snapshots for fast rollback after updates, config changes, package installs, and accidental file edits.
-- Use separate backups for disk loss, theft, filesystem corruption, and ransomware.
+Snapshots are cheap copy-on-write views of a subvolume at a point in time. They are **not** backups by themselves (same disk); use them for fast rollback after updates/config changes. Use separate backups (rsync/borg) for disk loss or corruption.
 
-## Useful Commands
+## Inspect (safe, read-only)
 ```bash
 btrfs subvolume list /
 btrfs subvolume show /
@@ -14,18 +10,17 @@ btrfs filesystem usage /
 btrfs filesystem df /
 btrfs scrub start -Bd /
 btrfs scrub status /
-btrfs check --readonly /dev/sdXN
+btrfs check --readonly /dev/sdXN     # unmounted only; never use --repair casually
 ```
-Run `btrfs check` only on an unmounted filesystem unless documentation says otherwise. Never use `--repair` casually; it can make damage worse.
 
-## Manual Snapshot Pattern
+## Manual Snapshot
 ```bash
-sudo btrfs subvolume snapshot -r /@ /.snapshots/root-before-change
+sudo btrfs subvolume snapshot -r /@  /.snapshots/root-before-change
 sudo btrfs subvolume snapshot -r /@home /.snapshots/home-before-change
 ```
-Use read-only snapshots for safety. Name snapshots with purpose and date, such as `2026-07-10-before-kernel-update`. Keep a small number of manual snapshots plus automatic hourly/daily ones.
+Use read-only (`-r`) snapshots. Name with purpose+date, e.g. `2026-07-10-before-kernel-update`. Keep a few manual plus automatic hourly/daily ones.
 
-## Snapper Basics
+## Snapper
 ```bash
 sudo snapper -c root create-config /
 sudo snapper -c root create --description "before upgrade"
@@ -34,29 +29,27 @@ sudo snapper -c root status 12..13
 sudo snapper -c root diff 12..13
 sudo snapper -c root undochange 12..13
 ```
-`snapper status` shows changed files between snapshots. `undochange` reverts selected changes; review diffs before applying.
+`status` shows changed files; review `diff` before `undochange`.
 
-## Timeshift Basics
-- Use Btrfs mode only when the distro layout is compatible with `@` and `@home` subvolumes.
+## Timeshift
+- Use Btrfs mode only with `@`/`@home` subvolume layout.
 - Prefer RSYNC mode on non-Btrfs filesystems.
-- Include home dotfiles only if you want config rollback; avoid including all personal files unless you understand the storage impact.
-- Test restore once before relying on it during an emergency.
+- Test a restore once before relying on it.
 
-## Rollback Safety Checklist
-1. Make a fresh snapshot before rollback.
-2. Confirm which subvolumes are root and home.
-3. Boot from a live USB if the system will not boot.
-4. Mount the Btrfs top-level subvolume with `subvolid=5`.
-5. Rename broken subvolume instead of deleting it immediately.
-6. Set the restored snapshot as the active subvolume or replace the active subvolume according to distro docs.
+## Rollback Checklist
+1. Take a fresh snapshot before rollback.
+2. Confirm root vs home subvolumes.
+3. Boot a live USB if system won't boot.
+4. Mount top-level with `subvolid=5`.
+5. Rename the broken subvolume instead of deleting it.
+6. Set the restored snapshot active per distro docs.
 
 ## Maintenance
-- Run `btrfs scrub` monthly on SSDs/HDDs to verify checksums and detect silent corruption.
-- Balance only when needed, such as after deleting many snapshots or when metadata/data allocation is badly skewed.
-- Avoid full balances as routine maintenance; they can take a long time and add wear.
-- Watch free space: Btrfs can report free space while metadata space is exhausted.
+- Run `btrfs scrub` monthly to verify checksums.
+- Balance only when needed (after deleting many snapshots): `btrfs balance start -dusage=50 /`.
+- Avoid routine full balances (wear/time). Watch free space — metadata can exhaust while data shows free.
 
 ## Common Problems
-- `No space left on device` with apparent free space: delete old snapshots, then run a limited metadata balance.
-- Bootloader does not see rollback: regenerate bootloader config if snapshot entries are generated dynamically.
-- Snapshot grows quickly: large databases, VM images, browser caches, and build directories change often; consider excluding or storing them outside snapshotted subvolumes.
+- `No space left` with free space: delete old snapshots, then limited metadata balance.
+- Bootloader missing rollback: regenerate bootloader config.
+- Snapshot grows fast: exclude large/changing dirs (VM images, caches, build dirs) from snapshotted subvolumes.

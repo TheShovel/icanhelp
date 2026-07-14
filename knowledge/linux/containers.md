@@ -1,143 +1,72 @@
 # Linux Container Runtimes
 
-## Container Runtime Comparison
-- **Docker**: most popular, full toolchain (build, ship, run). Daemon (`dockerd`), CLI, Docker Hub
-- **Podman**: daemonless, rootless by default, Docker-compatible CLI (alias `docker=podman`)
-  - No central daemon — each container is a child process of podman
-  - Built-in systemd integration: `systemd --user` to run containers as user services
-  - Pods: share network namespace (like Kubernetes pods) — `podman pod create`
-- **containerd**: industry-standard OCI runtime, used by Docker and Kubernetes (via CRI)
-  - CLI: `nerdctl` — Docker-compatible, supports containerd-specific features
-- **CRI-O**: lightweight CRI implementation for Kubernetes only (not general-purpose)
-- **LXC/LXD**: system containers (full OS, not app containers) — closer to VMs
+## Runtime Comparison
+- **Docker**: full toolchain, daemon (`dockerd`).
+- **Podman**: daemonless, rootless by default, Docker-compatible CLI.
+- **containerd**: OCI runtime used by Kubernetes; CLI `nerdctl`.
+- **CRI-O**: Kubernetes-only CRI.
+- **LXC/LXD**: system containers (full OS).
 
-## Podman Deep Dive
+Install with `sys pkg`:
+```bash
+sys pkg install docker
+sys pkg install podman
+```
 
-### Basic Usage
+## Podman (rootless by default)
 ```bash
 podman pull nginx:alpine
 podman run -d -p 8080:80 nginx:alpine
 podman ps
-podman exec -it <container> sh
-podman logs -f <container>
-```
-
-### Rootless Containers
-- Default for non-root users — no `sudo` needed
-- User namespaces: container uid 0 maps to host uid (e.g., 1000)
-- Limitations: cannot bind to ports < 1024, limited capabilities
-- Workaround for < 1024 ports: `sysctl net.ipv4.ip_unprivileged_port_start=80` or use reverse proxy
-- Rootless podman stores containers in `~/.local/share/containers/`
-
-### Pods (Kubernetes-style)
-```bash
+podman exec -it <c> sh
+podman logs -f <c>
 podman pod create --name mypod -p 8080:80
 podman run -d --pod mypod nginx
-podman run -d --pod mypod redis
-podman pod list
-podman pod stop mypod
 ```
 
-### Systemd Integration
+## Docker (same flags)
 ```bash
-# Generate systemd unit for existing container
-podman generate systemd --name mycontainer > ~/.config/systemd/user/mycontainer.service
-systemctl --user daemon-reload
-systemctl --user enable --now mycontainer.service
-journalctl --user -u mycontainer.service
+docker run -d -p 8080:80 nginx:alpine
+docker ps / docker logs -f <c>
+docker system prune
 ```
 
-## Container Security
-
-### Dropping Capabilities
+## Service (use `sys svc`)
 ```bash
-# Docker / Podman
---cap-drop=ALL
---cap-add=NET_BIND_SERVICE   # add back only what's needed
+sys svc enable --now docker
+sys svc status docker
 ```
 
-### Seccomp Profiles
-- Default Docker seccomp profile blocks ~44 of ~300 syscalls
-- Custom profile: `--security-opt seccomp=custom.json`
-- Podman default is more restrictive than Docker
-
-### Read-Only Rootfs
+## Security
 ```bash
---read-only                                # rootfs is read-only
---tmpfs /tmp                               # writable tmp for specific dirs
---tmpfs /var/run                           # runtime data
+--cap-drop=ALL --cap-add=NET_BIND_SERVICE
+--security-opt seccomp=custom.json
+--read-only --tmpfs /tmp
+# Docker userns-remap in /etc/docker/daemon.json
 ```
 
-### User Namespace Remapping
+## Building
 ```bash
-# Docker: /etc/docker/daemon.json
-{ "userns-remap": "default" }   # maps to dockremap user
-
-# Podman: built-in (always rootless by default)
+podman build -t myapp .
+podman build --no-cache .
+# Multi-stage Dockerfile: FROM builder AS x ... COPY --from=x
 ```
 
-## Building Images
-```dockerfile
-# Multi-stage build (common pattern)
-FROM rust:1.70 AS builder
-WORKDIR /app
-COPY . .
-RUN cargo build --release
-
-FROM debian:bookworm-slim
-COPY --from=builder /app/target/release/myapp /usr/local/bin/
-CMD ["myapp"]
-```
-
+## Networking & storage
 ```bash
-# Podman/Docker build
-podman build -t myapp:latest .
-podman build --layers=false .              # no layer caching
-podman build --no-cache .                  # force rebuild
-
-# Distroless images: google/distroless, chainguard/static
-# Alpine: ~5MB but uses musl libc (C binaries may not work)
-# Debian slim: ~80MB, glibc-compatible
-```
-
-## Storage & Networking
-
-### Storage Drivers
-- **overlay2**: default, fast, copy-on-write (recommended)
-- **devicemapper**: legacy, avoid
-- **btrfs/zfs**: native filesystem snapshots
-- **vfs**: no copy-on-write, for testing only
-
-### Network Drivers
-- **bridge**: default, isolated network, port forwarding
-- **host**: container uses host network (no isolation, better perf)
-- **macvlan**: assign MAC address to container (appears as separate device)
-- **none**: loopback only
-
-```bash
-# Custom bridge network
 podman network create mynet
 podman run -d --network mynet --name web nginx
-podman run -d --network mynet redis
-# Containers can now reach each other by name
+# Drivers: bridge (default), host, macvlan, none
+# Storage: overlay2 (default), btrfs/zfs, vfs
 ```
 
-## Common Troubleshooting
-- `podman logs <container>` — check output
-- `podman inspect <container>` — detailed config + state
-- `podman top <container>` — processes inside container
-- `podman stats` — live resource usage (CPU, mem, net, block)
-- `nerdctl ps -a` — list all containerd containers
-- `crictl ps` — list containers managed by CRI (kubelet)
-- `ctr images ls` — containerd raw image list
-
-## Podman vs Docker Commands
-| Docker | Podman | Notes |
-|---|---|---|
-| `docker run` | `podman run` | Same flags, no daemon |
-| `docker-compose up` | `podman-compose up` | Third-party tool |
-| `docker system prune` | `podman system prune` | Same behavior |
-| `docker swarm` | — | No swarm in Podman (use Kube) |
-| `docker buildx` | `podman build` | BuildKit vs Buildah backend |
-| `docker login` | `podman login` | Same registries |
-| — | `podman pod` | No pod concept in Docker |
+## Troubleshooting
+```bash
+podman inspect <c>      # config + state
+podman top <c>          # processes
+podman stats            # live usage
+nerdctl ps -a           # containerd
+crictl ps               # CRI (kubelet)
+ctr images ls
+```
+Rootless note: cannot bind ports < 1024 unless `sysctl net.ipv4.ip_unprivileged_port_start=80`.

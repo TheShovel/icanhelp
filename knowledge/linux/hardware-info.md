@@ -1,259 +1,91 @@
-# Hardware Information and Discovery
+# Hardware Information & Discovery
 
-## CPU Information
-- `lscpu` — CPU architecture, cores, threads, flags
-- `cat /proc/cpuinfo` — detailed CPU info (model, cache, flags)
-- `nproc` — number of processing units
-- `hwloc-ls` — CPU topology visualization
-- `lscpu --parse` — parseable CPU topology
-
-## Memory Information
-- `free -h` — memory usage (human readable)
-- `free -h --si` — use powers of 1000 (MB, GB)
-- `cat /proc/meminfo` — detailed memory statistics
-- `dmidecode -t memory` — DIMM slot info (requires root)
-- `lsmem` — list memory blocks and zones
-
-## Storage Devices
-- `lsblk` — block devices (disks, partitions)
-- `lsblk -f` — with filesystem info
-- `lsblk -o NAME,SIZE,TYPE,MOUNTPOINT,ROTA` — SSD vs HDD detection
-- `lsblk -d` — top-level devices only
-- `fdisk -l` — partition table (requires root)
-- `fdisk -l /dev/sda` — specific disk
-- `gdisk -l /dev/sda` — GPT partition info
-- `parted -l` — partition info for all disks
-
-## PCI Devices
-- `lspci` — PCI devices (graphics, network, storage)
-- `lspci -v` — verbose with kernel drivers
-- `lspci -nn` — numeric IDs (vendor:device)
-- `lspci -d 8086:1234` — filter by ID
-- `lspci -s 00:1f.2` — specific slot
-- `lspci -k` — kernel driver in use
-
-## USB Devices
-- `lsusb` — USB devices
-- `lsusb -v` — verbose info
-- `lsusb -t` — tree view of USB topology
-- `lsusb -D /dev/bus/usb/001/005` — device details
-- `usb-devices` — USB device tree
-
-## Hardware Information Tools
-
-### dmidecode
-- `dmidecode` — all DMI/SMBIOS info (root required)
-- `dmidecode -t system` — system info (manufacturer, product)
-- `dmidecode -t bios` — BIOS info
-- `dmidecode -t processor` — CPU info
-- `dmidecode -t memory` — memory modules
-- `dmidecode -t baseboard` — motherboard info
-
-### lshw (Hardware Lister)
-- `lshw` — all hardware (root for complete info)
-- `lshw -short` — brief overview
-- `lshw -class disk` — only disk drives
-- `lshecode -class network` — network devices
-- `lshw -class display` — graphics cards
-- `lshw -json` — JSON output
-- `lshw -html` — HTML output
-
-### inxi
-- `inxi -F` — full system info
-- `inxi -Fxx` — extra verbose
-- `inxi -c 0` — no color
-- `inxi -v 8` — very verbose
-
-## Sensors and Monitoring
-
-### lm-sensors
+## CPU
 ```bash
-# Install and detect
-apt install lm-sensors
-sensors-detect  # Answer yes to all probes
-
-# Show sensors
-sensors
-sensors -u     # Unscaled values
-sensors -f     # Fahrenheit
-sensors -j     # JSON output
+lscpu                        # architecture, cores, threads, flags (tested: works)
+lscpu --parse=CPU,CORE,SOCKET   # parseable topology (tested: works)
+cat /proc/cpuinfo            # detailed per-core info (tested: works)
+nproc                        # number of processing units (tested: works)
 ```
 
-### Sensor Chip Types
-- `coretemp` — Intel CPU temperature
-- `nct6775` — Super I/O (motherboard)
-- `it87` — ITE Super I/O
-- `k10temp` — AMD CPU temperature
-- `nouveau` — NVIDIA GPU (open source)
-
-### GPU Monitoring
+## Memory
 ```bash
-# NVIDIA (proprietary)
-nvidia-smi  # GPU stats
-nvidia-smi -l 1  # Continuous updates
-
-# NVIDIA (open source)
-nouveau-monitor
-
-# AMD/Intel (open source)
-intel_gpu_top
-radeontop
+free -h                      # usage, human readable (tested: works)
+cat /proc/meminfo            # detailed statistics (tested: works)
+lsmem                       # memory blocks and zones (tested: works)
+dmidecode -t memory         # DIMM slot info (requires root; denied in sandbox)
 ```
 
-## Firmware and BIOS
+## Storage
+```bash
+sys disk list                # block devices tree + fs/UUID (lsblk -f)
+sys disk usage               # usage per mount (df -h)
+# Native detail (not wrapped by sys):
+lsblk -o NAME,SIZE,TYPE,MOUNTPOINT,ROTA   # ROTA=1 → HDD, 0 → SSD
+lsblk -d                     # top-level devices only
+fdisk -l                     # partition tables (requires root)
+```
 
-### UEFI Firmware
-- `efibootmgr` — UEFI boot entries
-- `efibootmgr -v` — detailed entries
-- `efibootmgr -c -L "Linux" -l "\vmlinuz.efi"` — create entry
-- `efivars` — UEFI variables (/sys/firmware/efi/efivars/)
-- `efivar -l` — list UEFI variables (efivar package)
+## PCI / USB
+```bash
+lspci                        # all PCI devices (tested: works)
+lspci -nn                    # numeric vendor:device IDs
+lspci -k                     # kernel driver in use (tested: works)
+lspci -s 00:1f.2             # specific slot
+lsusb                        # USB devices (tested: works)
+lsusb -t                     # tree view (tested: works)
+lsusb -v                     # verbose
+```
 
-### BIOS Information
-- `dmidecode -t bios` — BIOS version and date
-- `dmidecode -s bios-version` — just version
-- `dmidecode -s bios-release-date` — release date
+## System / Firmware
+```bash
+hostnamectl                 # system info (systemd) (tested: works)
+dmidecode -t system         # manufacturer/product (requires root)
+dmidecode -t bios           # BIOS version/date
+efibootmgr -v               # UEFI boot entries
+```
 
-## Audio Hardware
-- `lspci | grep -i audio` — audio controllers
-- `aplay -l` — ALSA playback devices
-- `arecord -l` — ALSA capture devices
-- `cat /proc/asound/cards` — sound cards
-- `amixer` — mixer controls
+## Sensors & GPU
+```bash
+sensors                     # temperatures/fans (lm-sensors) (tested: works)
+sensors -j                  # JSON output
+nvidia-smi                  # NVIDIA GPU stats (proprietary driver)
+intel_gpu_top               # Intel GPU (open source)
+radeontop                   # AMD GPU
+glxinfo | grep "OpenGL renderer"   # active GPU renderer
+```
 
 ## Network Hardware
-- `ethtool eth0` — NIC driver and features
-- `ethtool -i eth0` — driver info
-- `ethtool -k eth0` — offload features
-- `ethtool -S eth0` — driver statistics
-- `mii-tool eth0` — PHY link status
-- `mii-tool -v eth0` — verbose PHY info
-
-## SCSI/SATA Devices
-- `lsblk -S` — SCSI devices with transport
-- `sginfo -l` — SCSI devices
-- `smartctl -a /dev/sda` — SMART info
-- `smartctl -H /dev/sda` — health status
-- `smartctl -c /dev/sda` — capabilities
-
-## Battery and Power
-- `upower -i /org/freedesktop/UPower/devices/battery_BAT0` — detailed
-- `upower -e` — list all power devices
-- `acpi -V` — ACPI info (battery, thermal)
-- `acpi -b` — battery only
-- `acpi -t` — thermal zones
-- `cat /sys/class/power_supply/BAT0/capacity` — battery percent
-
-## Display Hardware
-- `xrandr --listproviders` — GPU providers
-- `xrandr --prop` — detailed output info
-- `lshw -class display` — graphics hardware
-- `glxinfo | grep "OpenGL renderer"` — GPU renderer
-
-## Input Devices
-- `xinput list` — X11 input devices
-- `xinput list --id-only` — just IDs
-- `xinput test 12` — test device events
-- `lsinput` — all input devices
-
-## System Management
-
-### IPMI (Server Management)
-- `ipmitool chassis status` — chassis power
-- `ipmitool sdr` — sensor readings
-- `ipmitool lan print` — network config
-- `ipmitool user list 1` — users
-- `ipmitool sol activate` — serial-over-LAN
-
-### IPMI Tool Commands
 ```bash
-# Power control
-ipmitool chassis power status
-ipmitool chassis power on
-ipmitool chassis power off
-ipmitool chassis power reset
-
-# Boot device
-ipmitool chassis bootdev pxe
-ipmitool chassis bootdev disk
-
-# Serial console
-ipmitool sol info 1
-ipmitool sol activate
-ipmitool sol deactivate
+ethtool eth0                # NIC driver/features (replace eth0)
+ethtool -i eth0             # driver info
+ethtool -S eth0             # driver statistics
 ```
 
-### Serial Console
-- `ttyS0`, `ttyS1` — serial ports
-- `dmesg | grep tty` — serial port detection
-- `setserial -g /dev/ttyS0` — port parameters
-- `stty -F /dev/ttyS0 115200` — set baud rate
+## Disk Health (SMART)
+```bash
+smartctl -a /dev/sda        # full SMART info (tested: present)
+smartctl -H /dev/sda        # health status
+smartctl -c /dev/sda        # capabilities
+nvme smart-log /dev/nvme0   # NVMe
+```
+
+## Battery / Power
+```bash
+upower -i /org/freedesktop/UPower/devices/battery_BAT0
+acpi -V                     # battery + thermal (if installed)
+cat /sys/class/power_supply/BAT0/capacity   # battery %
+```
+
+## Audio Hardware
+```bash
+lspci | grep -i audio
+aplay -l                    # ALSA playback devices
+arecord -l                  # ALSA capture devices
+cat /proc/asound/cards
+```
 
 ## Hardware Database
 - `/usr/share/hwdata/pci.ids` — PCI vendor/device IDs
-- `/usr/share/hwdata/usb.ids` — USB vendor/product IDs
-- `update-pciids` — update PCI database
-- `update-usbids` — update USB database
-
-## Benchmark Tools
-
-### Disk Benchmarks
-- `hdparm -Tt /dev/sda` — cached/random reads
-- `hdparm -I /dev/sda` — drive info
-- `dd if=/dev/zero of=test bs=1G count=1 oflag=dsync` — write speed
-- `dd if=test of=/dev/null bs=1G count=1 iflag=direct` — read speed
-
-### CPU Benchmarks
-- `sysbench cpu --cpu-max-prime=10000 run` — CPU performance
-- `stress --cpu $(nproc) --timeout 60s` — CPU stress test
-
-### Memory Benchmarks
-- `sysbench memory run` — memory speed
-- `mbw -n 10 1024` — memory bandwidth
-
-## Hardware Troubleshooting
-
-### Device Not Detected
-```bash
-# Check kernel messages
-dmesg | grep -i "error\|fail"
-dmesg | tail -50
-
-# Check PCI
-lspci -nn
-lspci -k
-
-# Check USB
-lsusb -v
-
-# Check modules
-lsmod | grep driver_name
-```
-
-### Driver Issues
-```bash
-# Check loaded modules
-lsmod
-
-# Load module
-modprobe module_name
-
-# Blacklist module
-echo "blacklist module_name" >> /etc/modprobe.d/blacklist.conf
-update-initramfs -u  # Debian/Ubuntu
-
-# Check module info
-modinfo module_name
-```
-
-### Hardware Conflicts
-```bash
-# Check IRQ conflicts
-cat /proc/interrupts
-
-# Check I/O ports
-cat /proc/ioports
-
-# Check DMA
-cat /proc/dma
-```
+- `/usr/share/hwdata/usb.ids` — USB IDs
+- `update-pciids` / `update-usbids` — refresh databases

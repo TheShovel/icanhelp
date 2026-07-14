@@ -1,295 +1,138 @@
 # Linux Compression Tools & Archiving
 
-## Common Archive Formats
-
-| Format | Extension | Compression | Best for |
-|--------|-----------|-------------|----------|
-| tar + gzip | .tar.gz | Moderate | Compatibility |
-| tar + bzip2 | .tar.bz2 | Good | Size |
-| tar + xz | .tar.xz | Excellent | Size |
-| tar + zstd | .tar.zst | Fast + good | Speed + size |
-| tar only | .tar | None | Speed |
-| ZIP | .zip | Moderate | Windows compatibility |
-
-## tar Commands
-
+## tar (most common)
 ```bash
-# Create archives
-tar -czf archive.tar.gz dir/            # gzip (most common)
-tar -cjf archive.tar.bz2 dir/           # bzip2 (better compression)
-tar -cJf archive.tar.xz dir/            # xz (best compression)
-tar --zstd -cf archive.tar.zst dir/     # zstd (fast)
+tar -czf archive.tar.gz dir/        # gzip (most compatible)
+tar -cjf archive.tar.bz2 dir/       # bzip2 (better compression)
+tar -cJf archive.tar.xz dir/        # xz (best compression)
+tar --zstd -cf archive.tar.zst dir/ # zstd (fast + good)
 
-# Extract archives
-tar -xzf archive.tar.gz
-tar -xjf archive.tar.bz2
-tar -xJf archive.tar.xz
-tar --zstd -xf archive.tar.zst
+tar -xzf archive.tar.gz             # extract gzip
+tar -xjf archive.tar.bz2            # extract bzip2
+tar -xJf archive.tar.xz             # extract xz
+tar --zstd -xf archive.tar.zst      # extract zstd
 
-# List contents
-tar -tzf archive.tar.gz
-tar -tf archive.tar
-
-# Extract specific files
-tar -xzf archive.tar.gz path/to/file
-tar -xzf archive.tar.gz "*.txt"
-
-# Exclude files
-tar -czf archive.tar.gz --exclude="*.log" --exclude="*.tmp" dir/
-
-# Preserve permissions
-tar -czpf archive.tar.gz dir/           # -p preserves permissions
+tar -tzf archive.tar.gz             # list contents
+tar -tf archive.tar                 # list uncompressed tar
+tar -xzf archive.tar.gz -C /path    # extract to path
+tar -xzf archive.tar.gz "*.txt"     # extract matching files
+tar -czf archive.tar.gz --exclude='*.log' --exclude='*.tmp' dir/   # exclude
+tar -czpf archive.tar.gz dir/       # -p preserves permissions
 ```
 
 ## Standalone Compression
-
-### gzip
 ```bash
-gzip file                               # Compress
-gzip -d file.gz                         # Decompress
-gzip -9 file                            # Best compression
-gzip -1 file                            # Fastest
-zcat file.gz                            # View without decompressing
+# gzip
+gzip file            # compress -> file.gz
+gzip -d file.gz      # decompress
+gzip -9 file         # best compression
+gzip -1 file         # fastest
+zcat file.gz         # view without decompressing
+gzip -l file.gz      # compression stats
+
+# bzip2
+bzip2 file           # compress
+bunzip2 file.bz2     # decompress
+bzip2 -9 file        # best
+bzcat file.bz2       # view
+
+# xz
+xz file              # compress
+unxz file.xz         # decompress
+xz -9e file          # best (extreme)
+xz -T 0 file         # use all cores
+xz -k file           # keep original
+xzcat file.xz        # view
+xz -l file.xz        # stats
+
+# zstd
+zstd file            # compress (level 3)
+zstd -19 file        # best
+zstd -1 file         # fastest
+zstd -d file.zst     # decompress
+zstd -l file.zst     # view info
+
+# lz4 (fastest)
+lz4 file             # compress
+lz4 -d file.lz4      # decompress
+lz4 -9 file          # better
 ```
 
-### bzip2
+## zip / 7z / rar
 ```bash
-bzip2 file                              # Compress
-bunzip2 file.bz2                        # Decompress
-bzip2 -9 file                           # Best compression
-bzcat file.bz2                          # View
+zip -r archive.zip dir/     # create
+unzip archive.zip           # extract
+unzip -l archive.zip        # list
+unzip -d dir archive.zip    # extract to dir
+zip -9 archive.zip file     # best compression
+
+7z a archive.7z dir/        # (install) create
+7z x archive.7z             # (install) extract
+7z l archive.7z             # (install) list
+7z t archive.7z             # (install) test integrity
+
+rar a archive.rar dir/      # (install) create
+rar x archive.rar          # (install) extract
+rar t archive.rar          # (install) test
 ```
-
-### xz (lzma)
-```bash
-xz file                                 # Compress
-unxz file.xz                            # Decompress
-xz -9e file                            # Best compression (extreme)
-xz -T 0 file                            # Use all cores
-xz -k file                              # Keep original
-xzcat file.xz                           # View
-```
-
-### zstd (Facebook's Zstandard)
-```bash
-zstd file                               # Compress (level 3)
-zstd -19 file                           # Best compression
-zstd -1 file                            # Fastest
-zstd -d file.zst                        # Decompress
-unzstd file.zst
-zstd -l file                            # View
-zstd -c file > file.zst                 # Stream to stdout
-```
-
-### lz4 (Fastest)
-```bash
-lz4 file                                # Compress
-lz4 -d file.lz4                         # Decompress
-lz4 -9 file                             # Better compression
-unlz4 file.lz4
-lz4cat file.lz4                         # View
-```
-
-## archivers
-
-### zip
-```bash
-zip archive.zip file1 file2               # Create
-zip -r archive.zip dir/                 # Recursive
-unzip archive.zip                       # Extract
-unzip -l archive.zip                    # List
-unzip -d dir archive.zip                # Extract to dir
-zip -9 archive.zip file                 # Best compression
-zipcloak archive.zip                    # Encrypt
-```
-
-### 7z
-```bash
-7z a archive.7z dir/                    # Create
-7z x archive.7z                       # Extract
-7z l archive.7z                         # List
-7z t archive.7z                         # Test integrity
-7z a -t7z -mx=9 archive.7z dir/       # Best compression
-7z a -t7z -m0=lzma2 -mx=9 archive.7z dir/
-7z a -tzip archive.zip dir/             # Create zip
-7z a -txz archive.tar.xz dir/           # Create xz tar
-```
-
-### rar
-```bash
-rar a archive.rar dir/                  # Create
-rar x archive.rar                       # Extract
-rar l archive.rar                       # List
-rar t archive.rar                       # Test
-rar a -m5 archive.rar dir/             # Compression level 5
-```
-
-## Comparison (Quick Reference)
-
-```bash
-# Time comparison
-time tar -czf archive.tar.gz dir/
-time tar -cJf archive.tar.xz dir/
-time tar -I zstd -cf archive.tar.zst dir/
-time zip -9 archive.zip dir/
-
-# Size comparison
-ls -lh archive.*
-```
-
-## Compression Levels
-
-| Tool | Levels | Speed (fast→slow) | Compression (worse→better) |
-|------|--------|-------------------|---------------------------|
-| gzip | 1-9 | gz1 > gz9 | gz9 > gz1 |
-| bzip2 | 1-9 | bz21 > bz29 | bz29 > bz21 |
-| xz | 0-9, e | xz1 > xz9 | xz9e > xz9 > xz1 |
-| zstd | 1-19 | zstd1 > zstd19 | zstd19 > zstd1 |
-| lz4 | 1-9 | lz41 > lz49 | lz49 > lz41 |
 
 ## Parallel Compression
-
 ```bash
-# pigz - parallel gzip
-sudo apt install pigz
-pigz -p $(nproc) file
-
-# pbzip2 - parallel bzip2
-sudo apt install pbzip2
-pbzip2 file
-
-# pxz - parallel xz
-sudo apt install pxz
-pxz file
-
-# Using all cores by default
-xz -T 0 file
-zstd --threads=0 file
-```
-
-## Archive Splitting
-
-```bash
-# Split large archives
-split -b 2G large.tar.gz part_
-cat part_* | tar -xzf -
-
-# Or with tar
-tar -czf - dir/ | split -b 2G - archive.tar.gz.
-cat archive.tar.gz.* | tar -xzf -
-
-# Create split with specific size
-rar a -v2G archive.rar dir/            # RAR volumes
-7z a -v2G archive.7z dir/             # 7z volumes
+xz -T 0 file                # xz, all cores (built-in)
+zstd --threads=0 file       # zstd, all cores (built-in)
+pigz -p $(nproc) file       # (install) parallel gzip
+pbzip2 file                 # (install) parallel bzip2
 ```
 
 ## Encryption
-
 ```bash
-# GPG symmetric encryption
-gpg -c file                            # Encrypt
-gpg -d file.gpg                        # Decrypt
-gpg --cipher-algo AES256 -c file        # AES256
+gpg -c file                 # GPG symmetric encrypt (prompts for passphrase)
+gpg -d file.gpg             # decrypt
+gpg --cipher-algo AES256 -c file   # AES256
 
-# OpenSSL encryption
 openssl enc -aes-256-cbc -salt -pbkdf2 -in file -out file.enc
 openssl enc -d -aes-256-cbc -in file.enc -out file
 
-# zip encryption
-zip -e archive.zip file                 # Password protect
-zip -P password archive.zip file        # From command line (visible in ps)
-
-# 7z encryption
-7z a -p archive.7z dir/               # Password prompt
-7z a -pSECRET archive.7z dir/          # Password on CLI
+zip -e archive.zip file     # password-protect zip
 ```
 
-## Archive Analysis
-
+## Archive Splitting
 ```bash
-# Analyze compression
-gzip -l archive.tar.gz                  # gzip stats
-xz -l archive.tar.xz                    # xz stats
-zip -l archive.zip                      # zip stats
-
-# Compression ratio
-ls -lh archive.*
-awk '{print $5/8}' <<< "$(xz -l file.xz | tail -1)"
-
-# Compare sizes
-du -h --apparent-size archive.*
+split -b 2G large.tar.gz part_        # split into 2G parts
+cat part_* | tar -xzf -               # reassemble + extract
+rar a -v2G archive.rar dir/           # (install) RAR volumes
+7z a -v2G archive.7z dir/             # (install) 7z volumes
 ```
 
-## Archive Recovery
-
+## Archive Recovery / Testing
 ```bash
-# Recover corrupted gzip
-gzrecover archive.tar.gz
-
-# Recover corrupted zip
-zip -FF archive.zip --out fixed.zip      # Fix
-zip -r fixed.zip broken.zip             # Repair
-
-# Test archives
-gzip -t archive.tar.gz
-bzip2 -t archive.tar.bz2
-xz -t archive.tar.xz
-zip -t archive.zip
-7z t archive.7z
+gzip -t archive.tar.gz       # test gzip integrity
+bzip2 -t archive.tar.bz2     # test bzip2
+xz -t archive.tar.xz         # test xz
+zip -T archive.zip           # test zip
+zip -FF archive.zip --out fixed.zip   # repair zip
 ```
 
 ## Special Formats
-
-### cpio (Unix archive)
 ```bash
-# Create
-find dir/ -print | cpio -ov > archive.cpio
+# cpio
+find dir/ -print | cpio -ov > archive.cpio     # create
+cpio -iv < archive.cpio                        # extract
 
-# Extract
-cpio -iv < archive.cpio
+# ar (static libraries)
+ar rcs libfoo.a foo.o bar.o    # create
+ar x libfoo.a                  # extract
+ar t libfoo.a                  # list
 
-# With compression
-find dir/ -print | cpio -ov | xz > archive.cpio.xz
-xzcat archive.cpio.xz | cpio -iv
-```
-
-### ar (static libraries)
-```bash
-ar rcs libfoo.a foo.o bar.o             # Create
-ar x libfoo.a                           # Extract
-ar t libfoo.a                           # List
-```
-
-### deb/rpm packages
-```bash
-# deb
-dpkg-deb -x package.deb dir/            # Extract
-dpkg-deb -e package.deb               # Extract control files
-dpkg-deb -b dir/ package.deb          # Build
-
-# rpm
-rpm2cpio package.rpm | cpio -id         # Extract
-rpm -qpl package.rpm                   # List
+# deb / rpm packages
+dpkg-deb -x package.deb dir/   # extract deb
+rpm2cpio package.rpm | cpio -id  # extract rpm
 ```
 
 ## Useful One-Liners
-
 ```bash
-# Find largest files before archiving
-find dir/ -type f -exec du -h {} + | sort -rh | head -20
-
-# Archive only changed files (backup)
-find dir/ -mtime -1 -print0 | tar -czf recent.tar.gz --null -T -
-
-# Extract archive while preserving permissions
-tar -xzpf archive.tar.gz
-
-# Create archive excluding git and cache
-tar -czf archive.tar.gz --exclude='.git' --exclude='node_modules' --exclude='.cache' dir/
-
-# Compress all logs in directory
-find . -name "*.log" -exec xz -9 {} +
-
-# Decompress all archives recursively
-find . -name "*.tar.*" -exec tar -xf {} \;
+find dir/ -type f -exec du -h {} + | sort -rh | head -20   # largest files
+find dir/ -mtime -1 -print0 | tar -czf recent.tar.gz --null -T -   # changed files
+tar -czf archive.tar.gz --exclude='.git' --exclude='node_modules' dir/  # backup
+find . -name '*.tar.*' -exec tar -xf {} \;   # extract all archives
 ```

@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# sys-detect — report the distro family and available tooling.
+# Output is a single line of KEY=value pairs, safe to eval or parse.
+# Families: debian (Ubuntu/Debian), arch, fedora (RHEL/Fedora), suse, unknown
+set -euo pipefail
+
+family=unknown
+distro=""
+pkg=""
+svc_mgr="systemd"
+firewall=""
+initramfs_cmd=""
+
+if [ -r /etc/os-release ]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  distro="${ID:-}"
+  case "$ID" in
+    ubuntu|debian|linuxmint|pop|kali|raspbian) family=debian; pkg=apt ;;
+    arch|archarm|manjaro|endeavouros|garuda)    family=arch;  pkg=pacman ;;
+    fedora|rhel|centos|rocky|almalinux|ol)     family=fedora; pkg=dnf ;;
+    opensuse*|sles|sled)                        family=suse;  pkg=zypper ;;
+    *) family=unknown ;;
+  esac
+  # Derive from ID_LIKE when the exact ID is unknown.
+  if [ "$family" = "unknown" ] && [ -n "${ID_LIKE:-}" ]; then
+    case "$ID_LIKE" in
+      *debian*) family=debian; pkg=apt ;;
+      *arch*)   family=arch;   pkg=pacman ;;
+      *fedora*|*rhel*) family=fedora; pkg=dnf ;;
+      *suse*)   family=suse;   pkg=zypper ;;
+    esac
+  fi
+fi
+
+# Fallbacks if /etc/os-release was uninformative.
+if [ "$family" = "unknown" ]; then
+  if command -v pacman >/dev/null 2>&1; then family=arch; pkg=pacman; fi
+  if command -v apt-get >/dev/null 2>&1; then family=debian; pkg=apt; fi
+  if command -v dnf >/dev/null 2>&1; then family=fedora; pkg=dnf; fi
+  if command -v zypper >/dev/null 2>&1; then family=suse; pkg=zypper; fi
+fi
+
+# Firewall default per family.
+case "$family" in
+  debian) firewall=ufw ;;
+  arch)   firewall=nftables ;;
+  fedora) firewall=firewalld ;;
+  suse)   firewall=firewalld ;;
+  *)      firewall=unknown ;;
+esac
+
+# Initramfs rebuild command per family.
+case "$family" in
+  debian) initramfs_cmd="update-initramfs -u" ;;
+  arch)   initramfs_cmd="mkinitcpio -P" ;;
+  fedora) initramfs_cmd="dracut --force" ;;
+  *)      initramfs_cmd="" ;;
+esac
+
+# Service name for SSH differs by family.
+ssh_unit=""
+if [ "$family" = "debian" ]; then ssh_unit=ssh; else ssh_unit=sshd; fi
+
+printf 'family=%s distro=%s pkg=%s svc_mgr=%s firewall=%s initramfs="%s" ssh_unit=%s\n' \
+  "$family" "$distro" "$pkg" "$svc_mgr" "$firewall" "$initramfs_cmd" "$ssh_unit"

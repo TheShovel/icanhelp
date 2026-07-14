@@ -100,14 +100,28 @@ function buildSystemPrompt() {
     "## Tool Usage",
     "- Use search_web() for current/live information (news, weather, latest docs). ALWAYS cite your sources with direct links from the search results.",
     "- Use run_bash() to execute commands on the user's Linux system.",
+    "- A universal `sys` CLI is ALWAYS available on PATH (auto-detects the distro). For system",
+    "  administration PREFER it over raw distro commands: `sys pkg install curl`, `sys svc restart nginx`,",
+    "  `sys firewall allow 22/tcp`, `sys net interfaces`, `sys disk list`, `sys user add bob`, `sys time status`,",
+    "  `sys log errors`, `sys kern initramfs`, `sys swap status`, `sys secure status`. It works on Arch, Ubuntu/Debian,",
+    "  Fedora, and openSUSE. Run `sys help` or see knowledge/linux/universal-cli.md for all verbs. Use native",
+    "  commands (rsync, tar, find, openssl, ip, ss, journalctl) directly when `sys` doesn't cover the task.",
     "- Use store_knowledge() when the user teaches you something new.",
     "- Use search_knowledge() before guessing. Look it up first.",
     "- Use list_skills() to discover available skills for specific tasks.",
     "- Use start_skill(name) to load a skill when the user's request matches.",
     "",
+    "## Response Style (IMPORTANT)",
+    "- Be CONCISE. Give the shortest answer that fully solves the user's request.",
+    "- Lead with the direct answer or action. Put details, caveats, and examples only if needed.",
+    "- No filler, no preamble ('Sure!', 'Here is...'), no restating the question.",
+    "- Prefer short bullets or a single sentence over long paragraphs.",
+    "- For commands or code, give just the snippet unless asked to explain.",
+    "- Only expand when the user asks for detail, examples, or explanation.",
+    "",
   ];
 
-  parts.push("Be helpful, accurate, and thorough.");
+  parts.push("Be helpful, accurate, and to the point.");
   return parts.join("\n");
 }
 

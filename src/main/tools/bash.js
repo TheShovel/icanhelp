@@ -1,4 +1,30 @@
 const { spawn } = require("child_process");
+const path = require("path");
+
+// Ensure the app's bundled `bin/` (the universal `sys` CLI) is always on PATH
+// when the AI runs commands, regardless of how the desktop session exported
+// PATH. Falls back gracefully if the dir doesn't exist.
+function sysBinDir() {
+  try {
+    const dataHome =
+      process.env.XDG_DATA_HOME ||
+      path.join(require("os").homedir(), ".local", "share");
+    return path.join(dataHome, "icanhelp", "bin");
+  } catch (e) {
+    return null;
+  }
+}
+
+function withSysOnPath(env) {
+  const base = env || process.env;
+  const bin = sysBinDir();
+  if (!bin) return base;
+  const existing = base.PATH || base.Path || "";
+  if (existing.split(path.delimiter).includes(bin)) return base;
+  return Object.assign({}, base, {
+    PATH: bin + path.delimiter + existing,
+  });
+}
 
 const BLOCKED_PATTERNS = [
   /^\s*rm\s+-rf\s+\/\s*/,
@@ -57,6 +83,7 @@ async function runBash({ command, onSudoPrompt, onConfirm, onOutput }) {
   return new Promise(function (resolve) {
     var proc = spawn("/bin/bash", ["-c", command], {
       stdio: ["pipe", "pipe", "pipe"],
+      env: withSysOnPath(process.env),
     });
 
     var stdout = "";

@@ -1,151 +1,98 @@
 # systemd (System & Service Manager)
 
-## Unit Management
+Canonical reference for common systemd commands. Prefer the `sys` wrapper for service and log operations — it auto-detects distro quirks (e.g. the `ssh` vs `sshd` unit name). Other `systemd-*.md` files cover specific subsystems.
+
+## Service management — use `sys svc` (all distros)
+```bash
+sys svc status nginx            # status + recent logs (unit name auto-detected)
+sys svc start nginx
+sys svc stop nginx
+sys svc restart nginx
+sys svc enable nginx            # enable at boot
+sys svc disable nginx
+sys svc mask nginx              # prevent any activation
+sys svc unmask nginx
 ```
-systemctl start <unit>       — start a unit
-systemctl stop <unit>        — stop a unit
-systemctl restart <unit>     — restart a unit
-systemctl reload <unit>      — reload config (SIGHUP)
-systemctl enable <unit>      — enable at boot
-systemctl disable <unit>     — disable at boot
-systemctl enable --now <unit> — enable and start
-systemctl status <unit>      — show status + recent logs
-systemctl is-active <unit>   — check if running
-systemctl is-enabled <unit>  — check boot enable
-systemctl mask <unit>        — prevent any activation
-systemctl unmask <unit>      — reallow activation
-systemctl daemon-reload      — reload unit files
-systemctl cat <unit>         — show unit file content
-systemctl edit <unit>        — override unit config
-systemctl revert <unit>      — undo overrides
+Raw equivalent: `sudo systemctl status|start|stop|restart|enable|disable|mask|unmask <unit>`.
+
+`sys svc` has no `reload` verb — for config reload use native `sudo systemctl reload <unit>` (e.g. `sudo systemctl reload sshd`).
+
+## System state (native `systemctl`)
+```bash
+systemctl list-units --type=service        # active units
+systemctl --failed                         # failed units
+systemctl list-unit-files --type=service   # installed + enable state
+systemctl list-dependencies <unit>
+systemctl get-default                      # current boot target
+systemctl daemon-reload                    # after editing unit files
+systemctl cat <unit>                       # show unit file
+systemctl edit <unit>                      # drop-in override (creates .d/override.conf)
 ```
 
-## System State
-```
-systemctl list-units                            — all active units
-systemctl list-units --failed                   — failed units
-systemctl list-unit-files                       — all installed unit files
-systemctl list-dependencies <unit>              — dependency tree
-systemctl list-sockets                          — socket units
-systemctl list-timers                           — timer units
-systemctl get-default                           — current target
-systemctl set-default multi-user.target         — set boot target (CLI)
-systemctl set-default graphical.target          — set boot target (GUI)
+## Power commands (native)
+```bash
+systemctl poweroff / reboot / suspend / hibernate / hybrid-sleep
+systemctl reboot --firmware-setup          # into UEFI/BIOS
 ```
 
-## Power Commands
+## Logs — use `sys log` (all distros)
+```bash
+sys log show                 # all logs
+sys log show nginx           # logs for a unit
+sys log follow               # follow live
+sys log follow nginx
+sys log errors               # priority err and above, this boot
+sys log boot                 # current boot
+sys log disk                 # journal size on disk
+sys log vacuum 100M          # trim journal to 100M
 ```
-systemctl poweroff         — shutdown + power off
-systemctl reboot           — reboot
-systemctl reboot --firmware-setup — reboot into UEFI
-systemctl suspend          — suspend to RAM
-systemctl hibernate        — suspend to disk
-systemctl hybrid-sleep     — both suspend + hibernate
-systemctl reboot --force   — hard reboot
+Raw equivalent: `sudo journalctl`, `sudo journalctl -u <unit>`, `sudo journalctl -p err -b`, `sudo journalctl --vacuum-size=100M`.
+
+Advanced journalctl (native, not wrapped):
+```bash
+journalctl -u <unit> --since "1h"        # time filter
+journalctl -b -1                          # previous boot
+journalctl --list-boots
+journalctl -o json -u nginx | jq '.MESSAGE'
+journalctl --verify
 ```
 
-## Journalctl (Logs)
-```
-journalctl                        — all logs (pager)
-journalctl -u <unit>              — logs for specific unit
-journalctl -u <unit> -f           — follow logs live
-journalctl -u <unit> --since "1h" — last hour
-journalctl -u <unit> --since "yesterday" — since yesterday
-journalctl -k                     — kernel logs
-journalctl -n 50                  — last 50 lines
-journalctl -p err                 — priority err and above
-journalctl --no-pager             — disable pager
-journalctl --vacuum-size=100M     — trim log size
-journalctl --vacuum-time=7d       — keep 7 days
-journalctl --disk-usage           — show log disk usage
-journalctl --verify               — check journal integrity
-```
+## Common targets
+`poweroff.target`, `reboot.target`, `emergency.target`, `rescue.target`, `multi-user.target` (CLI), `graphical.target` (GUI), `suspend.target`, `hibernate.target`.
 
-## Common Targets
-- `poweroff.target` — shut down
-- `reboot.target` — reboot
-- `halt.target` — halt (no poweroff)
-- `emergency.target` — single-user emergency shell
-- `rescue.target` — basic system + rescue shell
-- `multi-user.target` — CLI multi-user (no GUI)
-- `graphical.target` — GUI (multi-user + display manager)
-- `suspend.target` — suspend to RAM
-- `hibernate.target` — hibernate to disk
-
-## Unit File Locations
-- `/usr/lib/systemd/system/` — distro-provided units
-- `/etc/systemd/system/` — admin/override units (higher priority)
-- `/run/systemd/system/` — runtime-generated units (highest priority)
+## Unit file locations (priority high→low)
+- `/etc/systemd/system/` — admin overrides (highest)
+- `/run/systemd/system/` — runtime-generated
+- `/usr/lib/systemd/system/` — package-provided (lowest)
 - `~/.config/systemd/user/` — user-service units
 
-## Unit File Anatomy (Service)
+## Distro service-name gotchas
+- **SSH**: `sshd.service` on Arch, `ssh.service` on Ubuntu/Debian. `sys svc status ssh` works on both via the alias.
+- **Networking**: Ubuntu Desktop uses `NetworkManager`; Ubuntu Server uses `systemd-networkd` or NetworkManager; Arch ships nothing enabled by default.
+- **Logging**: Arch is journald-only; Ubuntu also writes `/var/log/syslog`.
+
+## Unit file anatomy (service)
 ```ini
 [Unit]
 Description=My Service
-Documentation=man:something(1)
 After=network.target
-Wants=some.service
-Requires=other.service
-BindsTo=target.service
-Conflicts=conflicting.service
 
 [Service]
-Type=simple           # default: forks, oneshot, notify, dbus, idle
+Type=simple
 ExecStart=/usr/bin/myapp --flag
-ExecStop=/usr/bin/stop-myapp
-ExecReload=/bin/kill -HUP $MAINPID
-Restart=on-failure    # always, on-success, on-failure, on-abnormal, on-abort, on-watchdog
-RestartSec=5s
+Restart=on-failure
 User=myuser
-Group=mygroup
 Environment=VAR=value
-EnvironmentFile=/etc/sysconfig/myapp
-WorkingDirectory=/opt/myapp
-LimitNOFILE=65536
-TimeoutStartSec=30s
-TimeoutStopSec=10s
-StandardOutput=journal
-StandardError=journal
-ProtectSystem=full
-PrivateTmp=true
-NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
 ```
+See `systemd-service-guide.md` for writing units and `systemd-deep.md` for socket activation, cgroups, and hardening.
 
-## Timer Units (systemd Cron)
-```ini
-# /etc/systemd/system/backup.timer
-[Unit]
-Description=Weekly backup
-
-[Timer]
-OnCalendar=weekly
-Persistent=true
-RandomizedDelaySec=1h
-
-[Install]
-WantedBy=timers.target
+## systemd-analyze (safe, no service changes)
+```bash
+systemd-analyze                         # total boot time
+systemd-analyze blame                   # per-unit startup time
+systemd-analyze verify /etc/systemd/system/my.service  # syntax check
+systemd-analyze security my.service     # exposure audit
 ```
-- `systemctl list-timers` — list all active timers
-- `systemctl start backup.service` — manually trigger (without timer)
-- `systemctl enable --now backup.timer` — enable timer
-
-## Useful Environment Variables
-- `$SYSTEMD_PAGER` — set to `cat` to disable pager
-- `$SYSTEMD_COLORS` — set to `0` to disable colors
-- `$SYSTEMD_DEBUG` — enable debug logging
-
-## Drop-in Overrides
-Instead of editing unit files directly:
-```
-systemctl edit myunit.service
-# Creates /etc/systemd/system/myunit.service.d/override.conf
-```
-Then add overrides:
-```ini
-[Service]
-Environment=EXTRA=value
-```
-Run `systemctl daemon-reload` after editing.

@@ -509,6 +509,27 @@ LAUNCHEREOF
 chmod +x "$LAUNCHER"
 ok "Launcher created"
 
+# ── install universal `sys` CLI onto PATH ────────────────────────
+# The AI (and the user) can call `sys` from anywhere. Symlink the wrapper
+# scripts into ~/.local/bin, which is on PATH for Ubuntu, Fedora, Arch, and
+# openSUSE desktop sessions.
+log "Installing universal 'sys' CLI …"
+LOCAL_BIN="${XDG_BIN_HOME:-$HOME/.local/bin}"
+mkdir -p "$LOCAL_BIN"
+for script in "$INSTALL_DIR"/bin/*; do
+  [ -f "$script" ] || continue
+  name="$(basename "$script")"
+  # Remove any stale symlink, then link the deployed copy.
+  rm -f "$LOCAL_BIN/$name"
+  ln -s "$script" "$LOCAL_BIN/$name"
+  chmod +x "$script"
+done
+if [ -x "$LOCAL_BIN/sys" ]; then
+  ok "'sys' CLI linked into $LOCAL_BIN (on PATH)"
+else
+  warn "Could not link 'sys' CLI — the AI can still call it via $INSTALL_DIR/bin/sys"
+fi
+
 log "Registering system application …"
 mkdir -p "$APP_DIRS"
 cat > "$DESKTOP_FILE" << DESKTOPeof

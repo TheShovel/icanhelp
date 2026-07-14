@@ -2,459 +2,111 @@
 
 ## General Approach
 
-### 1. Define the Problem
-- What are the symptoms?
-- When did it start?
-- What changed recently?
-- Can you reproduce it?
-- What's the impact?
+1. **Define the problem** — symptoms, when it started, what changed, reproducible?, impact.
+2. **Gather information** — system state, logs, metrics.
+3. **Form hypothesis** — binary search / divide and conquer; check recent changes first.
+4. **Test hypothesis** — one change at a time; document; have a rollback plan.
+5. **Implement fix** — apply, verify, monitor for regression.
+6. **Document** — root cause, resolution, prevention.
 
-### 2. Gather Information
+## Gather Info (Baseline)
+Prefer `sys` verbs; native universal tools are fine where `sys` doesn't cover them.
 ```bash
-# System info
-uname -a
+uname -a                     # kernel (tested: works)
 cat /etc/os-release
-uptime
-who -b
-
-# Resource usage
-top / htop / btop
-free -h
-df -h
-iostat -xz 1
-vmstat 1
-
-# Logs
-journalctl -xe
-journalctl -u service-name -f
-dmesg -T
-tail -f /var/log/syslog
-tail -f /var/log/messages
-
-# Network
-ss -tulnp
-ip addr show
-ip route show
+sys detect                   # distro + tooling
+sys perf load                # load (uptime)
+sys perf mem                 # memory (free -h)
+sys disk usage               # disk (df -h)
+vmstat 1                     # health (tested: works)
+sys log show -xe             # last failure (tested: works)
+dmesg -T                     # kernel log (root in sandbox)
+sys net listen               # listening sockets (tested: works)
+ip addr show ; ip route show
 ping -c 3 8.8.8.8
 ```
 
-### 3. Form Hypothesis
-- Use binary search / divide and conquer
-- Check recent changes first
-- Eliminate variables
-
-### 4. Test Hypothesis
-- Make one change at a time
-- Document what you tried
-- Have rollback plan
-
-### 5. Implement Fix
-- Apply fix
-- Verify resolution
-- Monitor for regression
-
-### 6. Document
-- Root cause
-- Resolution
-- Prevention
-
 ## Common Issue Categories
 
-### Boot Issues
+### Boot
 ```bash
-# GRUB
-grub2-mkconfig -o /boot/grub2/grub.cfg
-grub2-install /dev/sda
-
-# Initramfs
-dracut -f
-mkinitcpio -P
-
-# systemd
-systemctl default
-systemctl isolate multi-user.target
-systemctl isolate graphical.target
-
-# Emergency shell
-# Kernel param: systemd.unit=emergency.target
-# Or: rd.break
-
-# Check failed units
-systemctl --failed
+systemctl --failed           # failed units (tested: works)
 systemctl list-units --state=failed
-
-# Journal from previous boot
-journalctl -b -1 -p err
+sys log boot -1 -p err       # previous boot errors
+sys kern initramfs           # rebuild initramfs
 ```
 
-### Network Connectivity
+### Network Connectivity (layered)
 ```bash
-# Layer 1: Physical
-ethtool eth0
-ip link show eth0
-
-# Layer 2: Data Link
-ip neighbor show
-bridge link show
-
-# Layer 3: Network
-ip route show
-ip route get 8.8.8.8
-traceroute 8.8.8.8
-mtr 8.8.8.8
-
-# Layer 4: Transport
-ss -tulnp
-nc -zv host port
-telnet host port
-
-# DNS
-dig example.com
-dig @8.8.8.8 example.com
-getent hosts example.com
-systemctl status systemd-resolved
-
-# Firewall
-iptables -L -n -v
-nft list ruleset
-firewall-cmd --list-all
-ufw status verbose
-
-# Capture
-tcpdump -i eth0 -nn -s0 -w capture.pcap port 80
+ethtool eth0 ; ip link show eth0        # L1/L2
+ip neighbor show ; ip route get 8.8.8.8 # L3
+sys net listen ; nc -zv host port        # L4
+dig example.com ; getent hosts example.com   # DNS
+sys firewall status ; nft list ruleset  # firewall
+tcpdump -i eth0 -nn -w cap.pcap port 80 # capture
 ```
 
-### Disk Space Issues
+### Disk Space
 ```bash
-# Find large files
-du -h / | sort -hr | head -20
+sys disk fs /                # du -sh on a path
 find / -xdev -type f -size +100M -exec ls -lh {} \;
-
-# Find deleted but open files
-lsof +L1
-lsof | grep deleted
-
-# Inode exhaustion
-df -i
-
-# Clean package cache
-apt clean
-dnf clean all
-pacman -Sc
-journalctl --vacuum-time=30d
-
-# Docker
-docker system prune -a
-docker image prune -a
-
-# Logs
-find /var/log -type f -name "*.log" -exec truncate -s 0 {} \;
+lsof +L1                      # deleted-but-open files
+df -i                         # inode exhaustion
+sys log vacuum 30d           # trim journal by time
 ```
 
-### Memory Issues
+### Memory
 ```bash
-# Check usage
-free -h
-cat /proc/meminfo
-
-# Find memory hogs
+sys perf mem ; cat /proc/meminfo
 ps aux --sort=-%mem | head
-smem -r
-
-# OOM killer
-dmesg -T | grep -i "out of memory"
-journalctl -k | grep -i oom
-
-# Swap
-swapon --show
-cat /proc/sys/vm/swappiness
-
-# Memory leaks
-valgrind --leak-check=full ./program
-heaptrack ./program
+dmesg -T | grep -i "out of memory"   # (root)
+sys swap status
 ```
 
-### CPU Issues
+### CPU
 ```bash
-# Top consumers
-top -c
-htop
-pidstat 1
-
-# Per-process
-pidstat -u -p PID 1
-perf top -p PID
-strace -p PID -c
-
-# System-wide
+top -c ; htop ; pidstat 1
 mpstat -P ALL 1
-perf record -a -g -- sleep 30
-perf report
-
-# Interrupts
+perf record -a -g -- sleep 30 ; perf report   # (perf not in sandbox)
 cat /proc/interrupts
-watch -n1 cat /proc/interrupts
 ```
 
 ### Process Issues
 ```bash
-# Stuck process
-ps aux | grep D
-# D state = uninterruptible sleep (usually I/O)
-
-# Zombie process
-ps aux | grep Z
-# Kill parent to reap zombie
-
-# High CPU
-pidstat 1
-perf top
-
-# Memory growth
-pidstat -r 1
-pmap -x PID
-
-# File descriptors
-lsof -p PID
-ls -l /proc/PID/fd/
-
-# Threads
-ps -eLf | grep PID
-top -H -p PID
+ps aux | grep D      # uninterruptible sleep (I/O stuck)
+ps aux | grep Z      # zombies (kill parent to reap)
+lsof -p PID ; ls -l /proc/PID/fd/   # open files / fds
+ps -eLf | grep PID ; top -H -p PID  # threads
 ```
 
 ### Service Issues
 ```bash
-# Status
-systemctl status service
-systemctl is-active service
-systemctl is-enabled service
-
-# Logs
+sys svc status service        # status + recent logs
 journalctl -u service -f
-journalctl -u service --since "1 hour ago"
-journalctl -u service -n 100
-
-# Debug
-systemctl cat service
-systemctl show service
-systemd-analyze verify service
-
-# Dependencies
+systemctl cat service ; systemd-analyze verify service
 systemctl list-dependencies service
-systemctl list-dependencies --reverse service
-
-# Restart
-systemctl restart service
-systemctl reload service
-systemctl daemon-reload
 ```
 
-### Permission Issues
+### Permissions
 ```bash
-# Check permissions
-ls -la /path
-stat /path
-getfacl /path
-
-# SELinux
-getenforce
-ausearch -m avc -ts recent
-sealert -a /var/log/audit/audit.log
-setenforce 0  # Temporary disable
-
-# AppArmor
-aa-status
-dmesg -T | grep apparmor
-
-# Capabilities
-getcap /path/to/binary
-setcap cap_net_bind_service=+ep /path/to/binary
-
-# sudo
-sudo -l
-visudo
+ls -la /path ; stat /path ; getfacl /path
+sys secure status             # SELinux / AppArmor
+sys secure audit              # recent AVC denials
+getcap /path/to/binary ; sudo -l
 ```
 
-## Performance Troubleshooting
+## Performance: USE Method
 
-### USE Method (Utilization, Saturation, Errors)
+For each resource check **U**tilization, **S**aturation, **E**rrors:
+- **CPU**: `mpstat 1` / `vmstat 1` (r > CPUs = saturated) / `dmesg | grep cpu`
+- **Memory**: `sys perf mem` / `vmstat 1` (si/so) / `dmesg | grep memory`
+- **Disk**: `iostat -xz 1` (%util, await) / `smartctl -a /dev/sda`
+- **Network**: `sar -n DEV 1` / `netstat -s | grep retrans` / `ethtool -S eth0`
+
+## Flame Graphs (CPU profiling)
 ```bash
-# CPU
-Utilization: mpstat 1, vmstat 1
-Saturation: vmstat 1 (r column > CPU count)
-Errors: dmesg | grep -i cpu
-
-# Memory
-Utilization: free -h
-Saturation: vmstat 1 (si/so columns), swap usage
-Errors: dmesg | grep -i memory
-
-# Disk
-Utilization: iostat -xz 1 (%util)
-Saturation: iostat -xz 1 (await, aqu-sz)
-Errors: smartctl -a /dev/sda, dmesg | grep -i disk
-
-# Network
-Utilization: sar -n DEV 1
-Saturation: netstat -s | grep -i "segments retransmitted"
-Errors: ethtool -S eth0 | grep -i error
-```
-
-### BPF Tools (Modern)
-```bash
-# Install bcc-tools / bpftrace
-
-# CPU
-profile-bpfcc
-cpuwalk-bpfcc
-
-# Memory
-memleak-bpfcc
-oomkill-bpfcc
-
-# Disk
-biolatency-bpfcc
-biosnoop-bpfcc
-
-# Network
-tcplife-bpfcc
-tcpconnect-bpfcc
-tcpretrans-bpfcc
-
-# File opens
-opensnoop-bpfcc
-```
-
-### Flame Graphs
-```bash
-# CPU
 perf record -F 99 -a -g -- sleep 30
 perf script | stackcollapse-perf.pl | flamegraph.pl > cpu.svg
-
-# Off-CPU
-perf record -e sched:sched_switch -a -g -- sleep 30
-perf script | stackcollapse-perf.pl | flamegraph.pl > offcpu.svg
-```
-
-## Specific Scenarios
-
-### "Server is Slow"
-```bash
-# 1. Check load
-uptime
-top
-
-# 2. Check resources
-free -h
-df -h
-iostat -xz 1
-
-# 3. Check network
-ss -tulnp
-netstat -s
-
-# 4. Check logs
-journalctl -p err -n 50
-dmesg -T | tail -20
-
-# 5. Check processes
-ps aux --sort=-%cpu | head
-ps aux --sort=-%mem | head
-```
-
-### "Website Down"
-```bash
-# 1. Local check
-curl -I http://localhost
-curl -I https://domain.com
-
-# 2. DNS
-dig domain.com
-dig @8.8.8.8 domain.com
-
-# 3. Port
-nc -zv domain.com 443
-telnet domain.com 80
-
-# 4. Service
-systemctl status nginx
-systemctl status php-fpm
-
-# 5. Upstream
-curl -I http://backend:8080
-
-# 6. Logs
-tail -f /var/log/nginx/error.log
-journalctl -u nginx -f
-```
-
-### "Database Slow"
-```bash
-# 1. Connections
-SELECT count(*) FROM pg_stat_activity;
-
-# 2. Long queries
-SELECT * FROM pg_stat_activity WHERE state = 'active' AND now() - query_start > interval '30 seconds';
-
-# 3. Locks
-SELECT * FROM pg_locks WHERE NOT granted;
-
-# 4. Index usage
-SELECT * FROM pg_stat_user_tables WHERE idx_scan = 0;
-
-# 5. Table bloat
-SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) 
-FROM pg_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size DESC;
-```
-
-### "Can't SSH"
-```bash
-# 1. Port
-nc -zv host 22
-telnet host 22
-
-# 2. Service
-systemctl status sshd
-
-# 3. Config
-sshd -T | grep -i permit
-cat /etc/ssh/sshd_config | grep -v ^#
-
-# 4. Logs
-journalctl -u sshd -f
-tail -f /var/log/auth.log
-
-# 5. Keys
-ssh -vvv host
-ssh -i ~/.ssh/id_rsa host
-
-# 6. Firewall
-iptables -L -n | grep 22
-firewall-cmd --list-all
-```
-
-### "SSL Certificate Issues"
-```bash
-# Check cert
-openssl s_client -connect domain.com:443 -servername domain.com
-openssl x509 -in cert.pem -text -noout
-
-# Check expiration
-openssl x509 -in cert.pem -noout -dates
-
-# Check chain
-openssl s_client -connect domain.com:443 -showcerts
-
-# Verify
-openssl verify -CAfile ca.pem cert.pem
-
-# Common issues
-# - Expired cert
-# - Wrong hostname (SAN)
-# - Missing intermediate
-# - Self-signed
-# - Weak cipher
 ```
 
 ## Debugging Tools Cheatsheet
@@ -465,56 +117,10 @@ openssl verify -CAfile ca.pem cert.pem
 | `ltrace` | Library calls |
 | `gdb` | Debugger |
 | `perf` | Profiling |
-| `bpftrace` | eBPF tracing |
+| `bpftrace` | eBPF tracing (see ebpf.md) |
 | `tcpdump` | Packet capture |
-| `wireshark` | Packet analysis |
 | `lsof` | Open files |
 | `ss` | Socket statistics |
-| `iotop` | I/O per process |
-| `nethogs` | Network per process |
+| `iotop` / `nethogs` | Per-process I/O / network |
 | `htop` | Interactive process viewer |
-| `dstat` | System statistics |
-| `sar` | Historical statistics |
-| `vmstat` | Virtual memory stats |
-| `iostat` | I/O statistics |
-| `mpstat` | CPU statistics |
-| `pidstat` | Per-process stats |
-| `numastat` | NUMA statistics |
-
-## Runbooks Template
-
-```markdown
-# Runbook: [Service Name] - [Issue Type]
-
-## Symptoms
-- [Observable behavior]
-
-## Diagnosis Steps
-1. [Command to run]
-   Expected: [normal output]
-   Alert if: [abnormal output]
-
-2. [Next step]
-
-## Resolution
-### Option 1: [Quick fix]
-```bash
-command to fix
-```
-
-### Option 2: [Full fix]
-```bash
-steps
-```
-
-## Verification
-- [How to confirm fix worked]
-
-## Escalation
-- [When to escalate]
-- [Contact info]
-
-## Prevention
-- [Monitoring alerts to add]
-- [Process changes]
-```
+| `vmstat` / `iostat` / `mpstat` / `pidstat` / `sar` / `numastat` | System statistics |

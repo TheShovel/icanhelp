@@ -1,269 +1,122 @@
-# Linux Cron & Systemd Timers
+# Cron & Migrating to systemd Timers
 
-## Cron
+Cron is the classic scheduler; systemd timers are the modern replacement with
+journal logging, dependencies, and missed-run recovery. See `systemd-timers.md`
+for timer syntax details.
 
-### Crontab Syntax
-```bash
+## Crontab syntax
+```
 # * * * * *  command
-# ┬ ┬ ┬ ┬ └─ Day of week (0-7) (Sun=0 or 7)
+# ┬ ┬ ┬ ┬ └─ Day of week (0-7, Sun=0 or 7)
 # ┬ ┬ ┬ └──── Month (1-12)
 # ┬ ┬ └────── Day of month (1-31)
 # ┬ └──────── Hour (0-23)
 # └────────── Minute (0-59)
-
-# Examples
-0 2 * * *     /backup.sh                    # Daily 2 AM
-*/15 * * * *  /check.sh                     # Every 15 min
-0 0 * * 0     /weekly.sh                    # Weekly Sunday
-0 0 1 * *     /monthly.sh                   # Monthly 1st
-@reboot       /startup.sh                   # On boot
-@yearly       /yearly.sh                    # Yearly Jan 1 0:00
-@monthly      /monthly.sh                   # Monthly 1st 0:00
-@weekly       /weekly.sh                    # Weekly Sun 0:00
-@daily        /daily.sh                     # Daily 0:00
-@hourly       /hourly.sh                    # Hourly :00
+0 2 * * *     /backup.sh                  # Daily 2 AM
+*/15 * * * *  /check.sh                   # Every 15 min
+0 0 * * 0     /weekly.sh                  # Weekly Sunday
+@reboot       /startup.sh                 # On boot
+@daily        /daily.sh                    # Daily 00:00
+@hourly       /hourly.sh                  # Hourly :00
 ```
 
-### Crontab Management
-```bash
-crontab -e              # Edit user crontab
-crontab -l              # List user crontab
-crontab -r              # Remove user crontab
-crontab -u user -e      # Edit other user's crontab (root)
+## Crontab management
+```
+crontab -e              # edit your crontab
+crontab -l              # list it
+crontab -r              # remove it
+crontab -u user -e      # edit another user's (root only)
+```
+System crontabs (have a USER field): `/etc/crontab`, `/etc/cron.d/*`,
+`/etc/cron.{hourly,daily,weekly,monthly}/` (run via run-parts).
 
-# System crontabs
-/etc/crontab            # System crontab (has USER field)
-/etc/cron.d/            # Drop-in files (has USER field)
-/etc/cron.{hourly,daily,weekly,monthly}/  # run-parts directories
+## Cron service management
+The cron daemon's unit name differs by distro — `cronie` (Arch), `cron`
+(Debian/Ubuntu), `crond` (Fedora/RHEL). Use `sys svc` so the right unit is
+picked automatically:
+```
+sys svc status  cronie   # check the daemon is running
+sys svc enable  cronie   # enable at boot
+sys svc start   cronie   # start now (sys svc has no --now flag)
+sys svc restart cronie   # after editing /etc/cron.d or /etc/crontab
+sys log follow  cronie   # watch cron runs in the journal
 ```
 
-### Cron Environment
-```bash
-# Cron runs with minimal env: SHELL=/bin/sh, PATH=/usr/bin:/bin, HOME=/home/user
-# Always use full paths in commands
-PATH=/usr/local/bin:/usr/bin:/bin
-SHELL=/bin/bash
-MAILTO="user@example.com"   # Email output (empty = no mail)
-
-# In script, source environment
-source /etc/profile
-source ~/.bashrc
+## Cron environment gotchas
+- Cron runs with a minimal env: `SHELL=/bin/sh`, `PATH=/usr/bin:/bin`.
+- Always use **full paths** in commands.
+- Set env in the crontab or source a profile in the script:
 ```
-
-### Cron Logging
-```bash
-# Systemd journal (systemd-cron)
-journalctl -u cron -f
-
-# Traditional syslog
-grep CRON /var/log/syslog
-grep CRON /var/log/cron
-
-# Capture output in crontab
-* * * * * /cmd >> /var/log/mycmd.log 2>&1
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO="user@example.com"   # empty = no mail
+0 2 * * * alice . $HOME/.profile; /home/alice/bin/daily.sh
 ```
+- A trailing newline in the crontab is required.
 
-### Common Issues
-```bash
-# Jobs not running
-# - Check cron daemon: systemctl status cron
-# - Check cron logs: journalctl -u cron
-# - Command path: use full /usr/bin/command
-# - Permissions: script must be executable
-# - Environment: source ~/.bashrc or set PATH
-# - Newline at end of crontab file required
-
-# Output not emailed
-# - Install mailutils/mailx
-# - Set MAILTO in crontab
-# - Check mail: mail or /var/mail/user
-```
-
-## Systemd Timers (Modern Replacement)
-
-### Timer Unit (`/etc/systemd/system/mytimer.timer`)
+## Migrating cron → timer
+1. Move the command into a oneshot service:
 ```ini
+# /etc/systemd/system/backup.service
 [Unit]
-Description=Run my script daily
-Requires=myscript.service
+Description=Backup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/backup.sh
+```
+2. Add a timer:
+```ini
+# /etc/systemd/system/backup.timer
+[Unit]
+Description=Daily backup
 
 [Timer]
-# Calendar events (systemd.time format)
-OnCalendar=daily                    # Daily 00:00
-OnCalendar=*-*-* 02:30:00           # Daily 02:30
-OnCalendar=Mon *-*-* 03:00:00       # Mondays 03:00
-OnCalendar=*-*-1 04:00:00           # 1st of month 04:00
-OnCalendar=Sat,Sun *-*-* 05:00:00   # Weekends 05:00
-OnCalendar=*-01,07-*-1 06:00:00     # Jan 1 & Jul 1 06:00
-
-# Monotonic timers (relative to boot/activation)
-OnBootSec=15min                     # 15 min after boot
-OnUnitActiveSec=1h                  # 1h after last activation
-OnUnitInactiveSec=30min             # 30min after last deactivation
-OnStartupSec=10min                  # 10 min after manager start
-
-# Accuracy
-AccuracySec=1min                    # Default 1min, use 1s for precision
-RandomizedDelaySec=15min            # Random delay 0-15min (prevent thundering herd)
-
-Persistent=true                     # Run immediately if missed (cron @reboot behavior)
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+RandomizedDelaySec=15min
 
 [Install]
 WantedBy=timers.target
 ```
-
-### Service Unit (`/etc/systemd/system/myscript.service`)
-```ini
-[Unit]
-Description=My backup script
-# No [Install] needed - timer handles enabling
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/backup.sh
-# Environment
-Environment=BACKUP_PATH=/mnt/backup
-EnvironmentFile=/etc/default/backup
-# Logging
-StandardOutput=journal
-StandardError=journal
-# Security hardening
-PrivateTmp=true
-ProtectSystem=strict
-ReadWritePaths=/mnt/backup
-NoNewPrivileges=true
+3. Enable and start the timer:
 ```
-
-### Timer Management
-```bash
-systemctl daemon-reload
-systemctl enable --now myscript.timer
-systemctl list-timers --all         # List all timers
-systemctl list-timers --all --no-pager
-systemctl status myscript.timer
-systemctl status myscript.service
-
-# Debug
-systemctl cat myscript.timer
-systemctl show myscript.timer
-journalctl -u myscript.service -f
+sys svc enable  backup.timer
+sys svc start   backup.timer
 ```
+4. Logs now appear in the journal: `sys log show backup.service` (or
+`sys log follow backup.service`).
 
-### Calendar Event Syntax (systemd.time)
-```bash
-# Examples
-daily                    # 00:00 daily
-weekly                   # Mon 00:00
-monthly                  # 1st 00:00
-yearly                   # Jan 1 00:00
-*-*-* 00:00:00           # Daily midnight
-Mon *-*-* 00:00:00       # Weekly Monday
-*-*-1 00:00:00           # Monthly 1st
-*-1-1 00:00:00           # Yearly Jan 1
-Mon,Fri *-*-* 00:00:00   # Mon & Fri
-*-*-1/2 00:00:00         # Every 2 days
-*-*-* 00:00:00/12        # Every 12 hours
-*-*-* 00:00:00+5min      # 5 min after midnight
+### Mapping
+| Cron | systemd timer |
+|------|----------------|
+| `0 2 * * *` | `OnCalendar=*-*-* 02:00:00` |
+| `*/15 * * * *` | `OnCalendar=*-*-* *:00/15` |
+| `@daily` | `OnCalendar=daily` |
+| `@reboot` | `OnBootSec=1min` + `Persistent=true` |
+| random delay | `RandomizedDelaySec=` |
+| mail on output | journal by default (`sys log show …`) |
+| missed run | `Persistent=true` |
 
-# Test calendar expressions
-systemd-analyze calendar "daily"
-systemd-analyze calendar "Mon *-*-* 03:00:00"
-```
+Validate a calendar spec: `systemd-analyze calendar "*-*-* 02:00:00"`.
 
-### Timer vs Cron
-| Feature | Cron | Systemd Timer |
-|---------|------|---------------|
-| Precision | ~1 min | 1 sec (AccuracySec) |
-| Logging | Syslog/mail | Journal (structured) |
-| Dependencies | None | Full systemd deps |
-| Random delay | Manual | RandomizedDelaySec |
-| Missed runs | Lost | Persistent=yes |
-| Timezone | System TZ | Per-timer TZ= |
-| Monitoring | Manual | systemctl list-timers |
-
-### Timer Debugging
-```bash
-# Next activation time
-systemctl list-timers --all | grep myscript
-
-# Show next 10 activations
-systemd-analyze calendar --iterations=10 "daily"
-
-# Test service without timer
-systemctl start myscript.service
-
-# Check timer status
-systemctl show myscript.timer -p NextElapseUSecRealtime,LastTriggerUSec
-
-# Timer generated service override
-systemctl edit myscript.timer
-# Add: [Timer] Persistent=true
-```
-
-## Anacron (Legacy, for non-24/7 systems)
+## Anacron (non-24/7 systems)
 ```bash
 # /etc/anacrontab
-# period  delay  job-id  command
-1       5      cron.daily   run-parts /etc/cron.daily
-7       10     cron.weekly  run-parts /etc/cron.weekly
-@monthly 15   cron.monthly run-parts /etc/cron.monthly
-
-# Runs if system was off during scheduled time
-# Check: /var/spool/anacron/cron.daily (timestamp)
+# period  delay  job-id          command
+1        5      cron.daily      run-parts /etc/cron.daily
+7        10     cron.weekly     run-parts /etc/cron.weekly
+@monthly 15     cron.monthly    run-parts /etc/cron.monthly
 ```
+Runs jobs whose scheduled time was missed while the machine was off. Timers with
+`Persistent=true` cover the same case for always-on-ish systems.
 
-## Common Patterns
-
-### Backup with Timer
-```ini
-# /etc/systemd/system/backup.service
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/backup.sh
-Environment=RESTIC_REPOSITORY=/mnt/backup
-Environment=RESTIC_PASSWORD_FILE=/etc/restic/password
-
-# /etc/systemd/system/backup.timer
-[Timer]
-OnCalendar=daily
-Persistent=true
-RandomizedDelaySec=30min
+## Debugging
 ```
-
-### Log Rotation with Timer
-```ini
-# /etc/systemd/system/logrotate.timer
-[Timer]
-OnCalendar=daily
-Persistent=true
-```
-
-### Cleanup Old Files
-```bash
-# /usr/local/bin/cleanup.sh
-find /var/log -name "*.log" -mtime +30 -delete
-find /tmp -type f -atime +7 -delete
-journalctl --vacuum-time=30d
-```
-
-```ini
-# /etc/systemd/system/cleanup.timer
-[Timer]
-OnCalendar=daily
-Persistent=true
-```
-
-## Monitoring Timers
-```bash
-# All timers status
-systemctl list-timers --all --no-pager
-
-# Failed timers
-systemctl list-timers --all --state=failed
-
-# Timer metrics
-systemctl show myscript.timer -p LastTriggerUSec,NextElapseUSec
-
-# Journal for timer-triggered services
-journalctl -u myscript.service --since "1 hour ago"
+# systemd-based cron
+sys svc status cronie          # daemon state
+sys log show  cronie           # daemon logs
+# traditional syslog
+grep CRON /var/log/syslog
+# run a job in a clean cron-like env
+env -i PATH=/usr/bin:/bin /home/alice/bin/backup.sh
 ```
