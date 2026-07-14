@@ -40,7 +40,9 @@ npm start
 
 ## Compatibility
 
-The installer supports **x86_64** and **ARM64 (aarch64)** machines running a glibc-based Linux distro (Ubuntu, Fedora, Debian, Arch, openSUSE, and derivatives) with a desktop environment. It does not work on musl-based systems like Alpine Linux, on headless/WSL setups without a desktop, or on 32-bit ARM.
+The installer supports **x86_64** and **ARM64 (aarch64)** machines running a glibc-based Linux distro with a desktop environment. It does not work on musl-based systems like Alpine Linux, on headless/WSL setups without a desktop, or on 32-bit ARM.
+
+**Runs best on Arch-based and Ubuntu-based distros** (Arch, EndeavourOS, Manjaro, Garuda; Ubuntu, Debian, Linux Mint, Pop!_OS, Kubuntu). These are the most thoroughly tested and are what the built-in `sys` universal CLI is tuned for. Other glibc distros (Fedora, openSUSE, and derivatives) work too, but may need occasional distro-specific commands outside `sys`.
 
 ## Setup
 
