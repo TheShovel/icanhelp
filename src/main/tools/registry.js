@@ -333,7 +333,9 @@ var tools = [
     function: {
       name: "list_knowledge",
       description:
-        "Get statistics about the knowledge base: total entries and breakdown by source.",
+        "Get statistics about the knowledge base (total entry count and breakdown by source). " +
+        "ONLY use this if the user explicitly asks for knowledge-base stats. To answer a question, " +
+        "use search_knowledge(query) instead — never use this to look things up.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -389,7 +391,18 @@ var handlers = {
   apply_theme: applyThemeStub,
   store_knowledge: (args) => addKnowledge(args.text, args.metadata),
   search_knowledge: (args) => searchKnowledge(args.query, args.k),
-  list_knowledge: listKnowledge,
+  list_knowledge: async function () {
+    // Return the stats but steer the model toward the actual search tool,
+    // since listing entries is never useful for answering a question.
+    var stats = await listKnowledge();
+    return (
+      stats +
+      "\n\nNOTE: This only lists counts. To actually use the knowledge base, " +
+      "call search_knowledge with a `query` argument (e.g. " +
+      'search_knowledge({ query: "cpu usage", k: 5 })) — do NOT call ' +
+      "list_knowledge to look things up."
+    );
+  },
   clear_knowledge: clearKnowledge,
   list_skills: function () {
     var all = getAllSkills();
@@ -428,6 +441,15 @@ var handlers = {
 };
 
 async function executeToolCall(toolCall, opts) {
+  // Hard cap on tool calls per turn. Small local models ignore soft prompt
+  // instructions and will loop tools endlessly; this guarantees a stop.
+  if (toolCallCount >= MAX_TOOLS_PER_TURN) {
+    return (
+      "TOOL_LIMIT_REACHED: You have already used " + MAX_TOOLS_PER_TURN +
+      " tools this turn. STOP calling tools now and answer the user with what " +
+      "you already know. Do not call any more tools."
+    );
+  }
   var fn = handlers[toolCall.function.name];
   if (!fn)
     return JSON.stringify({ error: "Unknown tool: " + toolCall.function.name });
@@ -440,10 +462,18 @@ async function executeToolCall(toolCall, opts) {
   if (opts) Object.assign(args, opts);
   try {
     var result = await fn(args);
+    toolCallCount++;
     return String(result);
   } catch (e) {
     return JSON.stringify({ error: e.message });
   }
 }
 
-module.exports = { tools, executeToolCall };
+// Per-turn tool budget. Reset at the start of every user turn.
+var MAX_TOOLS_PER_TURN = 4;
+var toolCallCount = 0;
+function resetToolBudget() {
+  toolCallCount = 0;
+}
+
+module.exports = { tools, executeToolCall, resetToolBudget };

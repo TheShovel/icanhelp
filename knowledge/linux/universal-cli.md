@@ -27,6 +27,7 @@ sys pkg list-installed         # all installed packages
 sys pkg owns /usr/bin/ls       # which package owns a file
 sys pkg files nginx            # files owned by a package
 sys pkg clean                  # clear package cache
+sys pkg check                  # list pending updates (does NOT install)
 ```
 
 ## Services (`sys svc`, systemd on every supported distro)

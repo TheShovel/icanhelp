@@ -157,6 +157,17 @@ pkg_clean() {
   esac
 }
 
+pkg_check() {
+  # List pending updates (does NOT install them). Distro-aware.
+  case "$PKG" in
+    apt)    sudo_if_needed apt-get update >/dev/null 2>&1; apt list --upgradable 2>/dev/null ;;
+    pacman) sudo_if_needed pacman -Sy >/dev/null 2>&1; pacman -Qu ;;
+    dnf)    sudo_if_needed dnf check-update ;;
+    zypper) sudo_if_needed zypper list-updates ;;
+    *) die "No package manager detected (family=$FAMILY)" ;;
+  esac
+}
+
 # =====================================================================
 # SERVICE MANAGEMENT (systemd on all supported families)
 # =====================================================================
@@ -399,7 +410,7 @@ sys_help() {
 sys — universal Linux admin CLI (auto-detects your distro)
 
   sys pkg update | upgrade | install <p...> | remove <p...> | purge <p...>
-         search <q> | info <p> | list-installed | owns <file> | files <p> | clean
+         search <q> | info <p> | list-installed | owns <file> | files <p> | clean | check
 
   sys svc status|start|stop|restart|enable|disable|mask|unmask <unit>
 

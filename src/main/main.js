@@ -208,7 +208,8 @@ function createWindow() {
     var cfg = loadConfig() || {};
     console.log("[main] Config loaded:", cfg);
     const { tools } = require("./tools/registry");
-    const { executeToolCall } = require("./tools/registry");
+    const { executeToolCall, resetToolBudget } = require("./tools/registry");
+    resetToolBudget(); // start each user turn with a fresh tool budget
 
     // Auto-search knowledge base for the latest user message, then inject the
     // results into the prompt automatically. This is the "hidden RAG" step:

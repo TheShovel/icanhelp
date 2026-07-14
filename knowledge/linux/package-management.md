@@ -15,7 +15,13 @@ sys pkg list-installed         # all installed packages
 sys pkg owns /usr/bin/ls       # which package owns a file
 sys pkg files nginx            # files owned by a package
 sys pkg clean                  # clear the package cache
+sys pkg check                  # list pending updates (does NOT install)
 ```
+
+**Checking for updates:** when the user asks "any updates?" / "available updates" /
+"what can I upgrade", run `sys pkg check` and report the pending count. It refreshes
+package lists and lists upgradable packages for the detected distro. Do NOT web-search
+for this — it is a question about THEIR system.
 
 Raw equivalents (only when you need distro specifics):
 - Debian/Ubuntu: `sudo apt-get update`, `sudo apt-get install -y pkg`, `sudo apt-get purge pkg`, `apt-cache search`, `dpkg -L pkg`, `dpkg -S /path`.

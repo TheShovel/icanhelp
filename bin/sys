@@ -52,7 +52,8 @@ case "$cmd" in
       owns)          need_args "$@"; pkg_owns "$@" ;;
       files)         need_args "$@"; pkg_files "$@" ;;
       clean)         pkg_clean ;;
-      *) die "Unknown pkg subcommand: $sub (try: update|upgrade|install|remove|purge|search|info|list-installed|owns|files|clean)" ;;
+      check)         pkg_check ;;
+      *) die "Unknown pkg subcommand: $sub (try: update|upgrade|install|remove|purge|search|info|list-installed|owns|files|clean|check)" ;;
     esac ;;
 
   svc)
