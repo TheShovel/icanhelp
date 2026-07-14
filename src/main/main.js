@@ -210,7 +210,11 @@ function createWindow() {
     const { tools } = require("./tools/registry");
     const { executeToolCall } = require("./tools/registry");
 
-    // Auto-search knowledge base for the latest user message
+    // Auto-search knowledge base for the latest user message, then inject the
+    // results into the prompt automatically. This is the "hidden RAG" step:
+    // the model receives relevant knowledge even if it never calls
+    // search_knowledge() itself. Injection is unconditional (top-k results are
+    // always embedded) so the AI always benefits from the knowledge base.
     try {
       var lastUser = messages
         .filter(function (m) {
@@ -223,22 +227,20 @@ function createWindow() {
         console.log("[main] Knowledge search done");
         var kbParsed = JSON.parse(kbResult);
         if (kbParsed.results && kbParsed.results.length > 0) {
-          var highValue = kbParsed.results.filter(function (r) {
-            return parseFloat(r.similarity) > 0.35;
+          // Always inject the top results (no similarity gate) so the model
+          // gets the knowledge even when the best match is below 0.35.
+          var contextLines = kbParsed.results.map(function (r) {
+            return "[KB: " + r.similarity + "] " + r.text;
           });
-          if (highValue.length > 0) {
-            var contextLines = highValue.map(function (r) {
-              return "[KB: " + r.similarity + "] " + r.text;
-            });
-            messages.unshift({
-              role: "system",
-              content:
-                "Relevant knowledge base entries:\n" + contextLines.join("\n"),
-            });
-            console.log(
-              "[main] Injected " + highValue.length + " knowledge entries",
-            );
-          }
+          messages.unshift({
+            role: "system",
+            content:
+              "Relevant knowledge base entries (auto-retrieved for the user's message):\n" +
+              contextLines.join("\n"),
+          });
+          console.log(
+            "[main] Injected " + kbParsed.results.length + " knowledge entries",
+          );
         }
       }
     } catch (e) {

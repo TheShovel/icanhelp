@@ -1,5 +1,7 @@
 # Linux Process Management
 
+> **For the AI:** When the user asks about running processes, CPU/memory per process, or "what's running", RUN the relevant command via `run_bash` (e.g. `sys perf top` or `ps ...`) and report the OUTPUT. Do NOT reply with a command list or snippet for the user to run.
+
 ## Viewing Processes
 ```bash
 ps aux                          # all processes (BSD style)

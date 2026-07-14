@@ -1,28 +1,48 @@
 const { spawn } = require("child_process");
 const path = require("path");
+const fs = require("fs");
 
 // Ensure the app's bundled `bin/` (the universal `sys` CLI) is always on PATH
 // when the AI runs commands, regardless of how the desktop session exported
-// PATH. Falls back gracefully if the dir doesn't exist.
-function sysBinDir() {
+// PATH. We resolve candidates in order and prepend every one that exists:
+//   1. <app-base>/bin   — works in both the dev tree and an installed layout
+//      (bash.js lives at <base>/src/main/tools/bash.js, so <base> is two dirs up)
+//   2. ~/.local/bin     — where the installer symlinks `sys` for humans/AI
+//   3. ~/.local/share/icanhelp/bin — alternative installed location
+// Falls back gracefully if none exist.
+function sysBinCandidates() {
+  const candidates = [];
   try {
+    const here = __dirname; // <base>/src/main/tools
+    const appBase = path.resolve(here, "..", "..", "..");
+    candidates.push(path.join(appBase, "bin"));
+  } catch (e) { /* ignore */ }
+  try {
+    const home = require("os").homedir();
+    candidates.push(path.join(home, ".local", "bin"));
     const dataHome =
-      process.env.XDG_DATA_HOME ||
-      path.join(require("os").homedir(), ".local", "share");
-    return path.join(dataHome, "icanhelp", "bin");
-  } catch (e) {
-    return null;
-  }
+      process.env.XDG_DATA_HOME || path.join(home, ".local", "share");
+    candidates.push(path.join(dataHome, "icanhelp", "bin"));
+  } catch (e) { /* ignore */ }
+  // de-dupe and keep only existing dirs
+  const seen = new Set();
+  return candidates.filter(function (c) {
+    const ok = !seen.has(c) && fs.existsSync(c);
+    if (ok) seen.add(c);
+    return ok;
+  });
 }
 
 function withSysOnPath(env) {
   const base = env || process.env;
-  const bin = sysBinDir();
-  if (!bin) return base;
   const existing = base.PATH || base.Path || "";
-  if (existing.split(path.delimiter).includes(bin)) return base;
+  const parts = existing.split(path.delimiter);
+  const toAdd = sysBinCandidates().filter(function (c) {
+    return !parts.includes(c);
+  });
+  if (toAdd.length === 0) return base;
   return Object.assign({}, base, {
-    PATH: bin + path.delimiter + existing,
+    PATH: toAdd.concat(parts).join(path.delimiter),
   });
 }
 

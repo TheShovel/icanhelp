@@ -2,6 +2,8 @@
 
 Live monitoring and analysis of CPU, memory, disk, and network. For profiling (perf/bpftrace) and sysctl tuning, see `performance-tuning.md`.
 
+> **For the AI:** When the user asks about current CPU/memory/disk/network state, RUN these commands via `run_bash` and report the OUTPUT (the actual percentages/numbers) — do NOT reply with the command list or a snippet for the user to run.
+
 ## CPU
 ```bash
 sys perf top                  # process snapshot (top -b -n1 | head)

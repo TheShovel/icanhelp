@@ -2,12 +2,14 @@
 
 "What is using up X" playbooks. Start broad, then drill into the offending process. Tools marked *(install)* are not present by default on every desktop.
 
+> **For the AI:** When asked what is using CPU/memory/disk/network, RUN `sys perf top` (and the relevant command) via `run_bash` and report the actual top processes/numbers. Do NOT reply with a list of commands or a snippet for the user to run.
+
 ## Quick triage — see everything at once
 ```bash
 sys perf top                  # CPU/MEM snapshot (top -b -n1 | head)
 sys perf mem                  # RAM + swap summary
 sys perf load                 # load average
-# Interactive viewers:
+# Interactive viewers (only mention these if the user wants a live view):
 htop              # (install) CPU/MEM per-process; F6 sort, F9 kill
 btop              # (install) CPU/GPU/mem/disk/net graphs
 glances           # (install) terminal + web dashboard
