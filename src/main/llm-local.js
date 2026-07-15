@@ -621,6 +621,7 @@ async function runLocalChatLoop({
         var text = await session.prompt("", {
           maxTokens: Math.floor(contextSize * 0.25),
           temperature: 0.7,
+          responsePrefix: "<think>\n",
           repeatPenalty: { penalty: 1.05 },
           signal: contAbort.signal,
           stopOnAbortSignal: true,
@@ -644,6 +645,7 @@ async function runLocalChatLoop({
       functions: functions,
       documentFunctionParams: true,
       maxTokens: Math.floor(contextSize * 0.75),
+      responsePrefix: "<think>\n",
       temperature: 0.7,
       // Repetition-loop prevention at the sampling level.
       repeatPenalty: {
