@@ -311,4 +311,5 @@ module.exports = {
   chunkText,
   preloadEmbeddings,
   seedCoreInstructions,
+  isSeeded,
 };

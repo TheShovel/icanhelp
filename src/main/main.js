@@ -57,13 +57,6 @@ const {
 const { searchKnowledge, preloadEmbeddings, seedCoreInstructions } = require("./rag");
 const { appPath, knowledgeFile, visionLog, ocrLog } =
   require("./paths");
-const {
-  loadAllSkills,
-  getSkillInstructions,
-  findSkills,
-  refreshCache,
-  ingestSkillsIntoKnowledge,
-} = require("./skills");
 
 marked.use({ breaks: true, gfm: true });
 
@@ -137,11 +130,11 @@ function createWindow() {
     }
   });
 
-  setTimeout(function () {
+  setTimeout(async function () {
     loadPipeline();
     loadExtract();
-    preloadEmbeddings();
-    seedCoreInstructions();
+    await preloadEmbeddings();
+    await seedCoreInstructions();
   }, 500);
 
   mainWindow.webContents.on("did-finish-load", function () {
@@ -294,16 +287,20 @@ function createWindow() {
           if (chunk.sudo_prompt) {
             event.sender.send("llm-chunk", { sudo_prompt: chunk.sudo_prompt });
           }
+          if (chunk.tool_generating) {
+            event.sender.send("llm-chunk", { tool_generating: chunk.tool_generating });
+          }
         },
         onToolStart: async function (info) {
           console.log(
-            "[main] tool_start:",
-            info.name,
-            JSON.stringify(info.args),
+            "[main] onToolStart ENTER:", info.name, Date.now(),
           );
           event.sender.send("llm-chunk", {
             tool_start: { name: info.name, args: info.args },
           });
+          console.log(
+            "[main] onToolStart IPC sent:", info.name, Date.now(),
+          );
         },
         onToolEnd: function (info) {
           console.log(
@@ -475,29 +472,6 @@ function createWindow() {
     return getDefaultThemeNames();
   });
 
-  ipcMain.handle("list-skills", function () {
-    return loadAllSkills().map(function (s) {
-      return { name: s.name, description: s.description, dirName: s.dirName };
-    });
-  });
-
-  ipcMain.handle("get-skill", function (_, name) {
-    var matched = findSkills(name);
-    if (matched.length === 0) return null;
-    return matched[0];
-  });
-
-  ipcMain.handle("refresh-skills", async function () {
-      refreshCache();
-      try {
-        await ingestSkillsIntoKnowledge();
-        console.log("[main] Skills ingested into knowledge base");
-      } catch (e) {
-        console.log("[main] Failed to ingest skills:", e.message);
-      }
-      return true;
-    });
-
   ipcMain.handle("load-active-theme", function () {
     var name = loadActiveTheme();
     if (!name) return null;
@@ -636,15 +610,26 @@ function createWindow() {
     return await shell.openPath(filePath);
   });
 
+  ipcMain.handle("save-file-as", async (_event, sourcePath, defaultName) => {
+    var result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultName || path.basename(sourcePath),
+      filters: [
+        { name: "Word Document", extensions: ["docx"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    try {
+      fs.copyFileSync(sourcePath, result.filePath);
+      return { ok: true, path: result.filePath };
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
   ipcMain.handle("open-folder", async (_event, key) => {
     var folder;
     switch (key) {
-      case "skills":
-        folder = path.join(__dirname, "..", "..", "skills");
-        break;
-      case "agents-skills":
-        folder = path.join(__dirname, "..", "..", ".agents", "skills");
-        break;
       case "knowledge":
         folder = appPath();
         break;

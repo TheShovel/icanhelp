@@ -2,13 +2,13 @@ const { runBash } = require("./bash");
 const { readFile, readFileLines, writeFile, listDirectory } = require("./fs");
 const { ocrImage } = require("../ocr");
 const { extractWebpage } = require("./extract");
+const { createDocx } = require("./docx");
 const {
   addKnowledge,
   searchKnowledge,
   listKnowledge,
   clearKnowledge,
 } = require("../rag");
-const { findSkills, getSkillInstructions, getAllSkills } = require("../skills");
 
 async function searchWeb({ query, resultSize }) {
   try {
@@ -423,6 +423,30 @@ var tools = [
   {
     type: "function",
     function: {
+      name: "create_docx",
+      description:
+        "Create a Word (.docx) document from text or markdown content. " +
+        "Use this when the user asks you to write a document, letter, report, or save something as a Word file. " +
+        "Returns a file path and preview that the user can download.",
+      parameters: {
+        type: "object",
+        properties: {
+          content: {
+            type: "string",
+            description: "The full text content for the document. Use markdown-style formatting for structure.",
+          },
+          filename: {
+            type: "string",
+            description: "Optional filename without extension (default: 'document'). Alphanumeric, spaces, hyphens, underscores only.",
+          },
+        },
+        required: ["content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "set_theme",
       description:
         "Call this when the user asks to change the app's colors, make a theme (green, blue, dark, etc), or change how the app looks. Set CSS variables — only use these exact names:" +
@@ -550,34 +574,6 @@ var tools = [
       parameters: { type: "object", properties: {} },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "list_skills",
-      description:
-        "List all available skills and their descriptions. Use this to discover what skills are available for the current task.",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "start_skill",
-      description:
-        "Load a skill's instructions into context. Call this when the user's request matches a skill's description. The skill provides expert guidance for completing the specific task. Returns the skill's full instructions.",
-      parameters: {
-        type: "object",
-        properties: {
-          name: {
-            type: "string",
-            description:
-              "The name of the skill to load (use list_skills first to find the right one)",
-          },
-        },
-        required: ["name"],
-      },
-    },
-  },
 ];
 
 var handlers = {
@@ -607,41 +603,8 @@ var handlers = {
     );
   },
   clear_knowledge: clearKnowledge,
-  list_skills: function () {
-    var all = getAllSkills();
-    return JSON.stringify(
-      all.map(function (s) {
-        return { name: s.name, description: s.description, path: s.dirName };
-      }),
-      null,
-      2,
-    );
-  },
   extract_webpage: extractWebpage,
-  start_skill: function (args) {
-    var name = args && args.name;
-    if (!name)
-      return "Please provide a skill name. Use list_skills to see available skills.";
-    var matched = findSkills(name);
-    if (matched.length === 0) {
-      return (
-        'Skill "' +
-        name +
-        '" not found. Use list_skills to see available skills.'
-      );
-    }
-    var instructions = getSkillInstructions([matched[0].name]);
-    if (!instructions) return 'Skill "' + name + '" has no instructions.';
-    return (
-      "--- Begin skill: " +
-      matched[0].name +
-      " ---\n\n" +
-      instructions +
-      "\n\n--- End skill: " +
-      matched[0].name +
-      " ---"
-    );
-  },
+  create_docx: createDocx,
 };
 
 async function executeToolCall(toolCall, opts) {

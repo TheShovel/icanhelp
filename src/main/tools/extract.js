@@ -169,7 +169,7 @@ async function processImage(imgUrl, tmpDir) {
 
 async function extractWebpage(args) {
   var url = (args && args.url) || "";
-  var extractImages = args && args.extractImages !== false;
+  var shouldExtract = args && args.extractImages !== false;
   var maxImages = (args && args.maxImages) || 3;
 
   if (!url) {
@@ -213,7 +213,7 @@ async function extractWebpage(args) {
     text: text,
   };
 
-  if (extractImages) {
+  if (shouldExtract) {
     var imgUrls = extractImages(html, finalUrl).slice(0, maxImages);
     if (imgUrls.length > 0) {
       var tmpDir = path.join(os.tmpdir(), "icanhelp-extract-" + Date.now());

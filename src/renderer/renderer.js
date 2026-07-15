@@ -640,8 +640,6 @@ document
     } else if (action === "model") {
       settingsMenuPanel.classList.add("hidden");
       openModelPicker();
-    } else if (action === "open-skills") {
-      window.electronAPI.openFolder("skills");
     } else if (action === "open-knowledge") {
       window.electronAPI.openFolder("knowledge");
     } else if (action === "open-config") {
@@ -1240,6 +1238,9 @@ async function sendMessage() {
   sendBtn.disabled = true;
 
   const cleanup = window.electronAPI.onLLMChunk(function (chunk) {
+    // Trace every chunk for debugging tool display timing.
+    if (chunk.tool_start) console.log("[renderer] chunk.tool_start:", chunk.tool_start.name, performance.now().toFixed(0) + "ms");
+    if (chunk.tool_end) console.log("[renderer] chunk.tool_end:", chunk.tool_end.name, performance.now().toFixed(0) + "ms");
     if (chunk.done || chunk.error) {
       sendBtn.classList.remove("hidden");
       cancelBtn.classList.add("hidden");
@@ -1359,7 +1360,26 @@ async function sendMessage() {
       return;
     }
 
+    if (chunk.tool_generating) {
+      if (!msgEl) {
+        hideTyping();
+        msgEl = createAssistantMessage();
+        bubble = msgEl.querySelector(".bubble");
+        thinkingContent = msgEl.querySelector(".thinking-content");
+        thinkingBlock = msgEl.querySelector(".thinking-block");
+        responseContent = msgEl.querySelector(".response-content");
+      }
+      var wi = bubble.querySelector(".working-indicator");
+      if (wi) {
+        wi.classList.remove("hidden");
+        var wt = wi.querySelector(".working-text");
+        if (wt) wt.textContent = typeof chunk.tool_generating === "string" ? chunk.tool_generating : "Generating tool call";
+      }
+      return;
+    }
+
     if (chunk.tool_start) {
+      console.log("[renderer] tool_start received:", chunk.tool_start.name);
       if (!msgEl) {
         hideTyping();
         var el = createAssistantMessage();
@@ -1446,12 +1466,15 @@ async function sendMessage() {
       toolBlock.appendChild(toolHeader);
       toolBlock.appendChild(toolContent);
       bubble.insertBefore(toolBlock, responseContent);
-      // Working indicator is already visible from createAssistantMessage
+      console.log("[renderer] tool block inserted for:", toolName, performance.now().toFixed(0) + "ms");
+      toolBlock.offsetHeight;
       smoothScroll(chatMessages);
       return;
     }
 
     if (chunk.tool_end) {
+      console.log("[renderer] tool_end received:", chunk.tool_end.name, "bubble:", !!bubble);
+      if (!bubble) { console.log("[renderer] tool_end but no bubble — msgEl:", !!msgEl); return; }
       var toolBlocks = bubble.querySelectorAll(".tool-block");
       var tbEnd = toolBlocks[toolBlocks.length - 1];
       if (tbEnd) {
@@ -1484,8 +1507,20 @@ async function sendMessage() {
           if (!existingOut) {
             var out = document.createElement("div");
             out.className = "tool-output";
-            out.textContent = stripEmojis(chunk.tool_end.output);
-            tcEnd.appendChild(out);
+            var outText = stripEmojis(chunk.tool_end.output);
+            var minAnim = 300;
+            var elapsed = Date.now() - (parseInt(tbEnd.dataset.started) || 0);
+            var delay = Math.max(0, minAnim - elapsed);
+            console.log("[renderer] tool output delayed " + delay + "ms for:", chunk.tool_end.name, performance.now().toFixed(0) + "ms");
+            setTimeout(function () {
+              console.log("[renderer] tool output showing for:", chunk.tool_end.name, performance.now().toFixed(0) + "ms");
+              out.textContent = outText;
+              tcEnd.appendChild(out);
+              tbEnd.classList.remove("tool-working");
+            }, delay);
+            setTimeout(function () {
+              tbEnd.classList.add("collapsed");
+            }, delay + 800);
           }
 
           // Replace scanning animation with result summary for ocr/extract.
@@ -1503,15 +1538,25 @@ async function sendMessage() {
               }
             }
           }
-          var minAnim = 300;
-          var elapsed = Date.now() - (parseInt(tbEnd.dataset.started) || 0);
-          var delay = Math.max(0, minAnim - elapsed);
-          setTimeout(function () {
-            tbEnd.classList.remove("tool-working");
-          }, delay);
-          setTimeout(function () {
-            tbEnd.classList.add("collapsed");
-          }, delay + 800);
+          // Show docx preview card when create_docx finishes.
+          if (chunk.tool_end.name === "create_docx") {
+            try {
+              var docxResult = JSON.parse(chunk.tool_end.output);
+              if (docxResult.ok && docxResult.path) {
+                renderDocxPreview(bubble, docxResult);
+              }
+            } catch (_) {}
+          }
+
+          // Show docx preview card when create_docx finishes.
+          if (chunk.tool_end.name === "create_docx") {
+            try {
+              var docxResult = JSON.parse(chunk.tool_end.output);
+              if (docxResult.ok && docxResult.path) {
+                renderDocxPreview(bubble, docxResult);
+              }
+            } catch (_) {}
+          }
         }
       }
       smoothScroll(chatMessages);
@@ -1855,6 +1900,54 @@ function renderCitations(bubble, sources) {
 
   citationsContainer.appendChild(citationsList);
   bubble.appendChild(citationsContainer);
+}
+
+function renderDocxPreview(bubble, result) {
+  // Guard against duplicates.
+  if (bubble.querySelector(".docx-preview-card")) return;
+
+  var card = document.createElement("div");
+  card.className = "docx-preview-card";
+
+  var header = document.createElement("div");
+  header.className = "docx-preview-header";
+  header.innerHTML = iconSvg("file", 16) + " <strong>" + escapeHtml(result.filename) + "</strong>";
+
+  var size = document.createElement("span");
+  size.className = "docx-preview-size";
+  var kb = (result.size / 1024).toFixed(1);
+  size.textContent = kb + " KB";
+  header.appendChild(size);
+
+  var actions = document.createElement("div");
+  actions.className = "docx-preview-actions";
+
+  var downloadBtn = document.createElement("button");
+  downloadBtn.className = "docx-download-btn";
+  downloadBtn.innerHTML = iconSvg("download", 14) + " Download";
+  downloadBtn.addEventListener("click", function () {
+    window.electronAPI.saveFileAs(result.path, result.filename);
+  });
+
+  var openBtn = document.createElement("button");
+  openBtn.className = "docx-download-btn";
+  openBtn.innerHTML = iconSvg("external", 14) + " Open";
+  openBtn.addEventListener("click", function () {
+    window.electronAPI.openFile(result.path);
+  });
+
+  actions.appendChild(downloadBtn);
+  actions.appendChild(openBtn);
+
+  card.appendChild(header);
+  card.appendChild(actions);
+  bubble.appendChild(card);
+}
+
+function escapeHtml(str) {
+  var div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 function getFaviconUrl(url) {

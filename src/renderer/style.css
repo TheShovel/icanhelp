@@ -2196,3 +2196,60 @@ body {
     color: var(--tool-fg);
     font-style: italic;
 }
+
+/* ---- Docx preview card ---- */
+.docx-preview-card {
+    margin: 8px 0;
+    padding: 10px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.docx-preview-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--fg);
+    margin-bottom: 6px;
+}
+
+.docx-preview-header svg {
+    stroke: var(--accent);
+    flex-shrink: 0;
+}
+
+.docx-preview-size {
+    font-size: 11px;
+    color: var(--fg-muted);
+    margin-left: auto;
+}
+
+.docx-preview-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.docx-download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.docx-download-btn:hover {
+    background: var(--accent-hover);
+}
+
+.docx-download-btn svg {
+    stroke: currentColor;
+}

@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   selectAttachment: () => ipcRenderer.invoke("select-attachment"),
   takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
   openFile: (filePath) => ipcRenderer.invoke("open-file", filePath),
+  saveFileAs: (sourcePath, defaultName) => ipcRenderer.invoke("save-file-as", sourcePath, defaultName),
   quitApp: () => ipcRenderer.send("quit-app"),
   restartApp: () => ipcRenderer.send("restart-app"),
   onVisionProgress: (callback) => {

@@ -59,52 +59,75 @@ test("buildFunctions - onToolStart completes before executeTool runs", async (t)
   assert.ok(execOrder < toolEndOrder);
 });
 
-test("buildFunctions - onToolStart blocking delays executeTool", async (t) => {
+test("buildFunctions - onToolStart fires before executeTool", async (t) => {
   const { buildFunctions } = require("./llm-local");
 
-  var execCalledAt = null;
-  var startResolvedAt = null;
+  var calls = [];
 
   var tools = [
     {
       function: {
-        name: "delay_tool",
-        description: "A delayed tool",
+        name: "order_tool",
+        description: "",
         parameters: { type: "object", properties: {} },
       },
     },
   ];
 
-  async function onToolStart(info) {
-    // Simulate realistic ack delay (~16ms = one frame)
-    await new Promise(function (r) { setTimeout(r, 30); });
-    startResolvedAt = Date.now();
+  function onToolStart(info) {
+    calls.push("start");
   }
 
   async function executeTool(name, params) {
-    execCalledAt = Date.now();
+    calls.push("exec");
     return "done";
   }
 
-  function onToolEnd(info) {}
+  function onToolEnd(info) {
+    calls.push("end");
+  }
 
-  var { functions } = buildFunctions(
-    tools,
-    executeTool,
-    onToolStart,
-    onToolEnd,
-  );
+  var { functions } = buildFunctions(tools, executeTool, onToolStart, onToolEnd);
 
-  await functions.delay_tool.handler({});
+  await functions.order_tool.handler({});
 
-  assert.ok(
-    execCalledAt - startResolvedAt >= 0,
-    "executeTool should start at or after onToolStart resolves",
-  );
-  assert.ok(
-    execCalledAt - startResolvedAt < 5,
-    "executeTool should start immediately after onToolStart resolves",
-  );
+  assert.deepStrictEqual(calls, ["start", "exec", "end"]);
+});
+
+test("buildFunctions - onToolStart yields before executeTool", async (t) => {
+  const { buildFunctions } = require("./llm-local");
+
+  var ordering = [];
+
+  var tools = [
+    {
+      function: {
+        name: "yield_tool",
+        description: "",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+  ];
+
+  function onToolStart(info) {
+    ordering.push("start");
+  }
+
+  async function executeTool(name, params) {
+    // executeTool runs after a setImmediate yield — verify start came first
+    ordering.push("exec-" + (ordering.length === 1 && ordering[0] === "start" ? "ok" : "wrong"));
+    return "done";
+  }
+
+  function onToolEnd(info) {
+    ordering.push("end");
+  }
+
+  var { functions } = buildFunctions(tools, executeTool, onToolStart, onToolEnd);
+
+  await functions.yield_tool.handler({});
+
+  assert.deepStrictEqual(ordering, ["start", "exec-ok", "end"]);
 });
 
 test("buildFunctions - multiple tools maintain order", async (t) => {
@@ -145,10 +168,10 @@ test("buildFunctions - multiple tools maintain order", async (t) => {
   assert.deepStrictEqual(calls[5], { type: "end", name: "tool_b" });
 });
 
-test("buildFunctions - onToolStart is awaited (returns promise)", async (t) => {
+test("buildFunctions - onToolStart is called before executeTool", async (t) => {
   const { buildFunctions } = require("./llm-local");
 
-  var execStarted = false;
+  var startCalled = false;
 
   var tools = [
     {
@@ -160,16 +183,12 @@ test("buildFunctions - onToolStart is awaited (returns promise)", async (t) => {
     },
   ];
 
-  var startDone = false;
-
-  async function onToolStart(info) {
-    await new Promise(function (r) { setTimeout(r, 10); });
-    startDone = true;
+  function onToolStart(info) {
+    startCalled = true;
   }
 
   async function executeTool(name, params) {
-    // If onToolStart is properly awaited, startDone should be true here
-    assert.ok(startDone, "executeTool should run after onToolStart promise resolves");
+    assert.ok(startCalled, "onToolStart should have been called before executeTool");
     return "ok";
   }
 

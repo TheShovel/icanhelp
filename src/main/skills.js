@@ -1,6 +1,6 @@
 const path = require("path");
 const fs = require("fs");
-const { addKnowledge, addKnowledgeBatch } = require("./rag");
+const { addKnowledge, addKnowledgeBatch, isSeeded } = require("./rag");
 
 var SKILL_DIRS = null;
 
@@ -148,6 +148,10 @@ function refreshCache() {
 }
 
 async function ingestSkillsIntoKnowledge() {
+  if (isSeeded("skills")) {
+    console.log("[skills] Skills already ingested, skipping");
+    return JSON.stringify({ ingested: 0, skipped: true });
+  }
   const all = getAllSkills();
   if (all.length === 0) return JSON.stringify({ ingested: 0 });
   

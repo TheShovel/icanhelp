@@ -170,6 +170,7 @@ function buildSystemPrompt(sysInfo) {
     "- Use as few tools as possible. Think before calling: is this tool actually needed?",
     "- Be concise. Lead with the answer. No preambles. One sentence or a few bullets.",
     "- The `sys` CLI is available for distro-agnostic system commands (sys pkg, sys svc, sys perf, etc).",
+    "- When asked to write a document, report, or letter: call create_docx(content, filename) IMMEDIATELY. Never say 'I'll create...' — just call the tool with the full content.",
   ];
 
   return parts.join("\n");
@@ -342,7 +343,11 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
           }
 
           state.total++;
-          await onToolStart({ name: name, args: params });
+          console.log("[llm-local] buildFunctions: calling onToolStart for " + name);
+          onToolStart({ name: name, args: params });
+          console.log("[llm-local] buildFunctions: onToolStart returned, yielding 30ms");
+          await new Promise(function (r) { setTimeout(r, 30); });
+          console.log("[llm-local] buildFunctions: executing " + name);
           try {
             var result = await executeTool(name, params);
             var resultStr = String(result);
@@ -524,39 +529,115 @@ async function runLocalChatLoop({
       });
     }
 
-    var IDLE_TIMEOUT_MS = 30 * 1000;
+    var IDLE_TIMEOUT_MS = 10 * 1000;
+    var EXTENDED_TIMEOUT_MS = 30 * 1000;
     var toolRunning = false;
     var idleTimer = null;
     var idleFired = false;
+    var lastActivityWasText = false;
+    var generatingInterval = null;
+    var generatingMessages = [
+      "Refining...",
+      "Making adjustments...",
+      "Adding details...",
+      "Polishing...",
+      "Working...",
+    ];
+    var generatingIndex = 0;
+    var generatingStartTime = 0;
+    var longTaskNotified = false;
+
+    function startGeneratingStatus() {
+      if (generatingInterval) return;
+      generatingIndex = 0;
+      generatingStartTime = Date.now();
+      longTaskNotified = false;
+      onChunk({ tool_generating: generatingMessages[0] });
+      generatingInterval = setInterval(function () {
+        generatingIndex = (generatingIndex + 1) % generatingMessages.length;
+        var msg = generatingMessages[generatingIndex];
+        if (!longTaskNotified && Date.now() - generatingStartTime > 60000) {
+          longTaskNotified = true;
+        }
+        if (longTaskNotified) {
+          msg = msg + " (this is a large task, might take a while)";
+        }
+        onChunk({ tool_generating: msg });
+      }, 2000);
+    }
+
+    function stopGeneratingStatus() {
+      if (generatingInterval) {
+        clearInterval(generatingInterval);
+        generatingInterval = null;
+      }
+    }
 
     function resetIdleTimer() {
       clearTimeout(idleTimer);
       idleFired = false;
       if (!toolRunning) {
+        var timeout = lastActivityWasText ? EXTENDED_TIMEOUT_MS : IDLE_TIMEOUT_MS;
         idleTimer = setTimeout(function () {
-          console.log("[llm-local] Idle timeout — no output for " + (IDLE_TIMEOUT_MS / 1000) + "s, aborting");
+          console.log("[llm-local] Idle timeout — no output for " + (timeout / 1000) + "s, aborting");
           idleFired = true;
           idleTimer = null;
           internalAbort.abort();
-        }, IDLE_TIMEOUT_MS);
+        }, timeout);
       }
+      // No safety net when toolRunning — wait indefinitely for tool completion.
     }
 
     // Wrap the tool callbacks to track when a tool is busy.
     var origOnToolStart = onToolStart;
     var origOnToolEnd = onToolEnd;
-    onToolStart = async function (info) {
+    onToolStart = function (info) {
+      console.log("[llm-local] wrapper onToolStart:", info.name, Date.now());
+      stopGeneratingStatus();
+      lastActivityWasText = false;
       toolRunning = true;
       clearTimeout(idleTimer);
-      await origOnToolStart(info);
+      origOnToolStart(info);
+      console.log("[llm-local] wrapper onToolStart done:", info.name, Date.now());
     };
     onToolEnd = function (info) {
+      stopGeneratingStatus();
       origOnToolEnd(info);
       toolRunning = false;
       resetIdleTimer();
     };
 
     resetIdleTimer();
+
+    async function forceContinue() {
+      idleFired = false;
+      resetIdleTimer();
+      var contAbort = new AbortController();
+      if (signal) {
+        signal.addEventListener("abort", function () { contAbort.abort(); });
+      }
+      try {
+        var text = await session.prompt("", {
+          maxTokens: Math.floor(contextSize * 0.25),
+          temperature: 0.7,
+          repeatPenalty: { penalty: 1.05 },
+          signal: contAbort.signal,
+          stopOnAbortSignal: true,
+          onTextChunk: function (chunk) {
+            resetIdleTimer();
+            if (repDetector.feed(chunk)) {
+              contAbort.abort();
+              throw new Error("REPETITION_DETECTED");
+            }
+            onChunk({ text: chunk });
+          },
+        });
+        clearTimeout(idleTimer);
+        return text;
+      } finally {
+        contAbort.abort();
+      }
+    }
 
     var opts = {
       functions: functions,
@@ -585,6 +666,20 @@ async function runLocalChatLoop({
       signal: internalAbort.signal,
       stopOnAbortSignal: true,
       onTextChunk: function (chunk) {
+        // Empty or whitespace-only chunk: node-llama-cpp intercepted a function
+        // call token. The model is generating tool content — pause the idle timer.
+        if (!chunk || chunk.trim().length === 0) {
+          lastActivityWasText = false;
+          if (!toolRunning) {
+            toolRunning = true;
+            clearTimeout(idleTimer);
+            startGeneratingStatus();
+          }
+          return;
+        }
+        lastActivityWasText = true;
+        toolRunning = false;
+        console.log("[llm-local] main onTextChunk:", chunk.slice(0, 60));
         resetIdleTimer();
         if (repDetector.feed(chunk)) {
           console.log("[llm-local] Repetition detected, aborting");
@@ -594,7 +689,12 @@ async function runLocalChatLoop({
         onChunk({ text: chunk });
       },
       onResponseChunk: function (chunk) {
-        resetIdleTimer();
+        // Only reset the idle timer for meaningful segments (thought, text).
+        // Blank/no-type chunks fire during function call generation and
+        // should not restart the timer — the model is working on a tool.
+        if (chunk && chunk.type === "segment") {
+          resetIdleTimer();
+        }
         if (
           chunk &&
           chunk.type === "segment" &&
@@ -612,10 +712,15 @@ async function runLocalChatLoop({
       },
     };
 
-    console.log("[llm-local] Starting session.promptWithMeta...");
+    console.log("[llm-local] Starting session.promptWithMeta...", Date.now());
     var result = await session.promptWithMeta(currentPrompt, opts);
     clearTimeout(idleTimer);
-    console.log("[llm-local] Response received:", result.responseText);
+    console.log("[llm-local] promptWithMeta returned:", Date.now(), "text:", (result.responseText || "").slice(0, 50));
+
+    if ((state.total > 0 || idleFired) && (!result.responseText || result.responseText.trim().length === 0)) {
+      console.log("[llm-local] Model stopped with no text — continuing");
+      await forceContinue();
+    }
   } catch (e) {
       clearTimeout(idleTimer);
       if (e.message === "REPETITION_DETECTED") {
@@ -623,7 +728,10 @@ async function runLocalChatLoop({
         onChunk({ error: "Model got stuck in a loop. Please try again." });
       } else if (e.name === "AbortError" || (signal && signal.aborted)) {
         if (idleFired) {
-          onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
+          console.log("[llm-local] Idle timeout — forcing continuation");
+          try { await forceContinue(); } catch (_) {
+            onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
+          }
         } else {
           console.log("[llm-local] Aborted by user");
         }
