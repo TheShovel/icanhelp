@@ -235,20 +235,25 @@ function createWindow() {
         console.log("[main] Knowledge search done");
         var kbParsed = JSON.parse(kbResult);
         if (kbParsed.results && kbParsed.results.length > 0) {
-          // Always inject the top results (no similarity gate) so the model
-          // gets the knowledge even when the best match is below 0.35.
-          var contextLines = kbParsed.results.map(function (r) {
-            return "[KB: " + r.similarity + "] " + r.text;
+          // Only inject results that are actually relevant (similarity >= 0.35).
+          // Low-similarity noise confuses small models more than it helps.
+          var relevant = kbParsed.results.filter(function (r) {
+            return parseFloat(r.similarity) >= 0.35;
           });
-          messages.unshift({
-            role: "system",
-            content:
-              "Relevant knowledge base entries (auto-retrieved for the user's message):\n" +
-              contextLines.join("\n"),
-          });
-          console.log(
-            "[main] Injected " + kbParsed.results.length + " knowledge entries",
-          );
+          if (relevant.length > 0) {
+            var contextLines = relevant.map(function (r) {
+              return "[KB: " + r.similarity + "] " + r.text;
+            });
+            messages.unshift({
+              role: "system",
+              content:
+                "Relevant knowledge base entries (auto-retrieved for the user's message):\n" +
+                contextLines.join("\n"),
+            });
+            console.log(
+              "[main] Injected " + relevant.length + " knowledge entries (filtered from " + kbParsed.results.length + ")",
+            );
+          }
         }
       }
     } catch (e) {

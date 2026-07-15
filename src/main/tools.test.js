@@ -100,12 +100,12 @@ test("fs - listDirectory returns error for missing dir", async (t) => {
 test("fs - large file content is truncated", async (t) => {
   const { readFile } = require("./tools/fs");
   const filePath = path.join(TEST_DIR, "large.txt");
-  const largeContent = "x".repeat(60000);
+  const largeContent = "x".repeat(70000);
   fs.writeFileSync(filePath, largeContent);
 
   const result = await readFile({ path: filePath });
-  assert.ok(result.includes("... (truncated)"));
-  assert.ok(result.length < 60000 + "... (truncated)".length + 10);
+  assert.ok(result.includes("too large to read in full"), "should reject oversized file");
+  assert.ok(result.length < 300, "message should be short, got: " + result.length);
 });
 
 test("bash - blocked commands are rejected", async (t) => {

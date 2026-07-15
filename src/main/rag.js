@@ -265,11 +265,15 @@ async function searchKnowledge(query, k) {
   }));
 
   results.sort((a, b) => b.similarity - a.similarity);
-  const top = results.slice(0, k || 5).map((r) => ({
-    text: r.text,
-    similarity: r.similarity.toFixed(3),
-    metadata: r.metadata,
-  }));
+  const MIN_SIMILARITY = 0.3;
+  const top = results
+    .filter(function (r) { return r.similarity >= MIN_SIMILARITY; })
+    .slice(0, k || 5)
+    .map((r) => ({
+      text: r.text,
+      similarity: r.similarity.toFixed(3),
+      metadata: r.metadata,
+    }));
 
   var out = { results: top, total: s.entries.length };
   if (top.length === 0) {

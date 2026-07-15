@@ -194,13 +194,15 @@ test("store - saveTheme and loadThemes", async (t) => {
   }
 });
 
-test("store - loadThemes returns empty object when no themes", async (t) => {
+test("store - loadThemes returns default themes when no themes saved", async (t) => {
   setupTestEnv();
   try {
     delete require.cache[require.resolve("./store")];
     const store = require("./store");
 
-    assert.deepStrictEqual(store.loadThemes(), {});
+    var themes = store.loadThemes();
+    assert.ok(typeof themes === "object");
+    assert.ok(Object.keys(themes).length >= 2, "should have at least default themes");
   } finally {
     cleanupTestEnv();
   }

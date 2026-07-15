@@ -57,6 +57,9 @@ function readRange(filePath, startLine, endLine) {
 }
 
 async function readFile({ path: filePath }) {
+  if (/^https?:\/\//i.test(filePath)) {
+    return "Error: '" + filePath + "' is a URL, not a file path. Use extract_webpage() to fetch and read webpage content.";
+  }
   try {
     const stat = fs.statSync(filePath);
     if (stat.size > SAFE_READ_BYTES) {
@@ -79,6 +82,9 @@ async function readFile({ path: filePath }) {
 }
 
 async function readFileLines({ path: filePath, startLine, maxLines }) {
+  if (/^https?:\/\//i.test(filePath)) {
+    return "Error: '" + filePath + "' is a URL, not a file path. Use extract_webpage() to fetch and read webpage content.";
+  }
   try {
     if (!isTextFile(filePath)) {
       return (

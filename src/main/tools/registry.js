@@ -38,27 +38,199 @@ async function searchWeb({ query, resultSize }) {
   }
 }
 
+function parseColor(str) {
+  if (!str || typeof str !== "string") return null;
+  str = str.trim();
+
+  // Hex colors
+  var hexMatch = str.match(/^#([0-9a-fA-F]{3,8})$/);
+  if (hexMatch) {
+    var h = hexMatch[1];
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    if (h.length === 4) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2] + h[3] + h[3];
+    if (h.length >= 6) {
+      return {
+        r: parseInt(h.slice(0, 2), 16),
+        g: parseInt(h.slice(2, 4), 16),
+        b: parseInt(h.slice(4, 6), 16),
+      };
+    }
+  }
+
+  // rgb() / rgba()
+  var rgbMatch = str.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgbMatch) {
+    return {
+      r: parseInt(rgbMatch[1], 10),
+      g: parseInt(rgbMatch[2], 10),
+      b: parseInt(rgbMatch[3], 10),
+    };
+  }
+
+  return null;
+}
+
+function relativeLuminance(rgb) {
+  function channel(c) {
+    var s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  }
+  return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b);
+}
+
+function contrastRatio(a, b) {
+  var l1 = relativeLuminance(a);
+  var l2 = relativeLuminance(b);
+  var lighter = Math.max(l1, l2);
+  var darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 async function setTheme({ properties, name }) {
+  var VALID_VARS = [
+    "--bg-panel", "--bg-header", "--bg-body", "--bg-input", "--bg-hover",
+    "--bg-code", "--bg-tool", "--bg-tool-out", "--bg-overlay",
+    "--bg-list-item-hover", "--bg-list-item-active",
+    "--border", "--border-strong", "--border-focus",
+    "--fg", "--fg-dim", "--fg-muted", "--fg-placeholder",
+    "--accent", "--accent-hover", "--accent-press", "--accent-fg",
+    "--user-bubble-bg", "--user-bubble-fg",
+    "--thinking-fg", "--thinking-border",
+    "--tool-fg", "--tool-border", "--tool-text-fg",
+    "--danger", "--confirm-cmd-fg",
+    "--scrollbar-thumb", "--scrollbar-thumb-list",
+  ];
+  var validSet = {};
+  for (var vi = 0; vi < VALID_VARS.length; vi++) validSet[VALID_VARS[vi]] = true;
+
   if (!properties || typeof properties !== "object") {
     return (
-      "The 'properties' argument must be a JSON object with CSS variable names mapping to hex colors. " +
-      "Available variables: --bg-panel, --bg-header, --bg-body, --bg-input, --bg-code, --bg-tool, " +
-      "--border, --border-strong, --fg, --fg-dim, --fg-muted, --accent, --accent-hover, " +
-      "--user-bubble-bg, --user-bubble-fg, --danger. " +
-      "Pick colors yourself based on what the user asked for. Example for a blue theme: " +
-      '{"--bg-panel":"#1a1a2e","--accent":"#5a9cf8","--fg":"#e0e0e0"}'
+      "Invalid: 'properties' must be a JSON object. Provide CSS variable names mapped to colors. " +
+      "Example: {\"--bg-panel\":\"#1a1a2e\",\"--accent\":\"#5a9cf8\"}"
     );
   }
+
   var keys = Object.keys(properties);
   if (keys.length === 0) {
     return (
-      "No variables provided. Available variables: --bg-panel, --bg-header, --bg-body, --bg-input, --bg-code, --bg-tool, " +
-      "--border, --border-strong, --fg, --fg-dim, --fg-muted, --accent, --accent-hover, " +
-      "--user-bubble-bg, --user-bubble-fg, --danger. " +
-      "Pick colors yourself based on what the user asked for and call set_theme again. Example: " +
-      '{"--bg-panel":"#1a1a2e","--accent":"#5a9cf8","--fg":"#e0e0e0"}'
+      "No variables provided. Pick colors and call set_theme again. " +
+      "Example: {\"--bg-panel\":\"#1a1a2e\",\"--accent\":\"#5a9cf8\"}"
     );
   }
+
+  // Validate variable names and values.
+  var errors = [];
+  for (var ki = 0; ki < keys.length; ki++) {
+    var k = keys[ki];
+    var v = properties[k];
+
+    if (!validSet[k]) {
+      errors.push("Unknown variable: '" + k + "'. Valid names: " + VALID_VARS.join(", "));
+      continue;
+    }
+
+    if (typeof v !== "string" || v.length === 0) {
+      errors.push("'" + k + "' value must be a CSS color string (e.g. '#1a1a2e', 'rgba(0,0,0,0.5)').");
+      continue;
+    }
+
+    // Reject injection attempts.
+    if (/[<>]/.test(v) || /url\s*\(/i.test(v) || /expression\s*\(/i.test(v) || /javascript\s*:/i.test(v)) {
+      errors.push("'" + k + "' value contains unsafe content. Use a plain CSS color only.");
+      continue;
+    }
+
+    // Validate color format: hex, rgb(), rgba(), hsl(), hsla(), or CSS named color.
+    var isHex = /^#[0-9a-fA-F]{3,8}$/.test(v);
+    var isFunc = /^(rgb|rgba|hsl|hsla)\s*\(/.test(v);
+    var isNamed = /^[a-zA-Z]+$/.test(v) && v.length < 30;
+    if (!isHex && !isFunc && !isNamed) {
+      errors.push("'" + k + "': '" + v + "' is not a valid CSS color. Use hex (#1a1a2e), rgb/rgba/hsl, or a named color.");
+    }
+  }
+
+  if (errors.length > 0) {
+    return "Theme validation failed — fix these and call set_theme again:\n" + errors.join("\n");
+  }
+
+  // Check contrast for text-on-background pairs. Uses default theme colors
+  // for any variable the user didn't set, so partial themes are validated.
+  var DEFAULTS = {
+    "--bg-panel": "#242424", "--bg-body": "#1e1e1e", "--bg-header": "#2d2d2d",
+    "--bg-input": "#3a3a3a", "--bg-code": "#333333", "--bg-tool": "#2a2a2a",
+    "--bg-tool-out": "#2a2a2a", "--bg-list-item-hover": "#333333",
+    "--fg": "#e0e0e0", "--fg-dim": "#bbbbbb", "--fg-muted": "#999999",
+    "--fg-placeholder": "#666666", "--accent": "#5a9cf8",
+    "--accent-fg": "#ffffff", "--accent-hover": "#7ab4ff",
+    "--user-bubble-bg": "#5a9cf8", "--user-bubble-fg": "#ffffff",
+    "--thinking-fg": "#d4a85c", "--thinking-border": "#8b6914",
+    "--tool-fg": "#66bb6a", "--tool-border": "#4a7c59",
+    "--tool-text-fg": "#a5d6a7", "--danger": "#f28b82",
+    "--confirm-cmd-fg": "#d4a85c", "--border": "#3a3a3a",
+    "--border-strong": "#4a4a4a",
+  };
+  var merged = {};
+  for (var dk in DEFAULTS) merged[dk] = DEFAULTS[dk];
+  for (var pk in properties) merged[pk] = properties[pk];
+  // User bubble bg defaults to accent if not explicitly set.
+  if (!properties["--user-bubble-bg"]) merged["--user-bubble-bg"] = merged["--accent"];
+
+  var contrastWarnings = [];
+  var pairs = [
+    // Body text on backgrounds
+    { fg: "--fg", bg: "--bg-panel", label: "main text on panel", min: 4.5 },
+    { fg: "--fg", bg: "--bg-body", label: "main text on body", min: 4.5 },
+    { fg: "--fg", bg: "--bg-header", label: "main text on header", min: 4.5 },
+    { fg: "--fg", bg: "--bg-input", label: "main text on input", min: 4.5 },
+    { fg: "--fg", bg: "--bg-code", label: "main text on code block", min: 4.5 },
+    { fg: "--fg", bg: "--bg-tool", label: "main text on tool block", min: 4.5 },
+    { fg: "--fg", bg: "--bg-list-item-hover", label: "text on list hover", min: 4.5 },
+    // Dim/muted text on panel
+    { fg: "--fg-dim", bg: "--bg-panel", label: "dim text on panel", min: 3.0 },
+    { fg: "--fg-muted", bg: "--bg-panel", label: "muted text on panel", min: 2.5 },
+    { fg: "--fg-placeholder", bg: "--bg-input", label: "placeholder on input", min: 1.8 },
+    // Accent button text
+    { fg: "--accent-fg", bg: "--accent", label: "button text on accent", min: 2.5 },
+    { fg: "--accent-fg", bg: "--accent-hover", label: "button text on accent hover", min: 2.0 },
+    // User bubble
+    { fg: "--user-bubble-fg", bg: "--user-bubble-bg", label: "bubble text on bubble", min: 2.5 },
+    // Thinking block
+    { fg: "--thinking-fg", bg: "--bg-panel", label: "thinking text on panel", min: 3.0 },
+    { fg: "--thinking-fg", bg: "--bg-tool", label: "thinking text on tool", min: 3.0 },
+    // Tool blocks
+    { fg: "--tool-fg", bg: "--bg-tool", label: "tool label on tool bg", min: 3.0 },
+    { fg: "--tool-text-fg", bg: "--bg-tool", label: "tool output on tool bg", min: 4.5 },
+    { fg: "--tool-text-fg", bg: "--bg-tool-out", label: "tool output on tool-out bg", min: 4.5 },
+    // Danger / confirm
+    { fg: "--danger", bg: "--bg-panel", label: "danger text on panel", min: 3.0 },
+    { fg: "--confirm-cmd-fg", bg: "--bg-tool", label: "confirm cmd on tool", min: 3.0 },
+    // Borders should contrast with panel
+    { fg: "--border", bg: "--bg-panel", label: "border on panel", min: 1.4 },
+    { fg: "--border-strong", bg: "--bg-panel", label: "strong border on panel", min: 1.8 },
+  ];
+
+  for (var pi = 0; pi < pairs.length; pi++) {
+    var pair = pairs[pi];
+    var fgColor = merged[pair.fg];
+    var bgColor = merged[pair.bg];
+    if (!fgColor || !bgColor) continue;
+    var fgRgb = parseColor(fgColor);
+    var bgRgb = parseColor(bgColor);
+    if (!fgRgb || !bgRgb) continue;
+    var ratio = contrastRatio(fgRgb, bgRgb);
+    if (ratio < pair.min) {
+      contrastWarnings.push(
+        pair.label + ": contrast ratio " + ratio.toFixed(1) +
+        " (need ≥" + pair.min + "). " + pair.fg + "=" + fgColor +
+        " vs " + pair.bg + "=" + bgColor + " — text will be unreadable."
+      );
+    }
+  }
+
+  if (contrastWarnings.length > 0) {
+    return "Theme rejected — insufficient contrast. Fix these and call set_theme again:\n" + contrastWarnings.join("\n");
+  }
+
   return (
     "Theme applied with " +
     keys.length +
@@ -473,15 +645,6 @@ var handlers = {
 };
 
 async function executeToolCall(toolCall, opts) {
-  // Hard cap on tool calls per turn. Small local models ignore soft prompt
-  // instructions and will loop tools endlessly; this guarantees a stop.
-  if (toolCallCount >= MAX_TOOLS_PER_TURN) {
-    return (
-      "TOOL_LIMIT_REACHED: You have already used " + MAX_TOOLS_PER_TURN +
-      " tools this turn. STOP calling tools now and answer the user with what " +
-      "you already know. Do not call any more tools."
-    );
-  }
   var fn = handlers[toolCall.function.name];
   if (!fn)
     return JSON.stringify({ error: "Unknown tool: " + toolCall.function.name });
@@ -494,7 +657,6 @@ async function executeToolCall(toolCall, opts) {
   if (opts) Object.assign(args, opts);
   try {
     var result = await fn(args);
-    toolCallCount++;
     return String(result);
   } catch (e) {
     return JSON.stringify({ error: e.message });
@@ -502,10 +664,8 @@ async function executeToolCall(toolCall, opts) {
 }
 
 // Per-turn tool budget. Reset at the start of every user turn.
-var MAX_TOOLS_PER_TURN = 4;
-var toolCallCount = 0;
 function resetToolBudget() {
-  toolCallCount = 0;
+  // No-op: hard limit removed. Soft nudges handled in buildFunctions.
 }
 
 module.exports = { tools, executeToolCall, resetToolBudget };

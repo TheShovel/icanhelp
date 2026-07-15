@@ -730,18 +730,21 @@ body {
     flex-direction: column;
     max-width: 85%;
     min-width: 0;
-    animation: fadeIn 0.15s ease;
 }
 
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(4px);
+        transform: translateY(8px);
     }
     to {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.message.message-animate {
+    animation: fadeIn 0.25s ease-out;
 }
 
 .message.user {
@@ -1099,9 +1102,48 @@ body {
 }
 
 .tool-block.collapsed .tool-content {
-    max-height: 0;
-    opacity: 0;
-}
+    	max-height: 0;
+    	opacity: 0;
+    }
+
+    .tools-summary {
+    	font-size: 11px;
+    	color: var(--fg-muted);
+    	cursor: pointer;
+    	user-select: none;
+    	padding: 3px 0;
+    	display: flex;
+    	align-items: center;
+    	gap: 4px;
+    	transition: color 0.15s;
+    }
+
+    .tools-summary:hover {
+    	color: var(--fg-dim);
+    }
+
+    .tools-summary::before {
+    	content: "▸";
+    	font-size: 10px;
+    	transition: transform 0.15s;
+    	display: inline-block;
+    }
+
+    .tools-summary.expanded::before {
+    	transform: rotate(90deg);
+    }
+
+    .tools-container {
+    	transition: max-height 0.2s ease, opacity 0.2s ease;
+    	max-height: 2000px;
+    	opacity: 1;
+    	overflow: hidden;
+    }
+
+    .tools-container.hidden {
+    	max-height: 0;
+    	opacity: 0;
+    }
 
 .tool-text {
     margin: 2px 0;
@@ -2129,4 +2171,28 @@ body {
     margin-top: 2px;
     display: block;
     text-align: right;
+}
+
+/* ---- OCR / Extract scanning animation ---- */
+.tool-block.tool-scanning {
+    animation: tool-working-pulse 0.8s ease infinite;
+}
+
+.tool-scan-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--tool-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 6px;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.tool-scan-label {
+    font-size: 11px;
+    color: var(--tool-fg);
+    font-style: italic;
 }

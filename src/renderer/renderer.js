@@ -1299,6 +1299,35 @@ async function sendMessage() {
           thinkingBlock.classList.add("collapsed");
         }, 600);
       }
+
+      // Collapse all tool blocks into a clickable summary at the top.
+      var toolBlocks = bubble.querySelectorAll(".tool-block");
+      if (toolBlocks.length > 0) {
+        var summary = document.createElement("div");
+        summary.className = "tools-summary";
+        var names = [];
+        toolBlocks.forEach(function (tb) {
+          var h = tb.querySelector(".tool-header");
+          names.push(h ? h.textContent.trim() : "tool");
+        });
+        summary.innerHTML = iconSvg("terminal", 12) + " " + toolBlocks.length + " tool" + (toolBlocks.length !== 1 ? "s" : "") + " used";
+        summary.title = names.join("\n");
+
+        var container = document.createElement("div");
+        container.className = "tools-container hidden";
+        toolBlocks.forEach(function (tb) {
+          container.appendChild(tb);
+        });
+
+        summary.addEventListener("click", function () {
+          container.classList.toggle("hidden");
+          summary.classList.toggle("expanded");
+        });
+
+        bubble.insertBefore(container, bubble.firstChild);
+        bubble.insertBefore(summary, container);
+      }
+
       var chat = getCurrentChat();
       var sourcesToRender = webSources.slice();
       webSources = [];
@@ -1367,6 +1396,22 @@ async function sendMessage() {
         toolBlock.dataset.toolName = "search_web";
         var query = args.query || "search";
         toolHeader.innerHTML = iconSvg("search", 14) + " " + query;
+        toolHeader.addEventListener("click", function () {
+          toolBlock.classList.toggle("collapsed");
+        });
+      } else if (toolName === "ocr_image" || toolName === "extract_webpage") {
+        toolBlock.classList.add("tool-scanning");
+        var scanLabel = toolName === "ocr_image"
+          ? (args.path ? args.path.split("/").pop().split("\\").pop() : "image")
+          : (args.url || "webpage");
+        toolHeader.innerHTML = iconSvg("search", 14) + " ";
+        var scanSpinner = document.createElement("span");
+        scanSpinner.className = "tool-scan-spinner";
+        toolHeader.appendChild(scanSpinner);
+        var scanText = document.createElement("span");
+        scanText.className = "tool-scan-label";
+        scanText.textContent = "Scanning " + scanLabel + "...";
+        toolHeader.appendChild(scanText);
         toolHeader.addEventListener("click", function () {
           toolBlock.classList.toggle("collapsed");
         });
@@ -1442,6 +1487,22 @@ async function sendMessage() {
             out.textContent = stripEmojis(chunk.tool_end.output);
             tcEnd.appendChild(out);
           }
+
+          // Replace scanning animation with result summary for ocr/extract.
+          if (tbEnd.classList.contains("tool-scanning")) {
+            tbEnd.classList.remove("tool-scanning");
+            var scanSpinner = tbEnd.querySelector(".tool-scan-spinner");
+            if (scanSpinner) scanSpinner.remove();
+            var scanLabel = tbEnd.querySelector(".tool-scan-label");
+            if (scanLabel) {
+              var outLen = chunk.tool_end.output ? chunk.tool_end.output.length : 0;
+              if (outLen > 0) {
+                scanLabel.textContent = "Done — " + (outLen < 100 ? chunk.tool_end.output.slice(0, 80) : outLen + " chars extracted");
+              } else {
+                scanLabel.textContent = "Done — nothing found";
+              }
+            }
+          }
           var minAnim = 300;
           var elapsed = Date.now() - (parseInt(tbEnd.dataset.started) || 0);
           var delay = Math.max(0, minAnim - elapsed);
@@ -1495,7 +1556,7 @@ async function sendMessage() {
 
 function createAssistantMessage() {
   const div = document.createElement("div");
-  div.className = "message assistant streaming";
+  div.className = "message assistant streaming message-animate";
   const bubble = document.createElement("div");
   bubble.className = "bubble";
 
@@ -1704,7 +1765,7 @@ function stripEmojis(text) {
 
 async function addMessage(text, role, attachment) {
   const div = document.createElement("div");
-  div.className = `message ${role}`;
+  div.className = "message " + role + " message-animate";
 
   if (attachment && attachment.name) {
     var attachmentLabel = document.createElement("div");

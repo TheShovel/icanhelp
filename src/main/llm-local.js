@@ -140,8 +140,24 @@ function resolveModelPath(config) {
 
 function buildSystemPrompt(sysInfo) {
   if (sysInfo === undefined) sysInfo = gatherSystemInfo();
+
+  var now = new Date();
+  var tz = "";
+  var locale = "";
+  try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (_) {}
+  try { locale = Intl.DateTimeFormat().resolvedOptions().locale; } catch (_) {}
+  var dateStr = now.toLocaleDateString(locale || undefined, {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+  var timeStr = now.toLocaleTimeString(locale || undefined, {
+    hour: "2-digit", minute: "2-digit",
+  });
+
   var parts = [
     "You are Canhelpy, a Linux desktop AI assistant.",
+    "",
+    "## Date & Location",
+    "- Current time: " + dateStr + ", " + timeStr + (tz ? " (" + tz + ")" : "") + (locale ? " [" + locale + "]" : ""),
     "",
     "## Your System",
     sysInfo,
@@ -149,8 +165,9 @@ function buildSystemPrompt(sysInfo) {
     "## Rules",
     "- Context window: " + (CONTEXT_SIZE / 1024) + "K tokens. Keep tool results and file reads small.",
     "- For factual/how-to questions: call search_knowledge() first. If it returns nothing, use search_web().",
+    "- After search_web, use extract_webpage(url) to get full page content from any result. It also extracts images with OCR.",
     "- For this system's live state (CPU%, disk, services, packages, updates): run commands with run_bash().",
-    "- Use as few tools as possible. After 4 tool calls, stop and answer with what you have.",
+    "- Use as few tools as possible. Think before calling: is this tool actually needed?",
     "- Be concise. Lead with the answer. No preambles. One sentence or a few bullets.",
     "- The `sys` CLI is available for distro-agnostic system commands (sys pkg, sys svc, sys perf, etc).",
   ];
@@ -290,16 +307,8 @@ function compressHistory(history, contextSize) {
 }
 
 function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
-  // consecutiveFailures: tool calls that returned an error/refusal without the
-  //   model ever producing a real result. Reset on any successful call.
-  // total: hard cap on tool calls in a single turn, so a model that calls
-  //   tools successfully forever (e.g. reading a huge file) is still bounded.
-  // recentCalls: signatures of recent calls, to detect the model repeating the
-  //   exact same call (a common loop). Reset when a different call is made.
-  var state = { consecutiveFailures: 0, total: 0, lastSig: null, lastSigCount: 0 };
-  var MAX_CONSECUTIVE_FAILURES = 5;
+  var state = { total: 0, lastSig: null, lastSigCount: 0, consecutiveFailures: 0 };
   var MAX_TOTAL_CALLS = 60;
-  var MAX_SAME_CALL_REPEATS = 2;
   var functions = {};
 
   for (var i = 0; i < tools.length; i++) {
@@ -310,49 +319,44 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
       handler: (function (name) {
         return async function (params) {
           if (state.total >= MAX_TOTAL_CALLS) {
-            return (
-              "Stop calling tools. You have made " + state.total +
-              " tool calls this turn. Respond directly to the user now with what you know."
-            );
+            return "Stop. You've made " + state.total + " calls. Answer the user now.";
           }
+
+          var nudge = "";
+
+          // Soft nudge after 4+ calls — still executes but encourages wrapping up.
+          if (state.total >= 4) {
+            nudge = "[Note: you've used " + state.total + " tools already. Consider answering now with what you have.]\n\n";
+          }
+
+          // Soft nudge on repeated identical calls instead of hard-blocking.
           var sig = name + "\x1f" + JSON.stringify(params || {});
           if (sig === state.lastSig) {
             state.lastSigCount++;
+            if (state.lastSigCount >= 2) {
+              nudge = "[Note: you've already called " + name + " with these arguments. Try a different approach or answer the user.]\n\n";
+            }
           } else {
             state.lastSig = sig;
             state.lastSigCount = 1;
           }
-          if (state.lastSigCount > MAX_SAME_CALL_REPEATS) {
-            return (
-              "You have already called " + name + " with these exact arguments " +
-              state.lastSigCount + " times and it is not helping. Do NOT call the " +
-              "same tool with the same arguments again. Respond directly to the " +
-              "user, or try a clearly different tool or arguments."
-            );
-          }
+
           state.total++;
           await onToolStart({ name: name, args: params });
           try {
             var result = await executeTool(name, params);
             var resultStr = String(result);
             onToolEnd({ name: name, output: resultStr });
-            // A successful call means progress was made; don't count it as a
-            // failure. This lets legitimate multi-call sequences (like reading
-            // a large file in chunks) proceed without tripping the guard.
             state.consecutiveFailures = 0;
-            return resultStr;
+            return nudge + resultStr;
           } catch (e) {
             state.consecutiveFailures++;
-            if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-              return (
-                "Too many consecutive failing tool calls. Do not retry the same " +
-                "call. Respond directly to the user now, or try a clearly " +
-                "different approach."
-              );
+            if (state.consecutiveFailures >= 5) {
+              return "Too many consecutive failing tool calls. Answer the user now.\n\n" + JSON.stringify({ error: e.message });
             }
             var errorStr = JSON.stringify({ error: e.message });
             onToolEnd({ name: name, output: errorStr });
-            return errorStr;
+            return nudge + errorStr;
           }
         };
       })(fn.name),
