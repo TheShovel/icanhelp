@@ -62,6 +62,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getRecommendedModels: () => ipcRenderer.invoke("get-recommended-models"),
   getSystemInfo: () => ipcRenderer.invoke("get-system-info"),
   getCompatibleModels: () => ipcRenderer.invoke("get-compatible-models"),
+  getExtraModels: () => ipcRenderer.invoke("get-extra-models"),
   listDownloadedModels: () => ipcRenderer.invoke("list-downloaded-models"),
   downloadModel: (modelId) => ipcRenderer.invoke("download-model", modelId),
   deleteModel: (filename) => ipcRenderer.invoke("delete-model", filename),

@@ -1,6 +1,7 @@
 const { runBash } = require("./bash");
 const { readFile, readFileLines, writeFile, listDirectory } = require("./fs");
 const { ocrImage } = require("../ocr");
+const { extractWebpage } = require("./extract");
 const {
   addKnowledge,
   searchKnowledge,
@@ -220,6 +221,36 @@ var tools = [
   {
     type: "function",
     function: {
+      name: "extract_webpage",
+      description:
+        "Fetch and extract the main text content from a webpage URL. Use this after search_web to get the full content of a search result. " +
+        "Optionally extracts and analyzes images found on the page using OCR and vision. " +
+        "Returns JSON with title, extracted text, and optional image descriptions.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The full URL of the webpage to extract content from",
+          },
+          extractImages: {
+            type: "boolean",
+            description: "Whether to download and analyze images on the page (default true)",
+            default: true,
+          },
+          maxImages: {
+            type: "number",
+            description: "Maximum number of images to process (default 3, max 5)",
+            default: 3,
+          },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "set_theme",
       description:
         "Call this when the user asks to change the app's colors, make a theme (green, blue, dark, etc), or change how the app looks. Set CSS variables — only use these exact names:" +
@@ -414,6 +445,7 @@ var handlers = {
       2,
     );
   },
+  extract_webpage: extractWebpage,
   start_skill: function (args) {
     var name = args && args.name;
     if (!name)

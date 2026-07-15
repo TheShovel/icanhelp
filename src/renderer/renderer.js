@@ -842,15 +842,17 @@ window.electronAPI.onModelDownloadProgress(function (info) {
   chatPanel.classList.add("hidden");
   sendBtn.classList.add("hidden");
 
+
   isSetupScreen = true;
   var sysInfo = await window.electronAPI.getSystemInfo();
   var allModels = await window.electronAPI.getRecommendedModels();
   var compatModels = await window.electronAPI.getCompatibleModels();
+  var extraModels = await window.electronAPI.getExtraModels();
 
-  renderModelPicker(allModels, compatModels, sysInfo);
+  renderModelPicker(allModels, compatModels, sysInfo, extraModels);
 })();
 
-function renderModelPicker(allModels, compatModels, sysInfo) {
+function renderModelPicker(allModels, compatModels, sysInfo, extraModels) {
   installModelList.innerHTML = "";
   installSpinner.classList.add("hidden");
   installProgressBar.classList.add("hidden");
@@ -954,6 +956,7 @@ function renderModelPicker(allModels, compatModels, sysInfo) {
   var hasCompatible = false;
   for (var i = 0; i < allModels.length; i++) {
     var m = allModels[i];
+    if (m.role === "extract") continue;
     var isCompatible = !!compatIds[m.id];
     if (isCompatible) hasCompatible = true;
 
@@ -1026,6 +1029,82 @@ function renderModelPicker(allModels, compatModels, sysInfo) {
 
     installModelList.appendChild(card);
   }
+
+  if (extraModels && extraModels.length > 0) {
+    var sep = document.createElement("div");
+    sep.className = "install-model-separator";
+    var sepLabel = document.createElement("span");
+    sepLabel.textContent = "Extra";
+    sep.appendChild(sepLabel);
+    installModelList.appendChild(sep);
+
+    for (var k = 0; k < extraModels.length; k++) {
+      var em = extraModels[k];
+      var eCard = document.createElement("button");
+      eCard.className =
+        "install-model-card install-model-extra" +
+        (em.compatible ? "" : " incompatible");
+      eCard.disabled = !em.compatible;
+
+      var eTopRow = document.createElement("div");
+      eTopRow.className = "install-model-top";
+
+      var eNameEl = document.createElement("span");
+      eNameEl.className = "install-model-name";
+      eNameEl.textContent = em.name;
+      eTopRow.appendChild(eNameEl);
+
+      var eBadge = document.createElement("span");
+      eBadge.className = "install-model-badge install-model-badge-extra";
+      eBadge.textContent = "Extra";
+      eTopRow.appendChild(eBadge);
+
+      eCard.appendChild(eTopRow);
+
+      var eMetaRow = document.createElement("div");
+      eMetaRow.className = "install-model-meta";
+
+      var eQualEl = document.createElement("span");
+      eQualEl.className = "install-model-quality";
+      eQualEl.textContent = em.quality || "Utility";
+      eMetaRow.appendChild(eQualEl);
+
+      var eSizeEl = document.createElement("span");
+      eSizeEl.className = "install-model-size";
+      eSizeEl.textContent = em.size;
+      eMetaRow.appendChild(eSizeEl);
+
+      eCard.appendChild(eMetaRow);
+
+      var eDescEl = document.createElement("span");
+      eDescEl.className = "install-model-desc";
+      eDescEl.textContent = em.description;
+      eCard.appendChild(eDescEl);
+
+      var eNoteEl = document.createElement("span");
+      eNoteEl.className = "install-model-note";
+      if (!em.compatible) {
+        eNoteEl.textContent =
+          "Needs ~" + em.minRamGB + " GB RAM — not enough free memory";
+      } else {
+        eNoteEl.textContent = "Utility model — not used as main assistant";
+      }
+      eCard.appendChild(eNoteEl);
+
+      if (em.compatible) {
+        eCard.addEventListener(
+          "click",
+          (function (mid, mname) {
+            return function () {
+              startModelDownload(mid, mname, true);
+            };
+          })(em.id, em.name),
+        );
+      }
+
+      installModelList.appendChild(eCard);
+    }
+  }
 }
 
 async function openModelPicker() {
@@ -1046,6 +1125,7 @@ async function openModelPicker() {
   var sysInfo = await window.electronAPI.getSystemInfo();
   var allModels = await window.electronAPI.getRecommendedModels();
   var compatModels = await window.electronAPI.getCompatibleModels();
+  var extraModels = await window.electronAPI.getExtraModels();
 
   try {
     var saved = await window.electronAPI.getConfig();
@@ -1054,7 +1134,7 @@ async function openModelPicker() {
     }
   } catch (_) {}
 
-  renderModelPicker(allModels, compatModels, sysInfo);
+  renderModelPicker(allModels, compatModels, sysInfo, extraModels);
 }
 
 function closeModelPicker() {
@@ -1068,7 +1148,7 @@ function closeModelPicker() {
   window.electronAPI.resizeWindow(400, 550);
 }
 
-async function startModelDownload(modelId, modelName) {
+async function startModelDownload(modelId, modelName, isExtra) {
   installModelList.innerHTML = "";
   installSpinner.classList.remove("hidden");
   installProgressBar.classList.remove("hidden");
@@ -1090,6 +1170,11 @@ async function startModelDownload(modelId, modelName) {
       return setTimeout(r, 3000);
     });
     installSubtitle.textContent = "Downloading " + modelName + "...";
+  }
+
+  if (isExtra) {
+    openModelPicker();
+    return;
   }
 
   var config = {

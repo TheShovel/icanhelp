@@ -60,7 +60,7 @@ function gatherSystemInfo() {
   // Memory total.
   var mem = run("bash", [
     "-c",
-    "free -h 2>/dev/null | sed -n 's/^Mem:[[:space:]]*\([0-9]*[A-Za-z]\).*/RAM total \1/p' | head -1",
+    "free -h 2>/dev/null | awk '/^Mem:/ {print \"RAM total \" $2}'",
   ]);
   if (mem) lines.push(mem);
   // Kernel.
@@ -143,98 +143,18 @@ function buildSystemPrompt(sysInfo) {
   var parts = [
     "You are Canhelpy, a Linux desktop AI assistant.",
     "",
-    "## Your System (detected at startup — use these facts, do not re-detect unless asked)",
+    "## Your System",
     sysInfo,
     "",
-    "## Context Window Limit",
-    "- Your context window is " + (CONTEXT_SIZE / 1024) + "K tokens (" + CONTEXT_SIZE + " tokens total).",
-    "- This is a HARD limit. If you exceed it, generation fails. Keep the total of the system prompt, conversation history, file contents, and tool results under this budget.",
-    "- Never paste a large file into the chat. If a file or tool result is large, read or fetch it in chunks.",
-    "",
-    "## Reading Files",
-    "- For SMALL files (< ~64 KB) use read_file().",
-    "- For LARGE files or when you only need part of a file, use read_file_lines(path, startLine, maxLines).",
-    "  It returns at most 500 lines per call and tells you the next startLine to continue reading.",
-    "- read_file_lines ONLY works on TEXT files (code, logs, CSV, markdown, JSON, etc.).",
-    "  Do NOT use it for images or binary files - use ocr_image for images instead.",
-    "- When a user attaches a file, if its content is large, do not try to hold it all in context. Read it in chunks with read_file_lines.",
-    "",
-    "## Knowledge Base Rules",
-    "- For ANY question about the user's own system (CPU, GPU, memory, disk, services, network, logs,",
-    "  packages, users, hardware, drivers, OR available updates/upgrades), FIRST check the knowledge base AND run the command locally.",
-    "  'Any updates?' / 'what can I upgrade?' means RUN `sys pkg check` and report the pending count — it is a question about THEIR system, not the web.",
-    "  Do NOT web-search for these — the answer comes from THEIR machine, not the internet.",
-    "- BEFORE answering any question, ALWAYS call search_knowledge() to find relevant information.",
-    "- If search_knowledge returns results, use them to inform your answer.",
-    "- Only if the knowledge base has NOTHING and the question is genuinely external (news, weather, docs for",
-    "  software you don't have, latest releases) should you use search_web().",
-    "- The knowledge base covers: Linux system administration, bash, networking, package management,",
-    "  systemd, permissions, processes, desktop environments, troubleshooting, kernel/hardware,",
-    "  security, programming (JavaScript, Python, TypeScript, Go, React, Git, Docker, SQL, regex, API design, testing),",
-    "  web development, computer science, physics, chemistry, biology, math, electronics,",
-    "  daily life (cooking, nutrition, career, travel, productivity, relationships, parenting, legal basics, tech concepts),",
-    "  health & fitness (exercise, first aid, mental health), personal finance, home (maintenance, cleaning, gardening, DIY),",
-    "  creative (writing, photography, drawing, music, video editing), earth & space, and green living.",
-    "",
-    "## Tool Usage",
-    "- Use run_bash() to execute commands on the user's Linux system.",
-    "- Use search_web() ONLY for genuinely external/live information (news, weather, release notes, docs for",
-    "  software NOT installed on this machine). For questions about THIS system's state, run a command instead.",
-    "  ALWAYS cite your sources with direct links from the search results.",
-    "- A universal `sys` CLI is ALWAYS available on PATH (auto-detects the distro). For system",
-    "  administration PREFER it over raw distro commands: `sys pkg install curl`, `sys pkg check`, `sys svc restart nginx`,",
-    "  `sys firewall allow 22/tcp`, `sys net interfaces`, `sys disk list`, `sys user add bob`, `sys time status`,",
-    "  `sys log errors`, `sys kern initramfs`, `sys swap status`, `sys secure status`. It works on Arch, Ubuntu/Debian,",
-    "  Fedora, and openSUSE. Run `sys help` or see knowledge/linux/universal-cli.md for all verbs. Use native",
-    "  commands (rsync, tar, find, openssl, ip, ss, journalctl) directly when `sys` doesn't cover the task.",
-    "- Use store_knowledge() when the user teaches you something new.",
-    "- Use search_knowledge() before guessing. Look it up first.",
-    "- Use list_skills() to discover available skills for specific tasks.",
-    "- Use start_skill(name) to load a skill when the user's request matches.",
-    "",
-    "## Response Style (CRITICAL — follow exactly)",
-    "- Be EXTREMELY concise. Aim for ONE short sentence or ONE line for simple questions.",
-    "- Hard budget: most answers under 60 words. Only exceed it if the user explicitly asks for detail, steps, or explanation.",
-    "- Lead with the direct answer or result. No preamble, no 'Sure!', no 'Here is...', no restating the question.",
-    "- Do NOT add unsolicited explanations, background, caveats, or 'if you need more help' closers.",
-    "- Prefer a single line or 1-3 short bullets over paragraphs. No markdown walls.",
-    "- When you run a command, report ONLY the key result (the number/status), not the full raw output.",
-    "- Expand ONLY when the user asks 'how', 'why', 'explain', or 'more detail'.",
-    "",
-    "## Examples (do this)",
-    "  Q: whats my cpu usage?  A: ~8% busy, 89% idle (load 1.2/1.5/2.3 on 12 cores).",
-    "  Q: what about gpu?  A: AMD Radeon RX 6600; `radeontop` isn't installed, so no live % available.",
-    "  Q: install curl  A: `sys pkg install curl` (done).",
-    "  Q: any updates?  A: `sys pkg check` → e.g. '12 packages upgradable (run sys pkg upgrade to apply)'.",
-    "  Q: what services are failing?  A: `sys log errors` / `sys svc status foo`.",
-    "",
-    "## Tool Usage Budget (CRITICAL)",
-    "- Use as FEW tools as possible. One good call beats five. Think before calling: is this tool actually needed?",
-    "- The '## Your System' section above ALREADY has the distro, CPU, GPU, RAM, and kernel — do NOT re-run",
-    "  probes (lscpu/lspci/free/uname) just to restate it. Only run a command when you need LIVE state (CPU %, running",
-    "  services, disk usage, packages, users, OR available updates) or to change something.",
-    "- Do NOT call list_knowledge (it only returns counts) — use search_knowledge with a query only if the system",
-    "  prompt and your knowledge don't already cover the question.",
-    "- HARD LIMIT: if you have already used 4 tools in this turn, STOP calling tools. Give the best answer you can",
-    "  from what you have and wrap up immediately. Never loop tools.",
-    "",
-    "## EXECUTE, don't just describe (CRITICAL)",
-    "- When the user asks about the state of THEIR system (CPU, GPU, memory, disk, services, network, logs,",
-    "  packages, users, hardware, drivers, OR available updates/upgrades), you MUST run the command yourself with run_bash() and report",
-    "  the OUTPUT. NEVER reply with a list of commands, a web-search summary, or just a command snippet.",
-    "  'Any updates?' → run `sys pkg check` and report the pending count. Do NOT web-search it.",
-    "- For GPU: the detected GPU is listed in '## Your System' above — use the matching tool",
-    "  (`nvidia-smi` for NVIDIA, `radeontop` for AMD, `intel_gpu_top` for Intel). Do NOT assume NVIDIA;",
-    "  if the listed GPU is AMD/Intel, run the corresponding tool (or note it is not installed). Report what you see.",
-    "- Example: if asked 'what is my CPU usage?', run `sys perf top` (or `top -bn1` / `free -h` if sys is unavailable) via run_bash and tell",
-    "  them the actual percentage and load — do not paste `ps aux --sort=-%cpu` as the answer.",
-    "- If a command fails (e.g. `top` needs a TTY — use `top -bn1` instead; `nvidia-smi` absent on non-NVIDIA),",
-    "  retry with a working variant or report the probe result, rather than giving up or pasting a generic answer.",
-    "- Only show a command (instead of running it) when the user explicitly asks 'how do I...' or 'show me the command'.",
-    "- Prefer the `sys` CLI (e.g. `sys perf top`, `sys disk usage`, `sys svc status`) so the command works on any distro.",
+    "## Rules",
+    "- Context window: " + (CONTEXT_SIZE / 1024) + "K tokens. Keep tool results and file reads small.",
+    "- For factual/how-to questions: call search_knowledge() first. If it returns nothing, use search_web().",
+    "- For this system's live state (CPU%, disk, services, packages, updates): run commands with run_bash().",
+    "- Use as few tools as possible. After 4 tool calls, stop and answer with what you have.",
+    "- Be concise. Lead with the answer. No preambles. One sentence or a few bullets.",
+    "- The `sys` CLI is available for distro-agnostic system commands (sys pkg, sys svc, sys perf, etc).",
   ];
 
-  parts.push("Be helpful, accurate, and to the point.");
   return parts.join("\n");
 }
 
@@ -594,9 +514,45 @@ async function runLocalChatLoop({
 
     if (signal) {
       signal.addEventListener("abort", function () {
+        clearTimeout(idleTimer);
+        idleFired = false;
         internalAbort.abort();
       });
     }
+
+    var IDLE_TIMEOUT_MS = 30 * 1000;
+    var toolRunning = false;
+    var idleTimer = null;
+    var idleFired = false;
+
+    function resetIdleTimer() {
+      clearTimeout(idleTimer);
+      idleFired = false;
+      if (!toolRunning) {
+        idleTimer = setTimeout(function () {
+          console.log("[llm-local] Idle timeout — no output for " + (IDLE_TIMEOUT_MS / 1000) + "s, aborting");
+          idleFired = true;
+          idleTimer = null;
+          internalAbort.abort();
+        }, IDLE_TIMEOUT_MS);
+      }
+    }
+
+    // Wrap the tool callbacks to track when a tool is busy.
+    var origOnToolStart = onToolStart;
+    var origOnToolEnd = onToolEnd;
+    onToolStart = async function (info) {
+      toolRunning = true;
+      clearTimeout(idleTimer);
+      await origOnToolStart(info);
+    };
+    onToolEnd = function (info) {
+      origOnToolEnd(info);
+      toolRunning = false;
+      resetIdleTimer();
+    };
+
+    resetIdleTimer();
 
     var opts = {
       functions: functions,
@@ -625,6 +581,7 @@ async function runLocalChatLoop({
       signal: internalAbort.signal,
       stopOnAbortSignal: true,
       onTextChunk: function (chunk) {
+        resetIdleTimer();
         if (repDetector.feed(chunk)) {
           console.log("[llm-local] Repetition detected, aborting");
           internalAbort.abort();
@@ -633,6 +590,7 @@ async function runLocalChatLoop({
         onChunk({ text: chunk });
       },
       onResponseChunk: function (chunk) {
+        resetIdleTimer();
         if (
           chunk &&
           chunk.type === "segment" &&
@@ -652,13 +610,19 @@ async function runLocalChatLoop({
 
     console.log("[llm-local] Starting session.promptWithMeta...");
     var result = await session.promptWithMeta(currentPrompt, opts);
+    clearTimeout(idleTimer);
     console.log("[llm-local] Response received:", result.responseText);
   } catch (e) {
+      clearTimeout(idleTimer);
       if (e.message === "REPETITION_DETECTED") {
         console.log("[llm-local] Repetition loop detected, requesting retry");
         onChunk({ error: "Model got stuck in a loop. Please try again." });
       } else if (e.name === "AbortError" || (signal && signal.aborted)) {
-        console.log("[llm-local] Aborted");
+        if (idleFired) {
+          onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
+        } else {
+          console.log("[llm-local] Aborted by user");
+        }
       } else if (e.message && e.message.includes("context shift strategy")) {
         console.log("[llm-local] Context size exceeded");
         onChunk({

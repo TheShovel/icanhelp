@@ -23,6 +23,7 @@ const {
   downloadModel,
   getSystemInfo,
   getCompatibleModels,
+  getExtraModels,
 } = require("./model-manager");
 const {
   loadConfig,
@@ -46,10 +47,14 @@ const {
   shutdownVision,
 } = require("./vision");
 const {
+  loadPipeline: loadExtract,
+  shutdownExtract,
+} = require("./extract-model");
+const {
   prepareAttachment,
   supportedAttachmentExtensions,
 } = require("./attachments");
-const { searchKnowledge, preloadEmbeddings } = require("./rag");
+const { searchKnowledge, preloadEmbeddings, seedCoreInstructions } = require("./rag");
 const { appPath, knowledgeFile, visionLog, ocrLog } =
   require("./paths");
 const {
@@ -134,7 +139,9 @@ function createWindow() {
 
   setTimeout(function () {
     loadPipeline();
+    loadExtract();
     preloadEmbeddings();
+    seedCoreInstructions();
   }, 500);
 
   mainWindow.webContents.on("did-finish-load", function () {
@@ -523,6 +530,10 @@ function createWindow() {
     return getCompatibleModels();
   });
 
+  ipcMain.handle("get-extra-models", function () {
+    return getExtraModels();
+  });
+
   ipcMain.handle("list-downloaded-models", function () {
     return listDownloadedModels();
   });
@@ -814,6 +825,7 @@ app.whenReady().then(function () {
 
 app.on("before-quit", function () {
   shutdownVision();
+  shutdownExtract();
   disposeModel();
 });
 

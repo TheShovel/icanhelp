@@ -159,6 +159,48 @@ async function addKnowledge(text, metadata) {
   });
 }
 
+function isSeeded(sourceTag) {
+  const s = loadStore();
+  return s.entries.some(function (e) {
+    return e.metadata && e.metadata.source === sourceTag;
+  });
+}
+
+async function seedCoreInstructions() {
+  if (isSeeded("core-instructions")) return;
+  console.log("[rag] Seeding core instructions into knowledge base...");
+
+  var entries = [
+    {
+      text: "sys CLI reference: `sys pkg install/remove/search/check/upgrade` for packages. `sys svc start/stop/restart/status/enable/disable <name>` for services. `sys firewall allow/deny <port>/<proto>` for firewall. `sys net interfaces/status` for networking. `sys disk list/usage` for disks. `sys user add/del <name>` for users. `sys time status/sync` for time. `sys log errors/tail` for logs. `sys kern initramfs` for kernel. `sys swap status` for swap. `sys secure status` for security. `sys perf top` for CPU. Works on Arch, Ubuntu, Fedora, openSUSE. Prefer sys over raw distro commands. Use native commands (rsync, tar, find, openssl, ip, ss, journalctl) when sys doesn't cover the task.",
+      metadata: { source: "core-instructions", topic: "sys-cli" },
+    },
+    {
+      text: "File reading: use read_file() for small files under ~64 KB. For large files or partial reads, use read_file_lines(path, startLine, maxLines) which returns at most 500 lines per call and tells you the next startLine. read_file_lines only works on TEXT files (code, logs, CSV, markdown, JSON). Do NOT use it for images or binaries — use ocr_image for images instead. When a user attaches a large file, read it in chunks with read_file_lines rather than holding it all in context.",
+      metadata: { source: "core-instructions", topic: "file-reading" },
+    },
+    {
+      text: "Response style: Be extremely concise. Aim for one short sentence or one line for simple questions. Most answers under 60 words. Lead with the direct answer or result — no preamble, no 'Sure!', no 'Here is...', no restating the question. No unsolicited explanations, background, caveats, or 'if you need more help' closers. Prefer a single line or 1-3 short bullets over paragraphs. When running a command, report only the key result (the number/status), not the full raw output. Expand only when the user asks 'how', 'why', 'explain', or 'more detail'.",
+      metadata: { source: "core-instructions", topic: "response-style" },
+    },
+    {
+      text: "System state questions — EXECUTE, don't describe: When the user asks about the state of THEIR system (CPU, GPU, memory, disk, services, network, logs, packages, users, hardware, drivers, or available updates), you MUST run the command yourself with run_bash() and report the OUTPUT. NEVER reply with a list of commands, a web-search summary, or just a command snippet. 'Any updates?' means run `sys pkg check` and report the pending count — it's about their system, not the web. For GPU: the detected GPU is in the system info header — use the matching tool (nvidia-smi for NVIDIA, radeontop for AMD, intel_gpu_top for Intel). If a command fails, retry with a working variant rather than giving up. Only show a command (instead of running it) when the user explicitly asks 'how do I...' or 'show me the command'.",
+      metadata: { source: "core-instructions", topic: "execute-dont-describe" },
+    },
+    {
+      text: "Tool usage budget: Use as FEW tools as possible. One good call beats five. The system info header already has distro, CPU, GPU, RAM, and kernel — do NOT re-run probes (lscpu/lspci/free/uname) just to restate it. Only run a command when you need live state (CPU%, running services, disk usage, packages, users, or available updates) or to change something. Do NOT call list_knowledge (it only returns counts). HARD LIMIT: if you have already used 4 tools in this turn, STOP calling tools and answer with what you have. Never loop tools.",
+      metadata: { source: "core-instructions", topic: "tool-budget" },
+    },
+  ];
+
+  try {
+    var result = await addKnowledgeBatch(entries);
+    console.log("[rag] Core instructions seeded: " + result);
+  } catch (e) {
+    console.error("[rag] Failed to seed core instructions:", e.message);
+  }
+}
+
 async function addKnowledgeBatch(items) {
   const s = loadStore();
   const allChunks = [];
@@ -205,7 +247,7 @@ async function addKnowledgeBatch(items) {
 async function searchKnowledge(query, k) {
   const s = loadStore();
   if (s.entries.length === 0) {
-    return JSON.stringify({ results: [], total: 0 });
+    return JSON.stringify({ results: [], total: 0, hint: "Knowledge base is empty. Use search_web() to find information on the web instead." });
   }
 
   let queryEmbedding;
@@ -229,7 +271,11 @@ async function searchKnowledge(query, k) {
     metadata: r.metadata,
   }));
 
-  return JSON.stringify({ results: top, total: s.entries.length });
+  var out = { results: top, total: s.entries.length };
+  if (top.length === 0) {
+    out.hint = "No matching entries found. Use search_web() to find this information on the web.";
+  }
+  return JSON.stringify(out);
 }
 
 async function listKnowledge() {
@@ -260,4 +306,5 @@ module.exports = {
   clearKnowledge,
   chunkText,
   preloadEmbeddings,
+  seedCoreInstructions,
 };

@@ -135,16 +135,18 @@ const RECOMMENDED_MODELS = [
     minRamGB: 8,
   },
   {
-    id: "qwen2.5-7b",
-    name: "Qwen 2.5 7B",
-    size: "~4.4 GB",
-    sizeBytes: 4466000000,
-    quality: "Best",
-    description: "Highest quality for complex tasks. Slow on weaker hardware.",
-    url: "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
-    filename: "Qwen2.5-7B-Instruct-Q4_K_M.gguf",
-    minRamGB: 10,
+    id: "lfm2-350m-extract",
+    name: "LFM2 350M Extract",
+    size: "~220 MB",
+    sizeBytes: 230000000,
+    quality: "Utility",
+    role: "extract",
+    description: "Webpage text extraction model. Used by the extract_webpage tool for cleaning HTML content.",
+    url: "https://huggingface.co/LiquidAI/LFM2-350M-Extract-GGUF/resolve/main/LFM2-350M-Extract-Q4_K_M.gguf",
+    filename: "LFM2-350M-Extract-Q4_K_M.gguf",
+    minRamGB: 4,
   },
+
 ];
 
 function getCompatibleModels() {
@@ -152,7 +154,7 @@ function getCompatibleModels() {
   var usableRam = info.freeRamGB;
 
   return RECOMMENDED_MODELS.filter(function (m) {
-    return m.minRamGB <= usableRam + 2;
+    return m.role !== "extract" && m.minRamGB <= usableRam + 2;
   }).map(function (m) {
     return {
       id: m.id,
@@ -164,6 +166,32 @@ function getCompatibleModels() {
       ramOk: m.minRamGB <= usableRam + 2,
     };
   });
+}
+
+function getExtraModels() {
+  var info = getSystemInfo();
+  var usableRam = info.freeRamGB;
+
+  return RECOMMENDED_MODELS.filter(function (m) {
+    return m.role === "extract";
+  }).map(function (m) {
+    return {
+      id: m.id,
+      name: m.name,
+      size: m.size,
+      description: m.description,
+      filename: m.filename,
+      quality: m.quality,
+      minRamGB: m.minRamGB,
+      compatible: m.minRamGB <= usableRam + 2,
+      ramOk: m.minRamGB <= usableRam + 2,
+      role: m.role,
+    };
+  });
+}
+
+function getAllModels() {
+  return RECOMMENDED_MODELS;
 }
 
 function ensureModelsDir() {
@@ -326,5 +354,6 @@ module.exports = {
   downloadModel,
   getSystemInfo,
   getCompatibleModels,
+  getExtraModels,
   MODELS_DIR,
 };

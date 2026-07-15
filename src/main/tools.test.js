@@ -255,6 +255,7 @@ test("registry - tools array has all expected tools", async (t) => {
   assert.ok(names.includes("write_file"));
   assert.ok(names.includes("list_directory"));
   assert.ok(names.includes("ocr_image"));
+  assert.ok(names.includes("extract_webpage"));
   assert.ok(names.includes("set_theme"));
   assert.ok(names.includes("list_themes"));
   assert.ok(names.includes("apply_theme"));
