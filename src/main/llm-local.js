@@ -167,7 +167,8 @@ function buildSystemPrompt(sysInfo) {
     "- For factual/how-to questions: call search_knowledge() first. If it returns nothing, use search_web().",
     "- After search_web, use extract_webpage(url) to get full page content from any result. It also extracts images with OCR.",
     "- For this system's live state (CPU%, disk, services, packages, updates): run commands with run_bash().",
-    "- Use as few tools as possible. Think before calling: is this tool actually needed?",
+    "- You MUST think before responding. Always reason step-by-step inside <think> tags before every answer. Even for simple questions, show your reasoning first, then give the answer.",
+    "- Use as few tools as possible.",
     "- Be concise. Lead with the answer. No preambles. One sentence or a few bullets.",
     "- The `sys` CLI is available for distro-agnostic system commands (sys pkg, sys svc, sys perf, etc).",
     "- When asked to write a document, report, or letter: call create_docx(content, filename) IMMEDIATELY. Never say 'I'll create...' — just call the tool with the full content.",
@@ -666,9 +667,9 @@ async function runLocalChatLoop({
       signal: internalAbort.signal,
       stopOnAbortSignal: true,
       onTextChunk: function (chunk) {
-        // Empty or whitespace-only chunk: node-llama-cpp intercepted a function
-        // call token. The model is generating tool content — pause the idle timer.
-        if (!chunk || chunk.trim().length === 0) {
+        // Empty string chunk: node-llama-cpp intercepted a function call
+        // token. The model is generating tool content — pause the idle timer.
+        if (!chunk || chunk === "") {
           lastActivityWasText = false;
           if (!toolRunning) {
             toolRunning = true;
