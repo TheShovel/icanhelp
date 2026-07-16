@@ -135,30 +135,6 @@ const RECOMMENDED_MODELS = [
     minRamGB: 8,
   },
   {
-    id: "lfm2-350m-extract",
-    name: "LFM2 350M Extract",
-    size: "~220 MB",
-    sizeBytes: 230000000,
-    quality: "Utility",
-    role: "extract",
-    description: "Webpage text extraction model. Used by the extract_webpage tool for cleaning HTML content.",
-    url: "https://huggingface.co/LiquidAI/LFM2-350M-Extract-GGUF/resolve/main/LFM2-350M-Extract-Q4_K_M.gguf",
-    filename: "LFM2-350M-Extract-Q4_K_M.gguf",
-    minRamGB: 4,
-  },
-  {
-    id: "lfm2-1.2b-extract",
-    name: "LFM2 1.2B Extract",
-    size: "~680 MB",
-    sizeBytes: 713000000,
-    quality: "Better",
-    role: "extract",
-    description: "Larger extraction model for complex webpages.",
-    url: "https://huggingface.co/LiquidAI/LFM2-1.2B-Extract-GGUF/resolve/main/LFM2-1.2B-Extract-Q4_K_M.gguf",
-    filename: "LFM2-1.2B-Extract-Q4_K_M.gguf",
-    minRamGB: 5,
-  },
-  {
     id: "lfm2-350m-math",
     name: "LFM2 350M Math",
     size: "~210 MB",
@@ -197,7 +173,7 @@ function getExtraModels() {
   var usableRam = info.freeRamGB;
 
   return RECOMMENDED_MODELS.filter(function (m) {
-    return m.role === "extract" || m.role === "math";
+    return m.role === "math";
   }).map(function (m) {
     return {
       id: m.id,

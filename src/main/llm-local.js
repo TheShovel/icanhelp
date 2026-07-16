@@ -602,7 +602,7 @@ async function runLocalChatLoop({
         var text = await session.prompt("", {
           maxTokens: Math.floor(contextSize * 0.25),
           temperature: 0.7,
-          responsePrefix: "<think>\n",
+          responsePrefix: "<think>\nContinuing my response.\n</think>\n\n",
           repeatPenalty: { penalty: 1.05 },
           signal: contAbort.signal,
           stopOnAbortSignal: true,
@@ -613,6 +613,25 @@ async function runLocalChatLoop({
               throw new Error("REPETITION_DETECTED");
             }
             onChunk({ text: chunk });
+          },
+          onResponseChunk: function (chunk) {
+            if (chunk && chunk.type === "segment") {
+              resetIdleTimer();
+            }
+            if (
+              chunk &&
+              chunk.type === "segment" &&
+              chunk.segmentType === "thought"
+            ) {
+              if (repDetector.feed(chunk.text)) {
+                console.log(
+                  "[llm-local] Repetition detected in force-continue thinking, aborting",
+                );
+                contAbort.abort();
+                throw new Error("REPETITION_DETECTED");
+              }
+              onChunk({ thinking: chunk.text });
+            }
           },
         });
         clearTimeout(idleTimer);

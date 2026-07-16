@@ -1,6 +1,5 @@
 const { ocrImage } = require("../ocr");
 const { describeImage } = require("../vision");
-const { extractText: extractWithModel } = require("../extract-model");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -192,16 +191,7 @@ async function extractWebpage(args) {
 
   var title = extractTitle(html);
 
-  var text;
-  var modelResult = await Promise.race([
-    extractWithModel(html).catch(function () { return null; }),
-    new Promise(function (r) { return setTimeout(function () { return r(null); }, 5000); }),
-  ]);
-  if (modelResult && modelResult.text && modelResult.text.length > 30) {
-    text = modelResult.text;
-  } else {
-    text = stripHtml(html);
-  }
+  var text = stripHtml(html);
 
   if (text.length > MAX_CONTENT_LENGTH) {
     text = text.slice(0, MAX_CONTENT_LENGTH) + "\n\n... (truncated)";

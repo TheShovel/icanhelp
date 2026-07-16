@@ -48,10 +48,6 @@ const {
   shutdownVision,
 } = require("./vision");
 const {
-  loadPipeline: loadExtract,
-  shutdownExtract,
-} = require("./extract-model");
-const {
   prepareAttachment,
   supportedAttachmentExtensions,
 } = require("./attachments");
@@ -132,7 +128,6 @@ function createWindow() {
 
   setTimeout(async function () {
     loadPipeline();
-    loadExtract();
   }, 500);
 
   mainWindow.webContents.on("did-finish-load", function () {
@@ -775,7 +770,6 @@ app.whenReady().then(function () {
 
 app.on("before-quit", function () {
   shutdownVision();
-  shutdownExtract();
   disposeModel();
 });
 

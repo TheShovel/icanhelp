@@ -67,11 +67,8 @@ Extra specialized models can be downloaded from **Settings → Addons** in the a
 
 | Model | Purpose | Size |
 |-------|---------|------|
-| LFM2 350M Extract | Webpage text extraction | ~220 MB |
-| LFM2 1.2B Extract | Better extraction | ~680 MB |
 | LFM2 350M Math | Math computation | ~210 MB |
 
-- **Extract** models improve the `extract_webpage` tool by cleaning HTML content. The 350M version is fast; the 1.2B version produces cleaner text on complex pages.
 - **Math** model powers the `math` tool for evaluating expressions, solving equations, and arithmetic — letting the main LLM offload computation to a specialized model.
 
 ## Screenshot Dependencies
