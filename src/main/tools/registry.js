@@ -8,27 +8,72 @@ const { createDocx } = require("./docx");
 
 async function searchWeb({ query, resultSize }) {
   try {
+    var limit = resultSize || 5;
     var res = await fetch(
-      "https://raspy-lab-e617.niccata24.workers.dev/?q=" +
-        encodeURIComponent(query) +
-        "&limit=" +
-        (resultSize || 5),
+      "https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(query),
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      },
     );
-    var data = await res.json();
-    var results = Array.isArray(data)
-      ? data
-      : data.items || data.results || data.data || [];
-    var trimmed = results.slice(0, resultSize || 5).map(function (r) {
-      return {
-        title: (r.title || "").slice(0, 120),
-        url: r.url || r.link || "",
-        snippet: (r.snippet || r.text || r.description || r.body || "").slice(
-          0,
-          200,
-        ),
-      };
-    });
-    return JSON.stringify(trimmed);
+    var html = await res.text();
+
+    // Detect CAPTCHA challenge page
+    if (html.includes("challenge") && /[Dd]uck/i.test(html)) {
+      return JSON.stringify([]);
+    }
+
+    // Extract result links
+    var links = [];
+    var linkRe =
+      /<a rel="nofollow" href="(.*?)" class='result-link'>(.*?)<\/a>/g;
+    var m;
+    while ((m = linkRe.exec(html)) !== null) {
+      links.push({
+        href: m[1],
+        title: m[2].replace(/<[^>]*>/g, "").trim(),
+      });
+    }
+
+    // Extract snippets
+    var snippets = [];
+    var snippetRe = /<td class='result-snippet'>(.*?)<\/td>/g;
+    while ((m = snippetRe.exec(html)) !== null) {
+      snippets.push(m[1].replace(/<[^>]*>/g, "").trim());
+    }
+
+    // Extract display URLs
+    var displayUrls = [];
+    var urlRe = /<span class='link-text'>(.*?)<\/span>/g;
+    while ((m = urlRe.exec(html)) !== null) {
+      displayUrls.push(m[1].trim());
+    }
+
+    var results = [];
+    for (var i = 0; i < links.length && i < limit; i++) {
+      var href = links[i].href;
+      var title = links[i].title;
+      if (!title) continue;
+
+      // Decode real URL from DuckDuckGo's redirect URL
+      var url = displayUrls[i] || "";
+      var uddg = href.match(/uddg=([^&]+)/);
+      if (uddg) {
+        try {
+          url = decodeURIComponent(uddg[1]);
+        } catch (_) {}
+      }
+
+      results.push({
+        title: title.slice(0, 120),
+        url: url,
+        snippet: (snippets[i] || "").slice(0, 200),
+      });
+    }
+
+    return JSON.stringify(results);
   } catch (e) {
     return "Search failed: " + e.message;
   }

@@ -152,6 +152,7 @@ function buildSystemPrompt(sysInfo) {
     "- You MUST think before responding. Always reason step-by-step inside <think> tags before every answer. Even for simple questions, show your reasoning first, then give the answer.",
     "- Use as few tools as possible.",
     "- Be concise. Lead with the answer. No preambles. One sentence or a few bullets.",
+    "- CALL ALL TOOLS FIRST, ANSWER AFTER: Think about what information you need, then call every required tool from within your <think> block. Only after every tool result has been collected should you provide your final answer. Never generate response text, then call a tool, then continue the response — that wastes your context window and confuses the conversation.",
     "- When asked to write a document, report, or letter: call create_docx(content, filename) IMMEDIATELY\n    - For math, arithmetic, algebra, or calculus problems: call math(expression) instead of calculating yourself. Describe the problem in plain language.. Never say 'I'll create...' — just call the tool with the full content.",
   ];
 
@@ -204,6 +205,46 @@ function estimateTokens(history) {
     }
   }
   return Math.ceil(chars / 4);
+}
+
+function compressMessagesAggressive(messages, currentPrompt) {
+  if (messages.length <= 2) return messages;
+
+  var lastUserIdx = -1;
+  for (var i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") { lastUserIdx = i; break; }
+  }
+  if (lastUserIdx === -1) return messages;
+
+  var keep = messages.slice(lastUserIdx);
+  var before = messages.slice(0, lastUserIdx);
+
+  var topicCount = 0;
+  var sampleTopics = [];
+  for (var i = 0; i < before.length; i++) {
+    if (before[i].role === "user" && before[i].content) {
+      topicCount++;
+      if (sampleTopics.length < 5) {
+        sampleTopics.push(String(before[i].content).slice(0, 60));
+      }
+    }
+  }
+
+  if (topicCount === 0) return keep;
+
+  var summary =
+    sampleTopics.length > 0
+      ? "Earlier conversation covered: " + sampleTopics.join("; ") +
+        (topicCount > sampleTopics.length
+          ? " and " + (topicCount - sampleTopics.length) + " more topics"
+          : "")
+      : "Earlier conversation exchanged " + topicCount + " messages.";
+
+  return [
+    { role: "user", content: summary },
+    { role: "assistant", content: "Understood. I'll continue with the current request." },
+    ...keep,
+  ];
 }
 
 function compressHistory(history, contextSize) {
@@ -289,9 +330,10 @@ function compressHistory(history, contextSize) {
   return systemMsg ? [systemMsg, ...result] : result;
 }
 
-function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
+function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop) {
   var state = { total: 0, lastSig: null, lastSigCount: 0, consecutiveFailures: 0 };
-  var MAX_TOTAL_CALLS = 60;
+  var MAX_SOFT_NUDGE = 4;
+  var MAX_TOOLS = 10;
   var functions = {};
 
   for (var i = 0; i < tools.length; i++) {
@@ -301,18 +343,20 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
       params: fn.parameters || { type: "object", properties: {} },
       handler: (function (name) {
         return async function (params) {
-          if (state.total >= MAX_TOTAL_CALLS) {
-            return "Stop. You've made " + state.total + " calls. Answer the user now.";
+          state.total++;
+
+          if (state.total > MAX_TOOLS) {
+            console.log("[llm-local] Tool limit reached (" + MAX_TOOLS + "), aborting");
+            if (hardStop) hardStop();
+            return "[SYSTEM: You have used " + MAX_TOOLS + " tools. You MUST stop now and answer the user with what you have. Do not call any more tools.]";
           }
 
           var nudge = "";
 
-          // Soft nudge after 4+ calls — still executes but encourages wrapping up.
-          if (state.total >= 4) {
-            nudge = "[Note: you've used " + state.total + " tools already. Consider answering now with what you have.]\n\n";
+          if (state.total >= MAX_SOFT_NUDGE && state.total < MAX_TOOLS) {
+            nudge = "[Note: you've used " + state.total + " tools. Consider answering soon with what you have.]\n\n";
           }
 
-          // Soft nudge on repeated identical calls instead of hard-blocking.
           var sig = name + "\x1f" + JSON.stringify(params || {});
           if (sig === state.lastSig) {
             state.lastSigCount++;
@@ -324,7 +368,6 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
             state.lastSigCount = 1;
           }
 
-          state.total++;
           console.log("[llm-local] buildFunctions: calling onToolStart for " + name);
           onToolStart({ name: name, args: params });
           console.log("[llm-local] buildFunctions: onToolStart returned, yielding 30ms");
@@ -335,6 +378,13 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd) {
             var resultStr = String(result);
             onToolEnd({ name: name, output: resultStr });
             state.consecutiveFailures = 0;
+
+            if (state.total === MAX_TOOLS) {
+              console.log("[llm-local] 10th tool completed, aborting inference");
+              if (hardStop) hardStop();
+              return nudge + resultStr + "\n\n[SYSTEM: That was your " + MAX_TOOLS + "th tool. Answer the user now with everything you have. Do not call more tools.]";
+            }
+
             return nudge + resultStr;
           } catch (e) {
             state.consecutiveFailures++;
@@ -491,17 +541,24 @@ async function runLocalChatLoop({
   }
   console.log("[llm-local] Current prompt:", currentPrompt.slice(0, 100));
 
-  var { functions, state } = buildFunctions(
-    tools,
-    executeTool,
-    onToolStart,
-    onToolEnd,
-  );
-  console.log("[llm-local] Tools count:", Object.keys(functions).length);
-
   try {
     var repDetector = RepetitionDetector();
     var internalAbort = new AbortController();
+    var toolLimitReached = false;
+
+    var hardStop = function () {
+      toolLimitReached = true;
+      internalAbort.abort();
+    };
+
+    var { functions, state } = buildFunctions(
+      tools,
+      executeTool,
+      onToolStart,
+      onToolEnd,
+      hardStop,
+    );
+    console.log("[llm-local] Tools count:", Object.keys(functions).length);
 
     if (signal) {
       signal.addEventListener("abort", function () {
@@ -730,7 +787,12 @@ async function runLocalChatLoop({
         console.log("[llm-local] Repetition loop detected, requesting retry");
         onChunk({ error: "Model got stuck in a loop. Please try again." });
       } else if (e.name === "AbortError" || (signal && signal.aborted)) {
-        if (idleFired) {
+        if (toolLimitReached) {
+          console.log("[llm-local] Tool limit reached, forcing wrap-up continuation");
+          try { await forceContinue(); } catch (_) {
+            onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
+          }
+        } else if (idleFired) {
           console.log("[llm-local] Idle timeout — forcing continuation");
           try { await forceContinue(); } catch (_) {
             onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
@@ -739,10 +801,76 @@ async function runLocalChatLoop({
           console.log("[llm-local] Aborted by user");
         }
       } else if (e.message && e.message.includes("context shift strategy")) {
-        console.log("[llm-local] Context size exceeded");
-        onChunk({
-          error: "Message too large. Try removing file attachments or reducing context size in settings.",
-        });
+        console.log("[llm-local] Context size exceeded, compressing and retrying");
+        try {
+          if (context) { try { context.dispose(); } catch (_) {} }
+
+          var compressed = compressMessagesAggressive(messages, currentPrompt);
+          console.log("[llm-local] Compressed messages from " + messages.length + " to " + compressed.length);
+
+          history = [];
+          for (var i = 0; i < compressed.length; i++) {
+            var msg = compressed[i];
+            if (msg.role === "system") continue;
+            if (msg.role === "user") {
+              history.push({ type: "user", text: msg.content });
+            } else if (msg.role === "assistant") {
+              if (msg.content) {
+                history.push({ type: "model", response: [msg.content] });
+              }
+            } else if (msg.role === "tool") {
+              history.push({ type: "user", text: "Function result: " + msg.content });
+            }
+          }
+
+          history = compressHistory(history, contextSize);
+
+          currentPrompt = "";
+          if (history.length > 0) {
+            var last = history[history.length - 1];
+            if (last.type === "user") {
+              currentPrompt = last.text;
+              history.pop();
+            }
+          }
+
+          var chatHistory = [{ type: "system", text: buildSystemPrompt() }];
+          for (var hi = 0; hi < history.length; hi++) {
+            chatHistory.push(history[hi]);
+          }
+
+          context = await model.createContext({
+            contextSize: config.contextSize || CONTEXT_SIZE,
+            batchSize: config.batchSize || 512,
+          });
+          contextSize = context.contextSize;
+
+          session = new LlamaChatSession({
+            contextSequence: context.getSequence(),
+            systemPrompt: buildSystemPrompt(),
+          });
+          session.setChatHistory(chatHistory);
+
+          // Retry without tools — the context is too full for more tool output
+          opts.functions = {};
+          opts.documentFunctionParams = false;
+          opts.maxTokens = Math.floor(contextSize * 0.5);
+
+          console.log("[llm-local] Retrying promptWithMeta with compressed context");
+          var result = await session.promptWithMeta(currentPrompt, opts);
+          clearTimeout(idleTimer);
+          console.log("[llm-local] Retry promptWithMeta returned:", Date.now(), "text:", (result.responseText || "").slice(0, 50));
+
+          if ((state.total > 0 || idleFired) && (!result.responseText || result.responseText.trim().length === 0)) {
+            console.log("[llm-local] Model stopped with no text after retry — continuing");
+            await forceContinue();
+          }
+        } catch (e2) {
+          console.log("[llm-local] Retry also failed:", e2.message);
+          onChunk({
+            error: "Message too large even after compression. Try removing file attachments or reducing context size in settings.",
+          });
+        }
       } else {
         onChunk({ error: e.message });
       }

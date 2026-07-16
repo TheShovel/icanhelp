@@ -1404,12 +1404,24 @@ async function sendMessage() {
       isProcessing = false;
       chatInput.disabled = false;
       sendBtn.disabled = false;
-      responseContent.textContent = "Error: " + chunk.error;
-      msgEl.classList.remove("streaming");
-      var wi = bubble.querySelector(".working-indicator");
-      if (wi) {
-        clearInterval(wi._dotsInterval);
-        wi.classList.add("hidden");
+      if (msgEl) {
+        msgEl.classList.remove("streaming");
+        var wi = bubble.querySelector(".working-indicator");
+        if (wi) {
+          clearInterval(wi._dotsInterval);
+          wi.classList.add("hidden");
+        }
+        responseContent.textContent = "Error: " + chunk.error;
+      }
+      var chat = getCurrentChat();
+      if (chat) {
+        var errMsg = { role: "assistant", content: "Error: " + chunk.error };
+        if (buffer) errMsg.content = buffer + "\n\n[Error: " + chunk.error + "]";
+        if (thinkingBuf) errMsg.thinking = thinkingBuf;
+        if (toolCalls.length > 0) errMsg.tools = toolCalls;
+        chat.messages.push(errMsg);
+        chat.updatedAt = Date.now();
+        debouncedSaveChats();
       }
       return;
     }
@@ -1797,37 +1809,38 @@ function createAssistantMessage() {
 }
 
 function parseBuffer(buffer) {
-  var t = "think";
-  var openTag = "<" + t + ">";
-  var closeTag = "</" + t + ">";
-  var openIdx = buffer.indexOf(openTag);
+  var openTag = "<think>";
+  var closeTag = "</think>";
 
-  if (openIdx === -1) {
-    return {
-      thinking: "",
-      response: buffer,
-      inThinking: false,
-      hasThinking: false,
-    };
-  }
+  // Strip all think blocks, collecting their content
+  var thinkingParts = [];
+  var cleaned = buffer;
+  var found = false;
+  var stillOpen = false;
 
-  var closeIdx = buffer.indexOf(closeTag, openIdx + openTag.length);
+  while (true) {
+    var openIdx = cleaned.indexOf(openTag);
+    if (openIdx === -1) break;
 
-  if (closeIdx === -1) {
-    return {
-      thinking: buffer.slice(openIdx + openTag.length),
-      response: buffer.slice(0, openIdx),
-      inThinking: true,
-      hasThinking: true,
-    };
+    var closeIdx = cleaned.indexOf(closeTag, openIdx + openTag.length);
+    if (closeIdx === -1) {
+      thinkingParts.push(cleaned.slice(openIdx + openTag.length));
+      cleaned = cleaned.slice(0, openIdx);
+      stillOpen = true;
+      found = true;
+      break;
+    }
+
+    thinkingParts.push(cleaned.slice(openIdx + openTag.length, closeIdx));
+    cleaned = cleaned.slice(0, openIdx) + cleaned.slice(closeIdx + closeTag.length);
+    found = true;
   }
 
   return {
-    thinking: buffer.slice(openIdx + openTag.length, closeIdx),
-    response:
-      buffer.slice(0, openIdx) + buffer.slice(closeIdx + closeTag.length),
-    inThinking: false,
-    hasThinking: true,
+    thinking: thinkingParts.join("\n"),
+    response: cleaned,
+    inThinking: stillOpen,
+    hasThinking: found,
   };
 }
 
@@ -2071,8 +2084,10 @@ function renderStructuredMessage(msg) {
     thinkingBlock.classList.add("hidden");
   }
 
-  // Render response text
-  renderContent(responseContent, msg.content || "");
+  // Render response text — strip thinking tags that may be embedded in content
+  var contentResp = msg.content || "";
+  var parsed = parseBuffer(contentResp);
+  renderContent(responseContent, parsed.response);
 
   // Restore tool calls
   if (msg.tools && msg.tools.length > 0) {
