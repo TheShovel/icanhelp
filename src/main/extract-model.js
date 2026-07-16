@@ -149,9 +149,22 @@ function loadPipeline() {
   return loadPromise;
 }
 
+function findBestExtractModel() {
+  var models = modelsDir();
+  var candidates = [
+    "LFM2-1.2B-Extract-Q4_K_M.gguf",
+    "LFM2-350M-Extract-Q4_K_M.gguf",
+  ];
+  for (var i = 0; i < candidates.length; i++) {
+    var p = path.join(models, candidates[i]);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 async function extractText(html) {
-  var modelPath = path.join(modelsDir(), "LFM2-350M-Extract-Q4_K_M.gguf");
-  if (!fs.existsSync(modelPath)) {
+  var modelPath = findBestExtractModel();
+  if (!modelPath) {
     return null;
   }
   if (!ready) {

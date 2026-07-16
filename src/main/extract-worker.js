@@ -2,7 +2,10 @@ const path = require("path");
 const fs = require("fs");
 const { modelsDir, appPath } = require("./paths");
 
-const EXTRACT_MODEL_FILE = "LFM2-350M-Extract-Q4_K_M.gguf";
+const EXTRACT_MODEL_FILES = [
+  "LFM2-1.2B-Extract-Q4_K_M.gguf",
+  "LFM2-350M-Extract-Q4_K_M.gguf",
+];
 const LOAD_TIMEOUT_MS = 60 * 1000;
 const EXTRACT_TIMEOUT_MS = 30 * 1000;
 const MAX_HTML_LENGTH = 30000;
@@ -32,9 +35,17 @@ function log(msg) {
 async function loadModel() {
   if (ready) return true;
 
-  var modelPath = path.join(modelsDir(), EXTRACT_MODEL_FILE);
-  if (!fs.existsSync(modelPath)) {
-    log("Extract model not found: " + modelPath);
+  var modelPath = null;
+  var models = modelsDir();
+  for (var i = 0; i < EXTRACT_MODEL_FILES.length; i++) {
+    var candidate = path.join(models, EXTRACT_MODEL_FILES[i]);
+    if (fs.existsSync(candidate)) {
+      modelPath = candidate;
+      break;
+    }
+  }
+  if (!modelPath) {
+    log("Extract model not found in: " + models);
     send({ type: "load-error", error: "Extract model not downloaded." });
     setTimeout(function () { process.exit(0); }, 100);
     return false;
