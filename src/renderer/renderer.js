@@ -440,7 +440,7 @@ function renderChatList() {
         });
         var newChat = chats[0];
         for (var m of newChat.messages) {
-          addMessage(m.content, m.role, m.attachment);
+          addMessage(m);
         }
         requestAnimationFrame(function () {
           smoothScroll(chatMessages);
@@ -500,7 +500,7 @@ function switchToChat(chatId) {
       renderEmptyState();
     } else {
       for (var m of chat.messages) {
-        addMessage(m.content, m.role, m.attachment);
+        addMessage(m);
       }
     }
     requestAnimationFrame(function () {
@@ -542,7 +542,7 @@ window.electronAPI.loadChats().then(function (loaded) {
       renderEmptyState();
     } else {
       for (var m of msgs) {
-        addMessage(m.content, m.role, m.attachment);
+        addMessage(m);
       }
     }
     requestAnimationFrame(function () {
@@ -1275,6 +1275,7 @@ async function sendMessage() {
   var responseContent = null;
   var buffer = "";
   var thinkingBuf = "";
+  var toolCalls = [];
   webSources = [];
 
   sendBtn.classList.add("hidden");
@@ -1379,9 +1380,15 @@ async function sendMessage() {
       var chat = getCurrentChat();
       var sourcesToRender = webSources.slice();
       webSources = [];
+      var savedFiles = toolFilePaths.slice();
       toolFilePaths = [];
       if (chat) {
-        chat.messages.push({ role: "assistant", content: buffer });
+        var msgData = { role: "assistant", content: buffer };
+        if (thinkingBuf) msgData.thinking = thinkingBuf;
+        if (toolCalls.length > 0) msgData.tools = toolCalls;
+        if (sourcesToRender.length > 0) msgData.sources = sourcesToRender;
+        if (savedFiles.length > 0) msgData.files = savedFiles;
+        chat.messages.push(msgData);
         chat.updatedAt = Date.now();
         debouncedSaveChats();
       }
@@ -1439,6 +1446,7 @@ async function sendMessage() {
         responseContent = el.querySelector(".response-content");
       }
       var toolName = chunk.tool_start.name;
+      toolCalls.push({ name: toolName, args: chunk.tool_start.args || {}, output: null });
       if (toolName === "search_web") {
         setAvatarState("search");
       } else {
@@ -1553,10 +1561,14 @@ async function sendMessage() {
             } catch (e) {}
           }
 
+          var outText = stripEmojis(chunk.tool_end.output);
+          if (toolCalls.length > 0) {
+            toolCalls[toolCalls.length - 1].output = outText;
+          }
+
           if (!existingOut) {
             var out = document.createElement("div");
             out.className = "tool-output";
-            var outText = stripEmojis(chunk.tool_end.output);
             var minAnim = 300;
             var elapsed = Date.now() - (parseInt(tbEnd.dataset.started) || 0);
             var delay = Math.max(0, minAnim - elapsed);
@@ -1910,6 +1922,19 @@ function removeEmptyState() {
 }
 
 async function addMessage(text, role, attachment) {
+  // Support passing a full message object for structured assistant messages
+  if (typeof text === "object" && text !== null && text.role) {
+    var msg = text;
+    if (msg.role === "assistant" && (msg.tools || msg.thinking || msg.sources || msg.files)) {
+      renderStructuredMessage(msg);
+      return;
+    }
+    // Fall through for user messages or simple assistant messages
+    role = msg.role;
+    attachment = msg.attachment;
+    text = msg.content;
+  }
+
   removeEmptyState();
   const div = document.createElement("div");
   div.className = "message " + role + " message-animate";
@@ -1935,6 +1960,126 @@ async function addMessage(text, role, attachment) {
   div.appendChild(bubble);
   chatMessages.appendChild(div);
   requestAnimationFrame(() => {
+    smoothScroll(chatMessages);
+  });
+}
+
+function renderStructuredMessage(msg) {
+  removeEmptyState();
+  var el = createAssistantMessage();
+  var bubble = el.querySelector(".bubble");
+  var thinkingContent = el.querySelector(".thinking-content");
+  var thinkingBlock = el.querySelector(".thinking-block");
+  var responseContent = el.querySelector(".response-content");
+  var wi = bubble.querySelector(".working-indicator");
+  if (wi) { clearInterval(wi._dotsInterval); wi.classList.add("hidden"); }
+
+  el.classList.remove("streaming");
+
+  // Restore thinking block
+  if (msg.thinking) {
+    thinkingContent.textContent = msg.thinking;
+    thinkingBlock.classList.remove("hidden");
+    thinkingBlock.classList.add("has-thinking");
+    thinkingBlock.classList.add("collapsed");
+  } else {
+    thinkingBlock.classList.add("hidden");
+  }
+
+  // Render response text
+  renderContent(responseContent, msg.content || "");
+
+  // Restore tool calls
+  if (msg.tools && msg.tools.length > 0) {
+    msg.tools.forEach(function (tool) {
+      var tb = document.createElement("div");
+      tb.className = "tool-block";
+      var th = document.createElement("div");
+      th.className = "tool-header";
+      th.addEventListener("click", function () {
+        tb.classList.toggle("collapsed");
+      });
+
+      var args = tool.args || {};
+      var isFileTool = tool.name === "write_file" || tool.name === "read_file";
+
+      if (isFileTool) {
+        var fp = args.path || "";
+        tb.classList.add("tool-file");
+        th.innerHTML = iconSvg("file", 14) + " " + fp;
+        th.addEventListener("click", function () {
+          window.electronAPI.openFile(fp);
+        });
+      } else if (tool.name === "search_web") {
+        var query = args.query || "search";
+        th.innerHTML = iconSvg("search", 14) + " " + query;
+      } else {
+        var label = args.command || tool.name;
+        if (label.length > 50) label = label.slice(0, 50) + "...";
+        th.innerHTML = iconSvg("terminal", 14) + " " + label;
+      }
+
+      var tc = document.createElement("div");
+      tc.className = "tool-content";
+
+      if (isFileTool) {
+        var cap = document.createElement("div");
+        cap.className = "tool-file-capsule";
+        cap.textContent = args.path || "";
+        cap.addEventListener("click", function () {
+          window.electronAPI.openFile(args.path);
+        });
+        tc.appendChild(cap);
+      } else {
+        var pre = document.createElement("pre");
+        pre.className = "tool-text";
+        pre.textContent = args.command || JSON.stringify(args);
+        tc.appendChild(pre);
+      }
+
+      if (tool.output) {
+        var out = document.createElement("div");
+        out.className = "tool-output";
+        out.textContent = tool.output;
+        tc.appendChild(out);
+      }
+
+      tb.appendChild(th);
+      tb.appendChild(tc);
+      bubble.insertBefore(tb, responseContent);
+    });
+
+    // Collapse tool blocks into a summary
+    var toolBlocks = bubble.querySelectorAll(".tool-block");
+    var summary = document.createElement("div");
+    summary.className = "tools-summary";
+    summary.innerHTML = iconSvg("terminal", 12) + " " + toolBlocks.length + " tool" + (toolBlocks.length !== 1 ? "s" : "") + " used";
+
+    var container = document.createElement("div");
+    container.className = "tools-container hidden";
+    toolBlocks.forEach(function (tb) { container.appendChild(tb); });
+
+    summary.addEventListener("click", function () {
+      container.classList.toggle("hidden");
+      summary.classList.toggle("expanded");
+    });
+
+    bubble.insertBefore(container, responseContent);
+    bubble.insertBefore(summary, container);
+  }
+
+  // Restore web sources
+  if (msg.sources && msg.sources.length > 0) {
+    renderCitations(bubble, msg.sources);
+  }
+
+  // Restore file paths as clickable links in the response text
+  if (msg.files && msg.files.length > 0) {
+    linkifyFilePaths(responseContent, msg.files);
+  }
+
+  renderResponseFooter(bubble);
+  requestAnimationFrame(function () {
     smoothScroll(chatMessages);
   });
 }

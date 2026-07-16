@@ -58,7 +58,7 @@ async function downloadFile(filename, progressCb) {
   var dest = path.join(CACHE_DIR, filename);
   if (fs.existsSync(dest)) {
     var stat = fs.statSync(dest);
-    if (stat.size > 1000) return dest;
+    if (stat.size > 0) return dest;
     fs.unlinkSync(dest);
   }
 
