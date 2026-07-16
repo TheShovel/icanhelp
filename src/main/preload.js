@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("model-preload-progress", handler);
     return () => ipcRenderer.removeListener("model-preload-progress", handler);
   },
+  renderMath: (tex, displayMode) => ipcRenderer.invoke("render-math", tex, displayMode),
   resetAllData: () => ipcRenderer.invoke("reset-all-data"),
   openFolder: (key) => ipcRenderer.invoke("open-folder", key),
 });

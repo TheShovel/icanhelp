@@ -2056,6 +2056,116 @@ body {
     display: block;
     stroke: currentColor;
 }
+
+/* ---- Addons Panel ---- */
+#addons-panel {
+    position: absolute;
+    inset: 12px 12px 80px 12px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 15;
+    animation: slideUp 0.2s ease;
+}
+#addons-panel.hidden {
+    display: none;
+}
+#addons-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-header);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+}
+#addons-body {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    background: var(--bg-body);
+}
+#addons-status {
+    font-size: 12px;
+    color: var(--fg-muted);
+    line-height: 1.5;
+    margin: 0;
+}
+#addons-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.addon-model-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-input);
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.addon-model-card:hover {
+    border-color: var(--accent);
+}
+.addon-model-card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.addon-model-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.addon-model-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+}
+.addon-model-role {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-list-item-active);
+    color: var(--accent);
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.addon-model-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--fg-muted);
+}
+.addon-model-desc {
+    font-size: 11px;
+    color: var(--fg-dim);
+    line-height: 1.4;
+}
+.addon-model-note {
+    font-size: 10px;
+    color: var(--fg-muted);
+}
+.addon-model-progress {
+    display: none;
+    margin-top: 4px;
+}
+.addon-model-card.downloading .addon-model-progress {
+    display: block;
+}
+
 .theme-item-empty {
     font-size: 12px;
     color: var(--fg-muted);
@@ -2319,4 +2429,25 @@ body {
 
 .docx-download-btn svg {
     stroke: currentColor;
+}
+
+/* ---- Math Tool Block ---- */
+.tool-block.tool-math .tool-header {
+    color: var(--thinking-fg);
+    border-color: var(--thinking-border);
+}
+.tool-block.tool-math .tool-output {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: 0.3px;
+    background: var(--bg-code);
+    padding: 12px 14px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    color: var(--fg);
+}
+.tool-block.tool-math .tool-text {
+    font-family: 'Courier New', Courier, monospace;
+    color: var(--thinking-fg);
 }

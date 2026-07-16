@@ -152,7 +152,7 @@ function buildSystemPrompt(sysInfo) {
     "- You MUST think before responding. Always reason step-by-step inside <think> tags before every answer. Even for simple questions, show your reasoning first, then give the answer.",
     "- Use as few tools as possible.",
     "- Be concise. Lead with the answer. No preambles. One sentence or a few bullets.",
-    "- When asked to write a document, report, or letter: call create_docx(content, filename) IMMEDIATELY. Never say 'I'll create...' — just call the tool with the full content.",
+    "- When asked to write a document, report, or letter: call create_docx(content, filename) IMMEDIATELY\n    - For math, arithmetic, algebra, or calculus problems: call math(expression) instead of calculating yourself. Describe the problem in plain language.. Never say 'I'll create...' — just call the tool with the full content.",
   ];
 
   return parts.join("\n");

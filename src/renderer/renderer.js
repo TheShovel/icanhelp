@@ -9,6 +9,7 @@ const cancelBtn = document.getElementById("cancel-btn");
 const typingIndicator = document.getElementById("typing-indicator");
 const settingsMenuPanel = document.getElementById("settings-menu-panel");
 const themePanel = document.getElementById("theme-panel");
+const addonsPanel = document.getElementById("addons-panel");
 const resetThemeBtn = document.getElementById("theme-reset");
 const sudoOverlay = document.getElementById("sudo-overlay");
 const sudoInput = document.getElementById("sudo-input");
@@ -45,6 +46,7 @@ document.getElementById("install-back").addEventListener("click", function () {
   closeModelPicker();
 });
 document.getElementById("close-settings-menu").innerHTML = iconSvg("close", 16);
+document.getElementById("close-addons").innerHTML = iconSvg("close", 16);
 document.getElementById("close-theme").innerHTML = iconSvg("close", 16);
 document.getElementById("send-btn").innerHTML = iconSvg("send", 16);
 document.getElementById("cancel-btn").innerHTML = iconSvg("close", 16);
@@ -684,8 +686,10 @@ document
     } else if (action === "model") {
       settingsMenuPanel.classList.add("hidden");
       openModelPicker();
-    } else if (action === "open-knowledge") {
-      window.electronAPI.openFolder("knowledge");
+    } else if (action === "addons") {
+      settingsMenuPanel.classList.add("hidden");
+      addonsPanel.classList.remove("hidden");
+      renderAddonModels();
     } else if (action === "open-config") {
       window.electronAPI.openFolder("config");
     } else if (action === "open-models") {
@@ -738,6 +742,11 @@ document
 
 document.getElementById("close-theme").addEventListener("click", function () {
   themePanel.classList.add("hidden");
+  settingsMenuPanel.classList.remove("hidden");
+});
+
+document.getElementById("close-addons").addEventListener("click", function () {
+  addonsPanel.classList.add("hidden");
   settingsMenuPanel.classList.remove("hidden");
 });
 
@@ -824,7 +833,12 @@ document.addEventListener("keydown", (e) => {
       closeChatList();
       return;
     }
-    if (!themePanel.classList.contains("hidden")) {
+    if (!addonsPanel.classList.contains("hidden")) {
+    addonsPanel.classList.add("hidden");
+    settingsMenuPanel.classList.remove("hidden");
+    return;
+  }
+  if (!themePanel.classList.contains("hidden")) {
       themePanel.classList.add("hidden");
       settingsMenuPanel.classList.remove("hidden");
       return;
@@ -893,6 +907,72 @@ window.electronAPI.onModelDownloadProgress(function (info) {
 
   renderModelPicker(allModels, compatModels, sysInfo, extraModels);
 })();
+
+async function renderAddonModels() {
+  var list = document.getElementById("addons-list");
+  if (!list) return;
+  list.innerHTML = "";
+
+  try {
+    var models = await window.electronAPI.getExtraModels();
+    if (!models || models.length === 0) {
+      list.innerHTML = '<p style="color: var(--fg-muted); font-size: 12px;">No addon models available.</p>';
+      return;
+    }
+
+    models.forEach(function (m) {
+      var card = document.createElement("div");
+      card.className = "addon-model-card";
+      if (!m.compatible) card.classList.add("disabled");
+
+      var top = document.createElement("div");
+      top.className = "addon-model-top";
+      var nameEl = document.createElement("span");
+      nameEl.className = "addon-model-name";
+      nameEl.textContent = m.name;
+      top.appendChild(nameEl);
+      var roleEl = document.createElement("span");
+      roleEl.className = "addon-model-role";
+      roleEl.textContent = m.role || "addon";
+      top.appendChild(roleEl);
+      card.appendChild(top);
+
+      var meta = document.createElement("div");
+      meta.className = "addon-model-meta";
+      meta.innerHTML = "<span>" + (m.quality || "") + "</span><span>" + m.size + "</span>";
+      card.appendChild(meta);
+
+      var desc = document.createElement("div");
+      desc.className = "addon-model-desc";
+      desc.textContent = m.description;
+      card.appendChild(desc);
+
+      var note = document.createElement("div");
+      note.className = "addon-model-note";
+      note.textContent = m.compatible ? "Click to download" : "Needs ~" + m.minRamGB + " GB RAM";
+      card.appendChild(note);
+
+      if (m.compatible) {
+        var clicked = false;
+        card.addEventListener("click", function () {
+          if (clicked) return;
+          clicked = true;
+          card.classList.add("downloading");
+          note.textContent = "Downloading...";
+          startModelDownload(m.id, m.name, "addons").finally(function () {
+            note.textContent = "Done";
+            card.classList.remove("downloading");
+          });
+        });
+      }
+
+      list.appendChild(card);
+    });
+  } catch (e) {
+    list.innerHTML = '<p style="color: var(--danger); font-size: 12px;">Failed to load addons.</p>';
+  }
+}
+
 
 function renderModelPicker(allModels, compatModels, sysInfo, extraModels) {
   installModelList.innerHTML = "";
@@ -998,7 +1078,7 @@ function renderModelPicker(allModels, compatModels, sysInfo, extraModels) {
   var hasCompatible = false;
   for (var i = 0; i < allModels.length; i++) {
     var m = allModels[i];
-    if (m.role === "extract") continue;
+    if (m.role === "extract" || m.role === "math") continue;
     var isCompatible = !!compatIds[m.id];
     if (isCompatible) hasCompatible = true;
 
@@ -1138,7 +1218,7 @@ function renderModelPicker(allModels, compatModels, sysInfo, extraModels) {
           "click",
           (function (mid, mname) {
             return function () {
-              startModelDownload(mid, mname, true);
+              startModelDownload(mid, mname, "model");
             };
           })(em.id, em.name),
         );
@@ -1214,8 +1294,13 @@ async function startModelDownload(modelId, modelName, isExtra) {
     installSubtitle.textContent = "Downloading " + modelName + "...";
   }
 
-  if (isExtra) {
+  if (isExtra === "model") {
     openModelPicker();
+    return;
+  }
+  if (isExtra === "addons") {
+    addonsPanel.classList.remove("hidden");
+    renderAddonModels();
     return;
   }
 
@@ -1447,7 +1532,7 @@ async function sendMessage() {
       }
       var toolName = chunk.tool_start.name;
       toolCalls.push({ name: toolName, args: chunk.tool_start.args || {}, output: null });
-      if (toolName === "search_web") {
+      if (toolName === "math") { setAvatarState("talking"); } else if (toolName === "search_web") {
         setAvatarState("search");
       } else {
         setAvatarState("bash");
@@ -1763,7 +1848,7 @@ async function renderStreamedContent(
   }
 
   responseContent.innerHTML = parsed.response
-    ? await window.electronAPI.parseMarkdown(parsed.response)
+    ? await processMathInHtml(await window.electronAPI.parseMarkdown(parsed.response))
     : "";
 
   if (toolFilePaths.length > 0) {
@@ -2084,9 +2169,59 @@ function renderStructuredMessage(msg) {
   });
 }
 
+
+async function processMathInHtml(html) {
+  if (!html) return html;
+
+  var displayPattern = /\$\$([\s\S]*?)\$\$/g;
+  var inlinePattern = /(?<!\\)\$(?!\$)([^\$\n]+?)(?<!\\)\$/g;
+
+  // Replace display math $...$
+  var displayMatches = [];
+  var m;
+  while ((m = displayPattern.exec(html)) !== null) {
+    displayMatches.push({ match: m[0], tex: m[1], index: m.index });
+  }
+
+  for (var i = displayMatches.length - 1; i >= 0; i--) {
+    var dm = displayMatches[i];
+    try {
+      var rendered = await window.electronAPI.renderMath(dm.tex, true);
+      html = html.substring(0, dm.index) + rendered + html.substring(dm.index + dm.match.length);
+    } catch (e) {
+      html = html.substring(0, dm.index) +
+        '<span class="math-block-fallback">' + dm.tex + "</span>" +
+        html.substring(dm.index + dm.match.length);
+    }
+  }
+
+  // Replace inline math $...$ (after display math is done, to avoid re-matching)
+  displayPattern.lastIndex = 0;
+  var inlineMatches = [];
+  while ((m = inlinePattern.exec(html)) !== null) {
+    inlineMatches.push({ match: m[0], tex: m[1], index: m.index });
+  }
+
+  for (var j = inlineMatches.length - 1; j >= 0; j--) {
+    var im = inlineMatches[j];
+    try {
+      rendered = await window.electronAPI.renderMath(im.tex, false);
+      html = html.substring(0, im.index) + rendered + html.substring(im.index + im.match.length);
+    } catch (e) {
+      html = html.substring(0, im.index) +
+        '<span class="math-inline-fallback">' + im.tex + "</span>" +
+        html.substring(im.index + im.match.length);
+    }
+  }
+
+  return html;
+}
+
 async function renderContent(el, text) {
   try {
-    el.innerHTML = await window.electronAPI.parseMarkdown(text);
+    var html = await window.electronAPI.parseMarkdown(text);
+    html = await processMathInHtml(html);
+    el.innerHTML = html;
   } catch (e) {
     el.textContent = text;
   }

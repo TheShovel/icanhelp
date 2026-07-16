@@ -13,6 +13,7 @@ const fs = require("fs");
 const os = require("os");
 const { execFile } = require("child_process");
 const { marked } = require("marked");
+const katex = require("katex");
 const { runLocalChatLoop } = require("./llm-local");
 const { preloadModel } = require("./llm-local");
 const { disposeModel } = require("./llm-local");
@@ -374,7 +375,15 @@ function createWindow() {
     console.log("[main] Done sent");
   }
 
-  ipcMain.handle("get-config", () => {
+  ipcMain.handle("render-math", async function (_, tex, displayMode) {
+  try {
+    return katex.renderToString(tex, { throwOnError: false, displayMode: !!displayMode });
+  } catch (e) {
+    return tex;
+  }
+});
+
+ipcMain.handle("get-config", () => {
     const cfg = loadConfig();
     return cfg
       ? {

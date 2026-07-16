@@ -1,5 +1,6 @@
 const { runBash } = require("./bash");
 const { readFile, readFileLines, writeFile, listDirectory } = require("./fs");
+const { solveMath } = require("./math");
 const { ocrImage } = require("../ocr");
 const { extractWebpage } = require("./extract");
 const { createDocx } = require("./docx");
@@ -500,6 +501,23 @@ var tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "math",
+      description: "Compute a math expression or solve a math problem. Call this for any arithmetic, algebra, or calculus.",
+      parameters: {
+        type: "object",
+        properties: {
+          expression: {
+            type: "string",
+            description: "The math expression or problem to solve.",
+          },
+        },
+        required: ["expression"],
+      },
+    },
+  },
 ];
 
 var handlers = {
@@ -516,6 +534,7 @@ var handlers = {
   apply_theme: applyThemeStub,
   extract_webpage: extractWebpage,
   create_docx: createDocx,
+  math: (args) => solveMath(args),
 };
 
 async function executeToolCall(toolCall, opts) {

@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Canhelpy</title>
         <link rel="stylesheet" href="style.css" />
+        <link rel="stylesheet" href="../../node_modules/katex/dist/katex.min.css" />
     </head>
     <body>
         <div id="app">
@@ -139,6 +140,11 @@
                         >
                     </button>
                     <div class="settings-menu-separator"></div>
+                    <div class="settings-menu-separator"></div>
+                    <button class="settings-menu-item" data-action="addons">
+                        <span>Addons</span>
+                        <span class="settings-menu-hint">Download extra tool models</span>
+                    </button>
                     <div class="settings-menu-section-label">Folders</div>
                     <button
                         class="settings-menu-item"
@@ -199,6 +205,17 @@
                 </div>
             </div>
 
+
+            <div id="addons-panel" class="hidden">
+                <div id="addons-header">
+                    <span>Addons</span>
+                    <button id="close-addons" class="btn-icon" title="Back to settings"></button>
+                </div>
+                <div id="addons-body">
+                    <p id="addons-status">Download extra models used by specific tools.</p>
+                    <div id="addons-list"></div>
+                </div>
+            </div>
             <div id="avatar" title="Click to ask me anything">
                 <img id="avatar-inner" src="" alt="" draggable="false" />
             </div>
