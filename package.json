@@ -10,11 +10,7 @@
     "build": "bash scripts/build.sh",
     "build:dir": "bash scripts/build.sh dir",
     "build:deb": "bash scripts/build.sh deb",
-    "build:appimage": "bash scripts/build.sh AppImage",
-    "ingest": "node scripts/ingest-knowledge.js",
-    "fetch-knowledge": "bash scripts/fetch-knowledge.sh",
-    "knowledge": "bash scripts/knowledge.sh",
-    "knowledge-stats": "node -e \"require('./src/main/rag').listKnowledge().then(console.log)\""
+    "build:appimage": "bash scripts/build.sh AppImage"
   },
   "build": {
     "appId": "com.icanhelp.app",

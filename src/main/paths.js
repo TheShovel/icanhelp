@@ -17,7 +17,6 @@ module.exports = {
   BASE_DIR,
   appPath,
   modelsDir: () => appPath("models"),
-  knowledgeFile: () => appPath("knowledge.json"),
   visionLog: () => appPath("vision.log"),
   ocrLog: () => appPath("ocr.log"),
   tesseractCache: () => appPath("tesseract"),

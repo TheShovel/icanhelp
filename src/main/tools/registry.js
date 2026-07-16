@@ -3,12 +3,7 @@ const { readFile, readFileLines, writeFile, listDirectory } = require("./fs");
 const { ocrImage } = require("../ocr");
 const { extractWebpage } = require("./extract");
 const { createDocx } = require("./docx");
-const {
-  addKnowledge,
-  searchKnowledge,
-  listKnowledge,
-  clearKnowledge,
-} = require("../rag");
+
 
 async function searchWeb({ query, resultSize }) {
   try {
@@ -505,75 +500,6 @@ var tools = [
       },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "store_knowledge",
-      description:
-        "Store information in the local knowledge base for later retrieval. Use this to remember facts, instructions, code snippets, or any information the user wants to keep. The knowledge is automatically chunked and embedded for semantic search.",
-      parameters: {
-        type: "object",
-        properties: {
-          text: {
-            type: "string",
-            description: "The information to store",
-          },
-          metadata: {
-            type: "object",
-            description: "Optional metadata like source, category, or tags",
-          },
-        },
-        required: ["text"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "search_knowledge",
-      description:
-        "IMPORTANT: Search the local knowledge base BEFORE answering any question about Linux, programming, security, networking, or system administration. " +
-        "Returns the most relevant stored entries with similarity scores (higher = more relevant). " +
-        "The knowledge base covers: bash, Linux commands, filesystem, systemd, package managers (apt/dnf/pacman), " +
-        "networking, permissions, desktop environments (Wayland/X11), troubleshooting, kernel, security hardening, " +
-        "JavaScript, Node.js, Python, Git, Docker, SQL, web development, HTTP, and computer science fundamentals." +
-        " Always call this when the user asks a factual or how-to question.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "What to search for in the knowledge base",
-          },
-          k: {
-            type: "number",
-            description: "Number of results to return (default 5)",
-            default: 5,
-          },
-        },
-        required: ["query"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "list_knowledge",
-      description:
-        "Get statistics about the knowledge base (total entry count and breakdown by source). " +
-        "ONLY use this if the user explicitly asks for knowledge-base stats. To answer a question, " +
-        "use search_knowledge(query) instead — never use this to look things up.",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "clear_knowledge",
-      description: "Delete all entries from the knowledge base.",
-      parameters: { type: "object", properties: {} },
-    },
-  },
 ];
 
 var handlers = {
@@ -588,21 +514,6 @@ var handlers = {
   list_themes: listThemesStub,
   delete_theme: deleteThemeStub,
   apply_theme: applyThemeStub,
-  store_knowledge: (args) => addKnowledge(args.text, args.metadata),
-  search_knowledge: (args) => searchKnowledge(args.query, args.k),
-  list_knowledge: async function () {
-    // Return the stats but steer the model toward the actual search tool,
-    // since listing entries is never useful for answering a question.
-    var stats = await listKnowledge();
-    return (
-      stats +
-      "\n\nNOTE: This only lists counts. To actually use the knowledge base, " +
-      "call search_knowledge with a `query` argument (e.g. " +
-      'search_knowledge({ query: "cpu usage", k: 5 })) — do NOT call ' +
-      "list_knowledge to look things up."
-    );
-  },
-  clear_knowledge: clearKnowledge,
   extract_webpage: extractWebpage,
   create_docx: createDocx,
 };

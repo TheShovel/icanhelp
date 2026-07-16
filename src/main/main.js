@@ -54,8 +54,7 @@ const {
   prepareAttachment,
   supportedAttachmentExtensions,
 } = require("./attachments");
-const { searchKnowledge, preloadEmbeddings, seedCoreInstructions } = require("./rag");
-const { appPath, knowledgeFile, visionLog, ocrLog } =
+const { appPath, visionLog, ocrLog } =
   require("./paths");
 
 marked.use({ breaks: true, gfm: true });
@@ -133,8 +132,6 @@ function createWindow() {
   setTimeout(async function () {
     loadPipeline();
     loadExtract();
-    await preloadEmbeddings();
-    await seedCoreInstructions();
   }, 500);
 
   mainWindow.webContents.on("did-finish-load", function () {
@@ -210,48 +207,6 @@ function createWindow() {
     const { tools } = require("./tools/registry");
     const { executeToolCall, resetToolBudget } = require("./tools/registry");
     resetToolBudget(); // start each user turn with a fresh tool budget
-
-    // Auto-search knowledge base for the latest user message, then inject the
-    // results into the prompt automatically. This is the "hidden RAG" step:
-    // the model receives relevant knowledge even if it never calls
-    // search_knowledge() itself. Injection is unconditional (top-k results are
-    // always embedded) so the AI always benefits from the knowledge base.
-    try {
-      var lastUser = messages
-        .filter(function (m) {
-          return m.role === "user";
-        })
-        .pop();
-      if (lastUser && lastUser.content) {
-        console.log("[main] Searching knowledge base...");
-        var kbResult = await searchKnowledge(lastUser.content, 5);
-        console.log("[main] Knowledge search done");
-        var kbParsed = JSON.parse(kbResult);
-        if (kbParsed.results && kbParsed.results.length > 0) {
-          // Only inject results that are actually relevant (similarity >= 0.35).
-          // Low-similarity noise confuses small models more than it helps.
-          var relevant = kbParsed.results.filter(function (r) {
-            return parseFloat(r.similarity) >= 0.35;
-          });
-          if (relevant.length > 0) {
-            var contextLines = relevant.map(function (r) {
-              return "[KB: " + r.similarity + "] " + r.text;
-            });
-            messages.unshift({
-              role: "system",
-              content:
-                "Relevant knowledge base entries (auto-retrieved for the user's message):\n" +
-                contextLines.join("\n"),
-            });
-            console.log(
-              "[main] Injected " + relevant.length + " knowledge entries (filtered from " + kbParsed.results.length + ")",
-            );
-          }
-        }
-      }
-    } catch (e) {
-      console.log("[main] Auto-knowledge search failed:", e.message);
-    }
 
     var pendingConfirm = null;
     var retries = 0;
@@ -553,7 +508,6 @@ function createWindow() {
     const dirs = [
       path.join(os.homedir(), ".config", "icanhelp"),
       appPath("models"),
-      knowledgeFile(),
       visionLog(),
       ocrLog(),
     ];
@@ -630,9 +584,6 @@ function createWindow() {
   ipcMain.handle("open-folder", async (_event, key) => {
     var folder;
     switch (key) {
-      case "knowledge":
-        folder = appPath();
-        break;
       case "config":
         folder = path.join(os.homedir(), ".config", "icanhelp");
         break;

@@ -260,10 +260,8 @@ test("registry - tools array has all expected tools", async (t) => {
   assert.ok(names.includes("list_themes"));
   assert.ok(names.includes("apply_theme"));
   assert.ok(names.includes("delete_theme"));
-  assert.ok(names.includes("store_knowledge"));
-  assert.ok(names.includes("search_knowledge"));
-  assert.ok(names.includes("list_knowledge"));
-  assert.ok(names.includes("clear_knowledge"));
+  assert.ok(names.includes("create_docx"));
+  assert.ok(names.includes("read_file_lines"));
 });
 
 test("registry - executeToolCall list_themes returns stub", async (t) => {

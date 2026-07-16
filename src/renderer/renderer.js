@@ -289,6 +289,17 @@ let dragStartY = 0;
 let conversation = [];
 let isProcessing = false;
 let lastChatSize = { width: 400, height: 550 };
+let responseStartTime = 0;
+var modelInfo = { name: "", backend: "CPU" };
+
+// Load model config info for the response footer
+window.electronAPI.getConfig().then(function (cfg) {
+  if (cfg && cfg.modelPath) {
+    var name = cfg.modelPath.split("/").pop().replace(/\.gguf$/i, "").replace(/_/g, " ");
+    modelInfo.name = name;
+    modelInfo.backend = (cfg.gpuLayers === "max" || cfg.gpuLayers > 0) ? "GPU" : "CPU";
+  }
+});
 let isResizing = false;
 let resizeStartX = 0;
 let resizeStartY = 0;
@@ -369,7 +380,7 @@ function saveChatsToStore() {
   var toSave = chats.map(function (c) {
     return {
       id: c.id,
-      name: c.name || "Chat",
+      name: c.name || null,
       messages: c.messages,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt || Date.now(),
@@ -377,6 +388,17 @@ function saveChatsToStore() {
   });
   window.electronAPI.saveChats(toSave);
 }
+
+var debouncedSaveChats = (function () {
+  var timer = null;
+  return function () {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function () {
+      timer = null;
+      saveChatsToStore();
+    }, 500);
+  };
+})();
 
 function renderChatList() {
   chatListBody.innerHTML = "";
@@ -396,7 +418,8 @@ function renderChatList() {
       preview = last.content.slice(0, 40);
       if (last.content.length > 40) preview += "…";
     }
-    nameSpan.textContent = chat.name + (preview ? ": " + preview : "");
+    var displayName = chat.name || "New Chat";
+    nameSpan.textContent = displayName + (preview ? ": " + preview : "");
 
     var delBtn = document.createElement("button");
     delBtn.className = "chat-list-del";
@@ -424,7 +447,7 @@ function renderChatList() {
         });
       }
       renderChatList();
-      saveChatsToStore();
+      debouncedSaveChats();
     });
 
     item.appendChild(nameSpan);
@@ -439,14 +462,22 @@ function renderChatList() {
 function createNewChat() {
   var chat = {
     id: generateId(),
-    name: "Chat " + (chats.length + 1),
+    name: null,
     messages: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
   chats.push(chat);
-  saveChatsToStore();
+  debouncedSaveChats();
   return chat.id;
+}
+
+function autoNameChat(chat, text) {
+  if (chat.name) return;
+  var name = text.trim().replace(/\s+/g, " ").slice(0, 40);
+  if (name.length === 0) name = "New Chat";
+  if (name.length >= 40) name += "…";
+  chat.name = name;
 }
 
 function switchToChat(chatId) {
@@ -465,13 +496,21 @@ function switchToChat(chatId) {
 
   var chat = getCurrentChat();
   if (chat) {
-    for (var m of chat.messages) {
-      addMessage(m.content, m.role, m.attachment);
+    if (chat.messages.length === 0) {
+      renderEmptyState();
+    } else {
+      for (var m of chat.messages) {
+        addMessage(m.content, m.role, m.attachment);
+      }
     }
     requestAnimationFrame(function () {
       smoothScroll(chatMessages);
     });
   }
+
+  requestAnimationFrame(function () {
+    chatInput.focus();
+  });
 
   renderChatList();
   chatListPanel.classList.add("hidden");
@@ -498,8 +537,13 @@ window.electronAPI.loadChats().then(function (loaded) {
       return (b.updatedAt || 0) - (a.updatedAt || 0);
     });
     currentChatId = chats[0].id;
-    for (var m of chats[0].messages || []) {
-      addMessage(m.content, m.role, m.attachment);
+    var msgs = chats[0].messages || [];
+    if (msgs.length === 0) {
+      renderEmptyState();
+    } else {
+      for (var m of msgs) {
+        addMessage(m.content, m.role, m.attachment);
+      }
     }
     requestAnimationFrame(function () {
       smoothScroll(chatMessages);
@@ -1207,14 +1251,16 @@ async function sendMessage() {
   ensureCurrentChat();
   await addMessage(display, "user", attachmentData);
   chatInput.value = "";
+  chatInput.style.height = "auto";
 
   var chat = getCurrentChat();
   var userMsg = { role: "user", content: display };
   if (attachmentData) userMsg.attachment = attachmentData;
   if (chat) {
+    if (chat.messages.length === 0) autoNameChat(chat, userText);
     chat.messages.push(userMsg);
     chat.updatedAt = Date.now();
-    saveChatsToStore();
+    debouncedSaveChats();
   }
 
   var conversation = chat
@@ -1236,6 +1282,7 @@ async function sendMessage() {
   isProcessing = true;
   chatInput.disabled = true;
   sendBtn.disabled = true;
+  responseStartTime = Date.now();
 
   const cleanup = window.electronAPI.onLLMChunk(function (chunk) {
     // Trace every chunk for debugging tool display timing.
@@ -1336,11 +1383,13 @@ async function sendMessage() {
       if (chat) {
         chat.messages.push({ role: "assistant", content: buffer });
         chat.updatedAt = Date.now();
-        saveChatsToStore();
+        debouncedSaveChats();
       }
       if (sourcesToRender.length > 0) {
         renderCitations(bubble, sourcesToRender);
       }
+
+      renderResponseFooter(bubble);
       return;
     }
 
@@ -1808,7 +1857,60 @@ function stripEmojis(text) {
     .replace(/ {2,}/g, " ");
 }
 
+var SUGGESTIONS = [
+  "What can you do?",
+  "Check my system",
+  "Search the web",
+  "Create a file",
+  "List my packages",
+  "Check disk usage",
+];
+
+function renderEmptyState() {
+  var existing = document.getElementById("chat-empty-state");
+  if (existing) return;
+  if (chatMessages.querySelector(".message")) return;
+
+  var el = document.createElement("div");
+  el.id = "chat-empty-state";
+
+  var title = document.createElement("div");
+  title.className = "empty-title";
+  title.textContent = "Ask me anything";
+
+  var desc = document.createElement("div");
+  desc.className = "empty-desc";
+  desc.textContent = "I can answer questions, run commands, search the web, and more.";
+
+  var chips = document.createElement("div");
+  chips.className = "empty-suggestions";
+
+  SUGGESTIONS.forEach(function (s) {
+    var chip = document.createElement("span");
+    chip.className = "empty-suggestion";
+    chip.textContent = s;
+    chip.addEventListener("click", function () {
+      chatInput.value = s;
+      chatInput.focus();
+      autoResizeTextarea();
+      sendMessage();
+    });
+    chips.appendChild(chip);
+  });
+
+  el.appendChild(title);
+  el.appendChild(desc);
+  el.appendChild(chips);
+  chatMessages.appendChild(el);
+}
+
+function removeEmptyState() {
+  var el = document.getElementById("chat-empty-state");
+  if (el) el.remove();
+}
+
 async function addMessage(text, role, attachment) {
+  removeEmptyState();
   const div = document.createElement("div");
   div.className = "message " + role + " message-animate";
 
@@ -1944,6 +2046,25 @@ function renderDocxPreview(bubble, result) {
   bubble.appendChild(card);
 }
 
+function renderResponseFooter(bubble) {
+  // Guard against duplicates
+  if (bubble.querySelector(".response-footer")) return;
+
+  var elapsed = Date.now() - responseStartTime;
+  var seconds = (elapsed / 1000).toFixed(1);
+
+  var footer = document.createElement("div");
+  footer.className = "response-footer";
+
+  var parts = [];
+  if (modelInfo.name) parts.push(modelInfo.name);
+  parts.push(modelInfo.backend);
+  parts.push(seconds + "s");
+
+  footer.textContent = parts.join(" · ");
+  bubble.appendChild(footer);
+}
+
 function escapeHtml(str) {
   var div = document.createElement("div");
   div.textContent = str;
@@ -2019,7 +2140,16 @@ window.electronAPI.onApplyTheme(function (properties) {
   }
 });
 
+function autoResizeTextarea() {
+  chatInput.style.height = "auto";
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + "px";
+}
+
 sendBtn.addEventListener("click", sendMessage);
-chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendMessage();
+chatInput.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
 });
+chatInput.addEventListener("input", autoResizeTextarea);

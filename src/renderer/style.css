@@ -725,6 +725,57 @@ body {
     gap: 6px;
 }
 
+#chat-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 20px;
+    gap: 12px;
+    color: var(--fg-muted);
+    text-align: center;
+}
+
+#chat-empty-state .empty-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg-dim);
+}
+
+#chat-empty-state .empty-desc {
+    font-size: 12px;
+    line-height: 1.5;
+    max-width: 240px;
+}
+
+.empty-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+    max-width: 280px;
+}
+
+.empty-suggestion {
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--fg-dim);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.empty-suggestion:hover {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+}
+
 .message {
     display: flex;
     flex-direction: column;
@@ -810,6 +861,18 @@ body {
     border-bottom-left-radius: 3px;
 }
 
+.response-footer {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--fg-muted);
+    display: flex;
+    gap: 6px;
+    opacity: 0.8;
+    user-select: none;
+}
+
 .message .bubble p {
     margin: 2px 0;
 }
@@ -846,7 +909,7 @@ body {
 /* ---- Chat Input ---- */
 #chat-input-area {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 8px;
     padding: 10px 14px;
     border-top: 1px solid var(--border);
@@ -857,6 +920,8 @@ body {
 #chat-input {
     flex: 1;
     min-width: 0;
+    max-height: 150px;
+    resize: none;
     background: var(--bg-input);
     border: 1px solid var(--border-strong);
     border-radius: 8px;
@@ -865,6 +930,8 @@ body {
     color: var(--fg);
     outline: none;
     font-family: inherit;
+    line-height: 1.4;
+    overflow-y: auto;
 }
 
 #chat-input::placeholder {

@@ -76,11 +76,11 @@
                             title="Remove attachment"
                         ></button>
                     </div>
-                    <input
-                        type="text"
+                    <textarea
                         id="chat-input"
                         placeholder="Ask me anything..."
-                    />
+                        rows="1"
+                    ></textarea>
                     <button
                         id="send-btn"
                         class="btn-icon"
@@ -142,16 +142,6 @@
                     <div class="settings-menu-section-label">Folders</div>
                     <button
                         class="settings-menu-item"
-                        data-action="open-knowledge"
-                    >
-                        <span>Knowledge Folder</span>
-                        <span class="settings-menu-hint"
-                            >RAG knowledge base files</span
-                        >
-                    </button>
-                    <div class="settings-menu-separator"></div>
-                    <button
-                        class="settings-menu-item"
                         data-action="open-config"
                     >
                         <span>Config Folder</span>
@@ -183,8 +173,8 @@
                     >
                         <span>Reset All Data</span>
                         <span class="settings-menu-hint"
-                            >Wipe config, models, knowledge base, and
-                            chats</span
+                            <span>Wipe config, models, and
+                                chats</span>
                         >
                     </button>
                 </div>

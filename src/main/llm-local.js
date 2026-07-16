@@ -9,17 +9,6 @@ const { modelsDir } = require("./paths");
 // generic note if anything fails.
 var cachedSysInfo = null;
 
-function sysBinDir() {
-  try {
-    const dataHome =
-      process.env.XDG_DATA_HOME ||
-      path.join(require("os").homedir(), ".local", "share");
-    return path.join(dataHome, "icanhelp", "bin");
-  } catch (e) {
-    return null;
-  }
-}
-
 function run(cmd, args, fallback) {
   try {
     return execFileSync(cmd, args, { encoding: "utf8", timeout: 5000 })
@@ -33,17 +22,11 @@ function run(cmd, args, fallback) {
 function gatherSystemInfo() {
   if (cachedSysInfo) return cachedSysInfo;
   var lines = [];
-  // Distro detection via the bundled `sys` CLI (falls back to /etc/os-release).
-  var bin = sysBinDir();
-  var detect = bin
-    ? run("bash", ["-c", bin + "/sys detect 2>/dev/null || true"])
-    : "";
-  if (!detect) {
-    detect = run("bash", [
-      "-c",
-      "source /etc/os-release 2>/dev/null && echo \"distro=$ID\"",
-    ]);
-  }
+  // Distro detection via /etc/os-release.
+  var detect = run("bash", [
+    "-c",
+    "source /etc/os-release 2>/dev/null && echo \"distro=$ID\"",
+  ]);
   if (detect) lines.push(detect);
   // CPU model + core count.
   var cpuModel = run("bash", [
@@ -164,13 +147,11 @@ function buildSystemPrompt(sysInfo) {
     "",
     "## Rules",
     "- Context window: " + (CONTEXT_SIZE / 1024) + "K tokens. Keep tool results and file reads small.",
-    "- For factual/how-to questions: call search_knowledge() first. If it returns nothing, use search_web().",
     "- After search_web, use extract_webpage(url) to get full page content from any result. It also extracts images with OCR.",
     "- For this system's live state (CPU%, disk, services, packages, updates): run commands with run_bash().",
     "- You MUST think before responding. Always reason step-by-step inside <think> tags before every answer. Even for simple questions, show your reasoning first, then give the answer.",
     "- Use as few tools as possible.",
     "- Be concise. Lead with the answer. No preambles. One sentence or a few bullets.",
-    "- The `sys` CLI is available for distro-agnostic system commands (sys pkg, sys svc, sys perf, etc).",
     "- When asked to write a document, report, or letter: call create_docx(content, filename) IMMEDIATELY. Never say 'I'll create...' — just call the tool with the full content.",
   ];
 
