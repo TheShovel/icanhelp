@@ -16,7 +16,6 @@
     </a>
     <nav class="nav">
       <a href="#features">Features</a>
-      <a href="#knowledge">Knowledge</a>
       <a href="#install">Install</a>
       <a class="nav-gh" href="https://github.com/TheShovel/icanhelp" target="_blank" rel="noopener">GitHub</a>
     </nav>
@@ -110,66 +109,12 @@
           <p>Search the web when needed and use a local vision model to understand images.</p>
         </div>
         <div class="card reveal">
-          <h3>Local knowledge base</h3>
-          <p>A curated RAG knowledge base across 9 categories answers without bigger weights.</p>
+          <h3>Addon models</h3>
+          <p>Download specialized models for web extraction and math computation. They load on-demand via the Addons panel.</p>
         </div>
         <div class="card reveal">
           <h3>Theme system</h3>
           <p>Light and dark themes, with a custom theme editor to match your desktop.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="knowledge" class="section reveal">
-      <h2>Knowledge base</h2>
-      <p class="section-lede">
-        A local Retrieval-Augmented Generation store of markdown files. The
-        assistant searches it before every answer, so it stays useful on small
-        models.
-      </p>
-
-      <div class="kb-flow" aria-hidden="true">
-        <div class="kb-node">
-          <span class="kb-node-icon">?</span>
-          <span class="kb-node-label">Your question</span>
-        </div>
-        <div class="kb-arrow"></div>
-        <div class="kb-node">
-          <span class="kb-node-icon">&#9776;</span>
-          <span class="kb-node-label">Embed (MiniLM)</span>
-        </div>
-        <div class="kb-arrow"></div>
-        <div class="kb-node">
-          <span class="kb-node-icon">&#9737;</span>
-          <span class="kb-node-label">Cosine search</span>
-        </div>
-        <div class="kb-arrow"></div>
-        <div class="kb-node">
-          <span class="kb-node-icon">&#10003;</span>
-          <span class="kb-node-label">Grounded answer</span>
-        </div>
-      </div>
-
-      <h3>Explore the categories</h3>
-      <p class="section-lede">
-        Click a category to see what's inside and watch the assistant pull a
-        relevant snippet from it.
-      </p>
-      <div class="kb-explorer">
-        <div class="kb-chips" id="kb-chips"></div>
-        <div class="kb-detail" id="kb-detail">
-          <div class="kb-detail-head">
-            <span class="kb-detail-name" id="kb-detail-name">Select a category</span>
-            <span class="kb-detail-count" id="kb-detail-count"></span>
-          </div>
-          <p class="kb-detail-topics" id="kb-detail-topics">
-            Pick one of the 9 knowledge categories above to preview its contents.
-          </p>
-          <div class="kb-retrieval" id="kb-retrieval" hidden>
-            <div class="kb-retrieval-label">Retrieving match&hellip;</div>
-            <div class="kb-retrieval-bar"><div class="kb-retrieval-fill"></div></div>
-            <div class="kb-snippet" id="kb-snippet"></div>
-          </div>
         </div>
       </div>
     </section>

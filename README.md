@@ -42,7 +42,7 @@ npm start
 
 The installer supports **x86_64** and **ARM64 (aarch64)** machines running a glibc-based Linux distro with a desktop environment. It does not work on musl-based systems like Alpine Linux, on headless/WSL setups without a desktop, or on 32-bit ARM.
 
-**Runs best on Arch-based and Ubuntu-based distros** (Arch, EndeavourOS, Manjaro, Garuda; Ubuntu, Debian, Linux Mint, Pop!_OS, Kubuntu). These are the most thoroughly tested and are what the built-in `sys` universal CLI is tuned for. Other glibc distros (Fedora, openSUSE, and derivatives) work too, but may need occasional distro-specific commands outside `sys`.
+**Runs best on Arch-based and Ubuntu-based distros** (Arch, EndeavourOS, Manjaro, Garuda; Ubuntu, Debian, Linux Mint, Pop!_OS, Kubuntu). These are the most thoroughly tested and The LLM uses native package managers and system commands for the detected distribution..
 
 ## Setup
 
@@ -56,44 +56,8 @@ On first launch the setup panel appears. Select a model from the download list (
 - Screenshot capture
 - Bash command execution
 - Web search
-- Knowledge base
 - Theme system
 - Vision model
-
-## Knowledge Base
-
-The AI assistant has a local RAG (Retrieval-Augmented Generation) knowledge base at `knowledge/` - a curated collection of markdown files across 9 categories. The AI uses it to answer questions without needing larger model weights.
-
-### Categories
-
-| Category | Files | Topics |
-|----------|-------|--------|
-| `knowledge/creative/` | 35 | Music, photography, cooking, baking, sewing, drawing, writing, film, crafts |
-| `knowledge/daily/` | 60 | Life skills, travel, parenting, relationships, career, fitness, car maintenance |
-| `knowledge/finance/` | 12 | Budgeting, investing, taxes, retirement, credit, small business |
-| `knowledge/general/` | 27 | History, philosophy, economics, politics, world religions, ethics |
-| `knowledge/health/` | 50 | Mental health, nutrition, exercise, first aid, sleep, child development |
-| `knowledge/home/` | 37 | Gardening, plumbing, woodworking, electrical, home security, cleaning |
-| `knowledge/linux/` | 16 | Bash, systemd, kernel, networking, package management, troubleshooting |
-| `knowledge/programming/` | 70 | Python, JS/TS, Rust, Go, databases, Docker, Kubernetes, ML, web dev |
-| `knowledge/science/` | 32 | Physics, chemistry, biology, neuroscience, climate science, astronomy |
-
-### How It Works
-
-- `src/main/rag.js` - chunks, embeds (all-MiniLM-L6-v2), and performs cosine similarity search over the knowledge base
-- Auto-search in `src/main/main.js` injects relevant knowledge entries before every user prompt
-- The system prompt in `src/main/llm-local.js` instructs the model to always search before answering
-- Data persists to `~/.local/share/icanhelp/knowledge.json`
-
-### Adding Knowledge
-
-1. Create a markdown file in the appropriate `knowledge/<category>/` directory
-2. Use dense, factual formatting - lists, tables, code blocks, clear headings
-3. Run `npm run ingest` to embed everything into the vector store
-4. Run `npm run fetch-knowledge` to download external references
-5. Run `npm run knowledge-stats` to see the current number of chunks per category
-
-The AI can also use the `store_knowledge` tool at runtime to remember facts, instructions, or code snippets, and `search_knowledge` to retrieve them by meaning.
 
 ## Screenshot Dependencies
 
@@ -115,8 +79,7 @@ Downloads automatically on first launch (~950 MB, cached at `~/.local/share/ican
 ## Files
 
 - Config: `~/.config/icanhelp/config.enc` (encrypted)
-- App data: `~/.local/share/icanhelp/` (models, knowledge base, vision model, logs)
+- App data: `~/.local/share/icanhelp/` (models, addon models, vision model, logs)
   - Models: `~/.local/share/icanhelp/models/`
   - Vision model cache: `~/.local/share/icanhelp/transformers/`
-  - Knowledge base: `~/.local/share/icanhelp/knowledge.json`
   - Logs: `~/.local/share/icanhelp/vision.log`, `ocr.log`
