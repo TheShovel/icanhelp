@@ -67,6 +67,7 @@ const BUDDY_SKINS_DIR = path.join(CONFIG_DIR, "buddySkins");
 let mainWindow;
 let pendingSudo = null;
 let pendingConfirm = null;
+let pendingCaptchaWin = null;
 
 function requestSudoPassword(event) {
   event.sender.send("llm-chunk", { sudo_prompt: {} });
@@ -135,6 +136,12 @@ function createWindow() {
   });
 
   ipcMain.on("close-window", function () {});
+  ipcMain.on("close-captcha", function () {
+    if (pendingCaptchaWin && !pendingCaptchaWin.isDestroyed()) {
+      pendingCaptchaWin.close();
+    }
+    pendingCaptchaWin = null;
+  });
   setProgressCallback(function (info) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("vision-download-progress", info);
@@ -376,6 +383,21 @@ function createWindow() {
                 },
               });
 
+              var captchaHtml = parsedCaptcha.captchaHtml || "";
+              var captchaFilePath = null;
+              if (captchaHtml) {
+                var baseTag = '<base href="https://lite.duckduckgo.com/">';
+                if (/<head[^>]*>/i.test(captchaHtml)) {
+                  captchaHtml = captchaHtml.replace(/<head[^>]*>/i, "$&" + baseTag);
+                } else if (/<html[^>]*>/i.test(captchaHtml)) {
+                  captchaHtml = captchaHtml.replace(/<html[^>]*>/i, "$&<head>" + baseTag + "</head>");
+                } else {
+                  captchaHtml = "<head>" + baseTag + "</head>" + captchaHtml;
+                }
+                captchaFilePath = path.join(os.tmpdir(), "icanhelp-captcha-" + Date.now() + ".html");
+                fs.writeFileSync(captchaFilePath, captchaHtml, "utf-8");
+              }
+
               var captchaWin = new BrowserWindow({
                 width: 800,
                 height: 700,
@@ -384,14 +406,27 @@ function createWindow() {
                 title: "Solve captcha to search the web",
                 autoHideMenuBar: true,
               });
-              captchaWin.loadURL(parsedCaptcha.captchaUrl);
+              pendingCaptchaWin = captchaWin;
+
+              if (captchaFilePath) {
+                captchaWin.loadFile(captchaFilePath);
+              } else {
+                captchaWin.loadURL(parsedCaptcha.captchaUrl);
+              }
 
               await new Promise(function (resolve) {
-                captchaWin.on("closed", resolve);
+                captchaWin.on("closed", function () {
+                  pendingCaptchaWin = null;
+                  resolve();
+                });
               });
 
+              if (captchaFilePath) {
+                try { fs.unlinkSync(captchaFilePath); } catch (_) {}
+              }
+
               // Collect session cookies so the retry request can use them.
-              var ddgCookies = await mainWindow.webContents.session.cookies.get({
+              var ddgCookies = await captchaWin.webContents.session.cookies.get({
                 url: "https://lite.duckduckgo.com",
               });
               var cookieStr = ddgCookies
@@ -520,7 +555,7 @@ function createWindow() {
     // After the main chat loop exits, check if a document session was requested.
     // Also auto-trigger if the user asked for a document but the model never called
     // create_docx (hit tool limit, timed out, etc).
-    if (!pendingDocSession && isDocRequest && gatheredResearch.length > 0) {
+    if (!pendingDocSession && isDocRequest) {
       console.log("[main] Document was requested but never created — auto-triggering");
       var filename = "document";
       var description = lastUserMsg.slice(0, 200);
@@ -557,6 +592,9 @@ function createWindow() {
           onChunk: function (chunk) {
             if (chunk.text) {
               event.sender.send("llm-chunk", { doc_stream_chunk: chunk.text });
+            }
+            if (chunk.doc_stream_think) {
+              event.sender.send("llm-chunk", { doc_stream_think: chunk.doc_stream_think });
             }
             if (chunk.doc_status) {
               event.sender.send("llm-chunk", { doc_status: chunk.doc_status });

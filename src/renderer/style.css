@@ -2556,6 +2556,11 @@ body {
     border-radius: 4px;
     padding: 8px;
 }
+.doc-stream-body.doc-stream-thinking {
+    color: var(--thinking-fg);
+    background: var(--bg-body);
+    font-style: italic;
+}
 
 /* ---- Math Tool Block ---- */
 .tool-block.tool-math .tool-header {

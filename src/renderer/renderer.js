@@ -287,6 +287,7 @@ confirmNo.addEventListener("click", function () {
 
 captchaOk.addEventListener("click", function () {
   captchaOverlay.classList.add("hidden");
+  window.electronAPI.closeCaptcha();
 });
 
 let chatOpen = false;
@@ -761,7 +762,7 @@ document
             item.querySelector("span:first-child").textContent =
               "Reset All Data";
             item.querySelector(".settings-menu-hint").textContent =
-              "Wipe config, models, knowledge base, and chats";
+              "Wipe config, models, and chats";
           }
         }, 5000);
       } else {
@@ -1435,6 +1436,7 @@ async function sendMessage() {
   var thinkingBuf = "";
   var toolCalls = [];
   var docStreamBuf = "";
+  var docStreamThinkBuf = "";
   var docStreamCard = null;
   var docStreamBody = null;
   webSources = [];
@@ -1803,13 +1805,36 @@ async function sendMessage() {
       }
       setAvatarState("talking");
       docStreamBuf = "";
+      docStreamThinkBuf = "";
       var dsCard = renderDocStreamCard(bubble, chunk.doc_stream_start);
       docStreamCard = dsCard;
       docStreamBody = dsCard.querySelector(".doc-stream-body");
       return;
     }
 
+    if (chunk.doc_stream_think) {
+      docStreamThinkBuf += chunk.doc_stream_think;
+      if (docStreamBody) {
+        docStreamBody.textContent = docStreamThinkBuf.slice(-3000);
+        docStreamBody.scrollTop = docStreamBody.scrollHeight;
+        docStreamBody.classList.add("doc-stream-thinking");
+      }
+      if (docStreamCard) {
+        var spinner = docStreamCard.querySelector(".doc-stream-spinner");
+        if (spinner) spinner.remove();
+        var dsLabel = docStreamCard.querySelector(".doc-stream-label");
+        if (dsLabel) dsLabel.textContent = " Thinking...";
+      }
+      return;
+    }
+
     if (chunk.doc_stream_chunk) {
+      // First real content chunk: clear the thinking display.
+      if (docStreamThinkBuf && docStreamBody) {
+        docStreamBody.textContent = "";
+        docStreamBody.classList.remove("doc-stream-thinking");
+        docStreamThinkBuf = "";
+      }
       docStreamBuf += chunk.doc_stream_chunk;
       if (docStreamBody) {
         docStreamBody.textContent = docStreamBuf.slice(-3000);

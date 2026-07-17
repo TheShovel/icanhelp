@@ -1200,7 +1200,7 @@ function buildDocWriterSystemPrompt(description, researchContext) {
   parts.push("- Use **bold** and *italic* for emphasis");
   parts.push("- Be thorough and comprehensive");
   parts.push("");
-  parts.push("Start writing the document directly — no preamble, no introduction about yourself. Begin with the document title.");
+  parts.push("IMPORTANT: Do NOT use <think> tags or any chain-of-thought reasoning. Do not output thoughts, plans, or analysis. Start writing the document content immediately with the title heading. No preamble, no introduction about yourself.");
 
   return parts.join("\n");
 }
@@ -1308,7 +1308,7 @@ async function generateDocument({ description, researchContext, filename, onChun
     }, 5 * 60 * 1000);
 
     var result = await session.prompt(
-      "Write a comprehensive document about: " + description + "\n\nBegin writing now.",
+      "Write a comprehensive document about: " + description + "\n\nBegin writing now. Do not output <think> tags or reasoning.",
       {
         maxTokens: Math.floor(contextSize * 0.75),
         temperature: 0.7,
@@ -1337,6 +1337,13 @@ async function generateDocument({ description, researchContext, filename, onChun
           docStatusTimer = setTimeout(function () {
             startDocStatus();
           }, 5000);
+        },
+        onResponseChunk: function (chunk) {
+          if (chunk && chunk.type === "segment" && chunk.segmentType === "thought") {
+            console.log("[llm-local] generateDocument: thinking (" + chunk.text.length + " chars)");
+            if (onChunk) onChunk({ doc_stream_think: chunk.text });
+            return;
+          }
         },
       }
     );

@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   sendSudoPassword: (password) => ipcRenderer.send("sudo-response", password),
   sendConfirmResponse: (ok) => ipcRenderer.send("confirm-response", ok),
+  closeCaptcha: () => ipcRenderer.send("close-captcha"),
   cancelStream: () => ipcRenderer.send("cancel-stream"),
   	loadChats: () => ipcRenderer.invoke("load-chats"),
   	saveChats: (chats) => ipcRenderer.invoke("save-chats", chats),

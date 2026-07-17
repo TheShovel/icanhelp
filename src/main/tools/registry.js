@@ -32,7 +32,7 @@ async function searchWeb({ query, resultSize, sessionCookies }) {
       isCaptcha = true;
     }
     if (isCaptcha) {
-      return JSON.stringify({ captcha: true, captchaUrl: url });
+      return JSON.stringify({ captcha: true, captchaUrl: url, captchaHtml: html });
     }
 
     // Extract result links
