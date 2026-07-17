@@ -17,6 +17,25 @@ function gatherDistro() {
 
 var CONTEXT_SIZE = 32768;
 
+function defaultContextSize() {
+  try {
+    var freeMb = require("os").freemem() / (1024 * 1024);
+    // Scale context to ~2K tokens per 1GB of free RAM, capped at 32768.
+    // A 0.8B Q4 model + KV cache for 32K context needs ~3-4GB.
+    // OS needs ~1GB, so we need ~5GB free for 32K to be comfortable.
+    var size = Math.floor(freeMb / 1024 * 2048);
+    size = Math.max(2048, Math.min(32768, size));
+    // Round to nearest power-of-2 friendly number
+    var steps = [2048, 4096, 6144, 8192, 12288, 16384, 24576, 32768];
+    for (var i = 0; i < steps.length; i++) {
+      if (size <= steps[i]) return steps[i];
+    }
+    return 32768;
+  } catch (_) {
+    return 32768;
+  }
+}
+
 // Sampling defaults tuned to break small-model repetition loops at the
 // source (see guidance on repetition_penalty / no_repeat_ngram_size / min_p).
 // Each can be overridden via the saved config object.
@@ -497,8 +516,8 @@ async function runLocalChatLoop({
     return;
   }
 
-  var desiredSize = config.contextSize || CONTEXT_SIZE;
-  console.log("[llm-local] Creating context with contextSize=" + desiredSize);
+  var desiredSize = config.contextSize || defaultContextSize();
+  console.log("[llm-local] Creating context with contextSize=" + desiredSize + " (free RAM: " + Math.round(require("os").freemem() / 1024 / 1024) + " MB)");
   var context;
   try {
     context = await createContextWithRetry(model, desiredSize, config.batchSize || 512);
@@ -640,7 +659,7 @@ async function runLocalChatLoop({
     }
 
     var IDLE_TIMEOUT_MS = 60 * 1000;
-    var EXTENDED_TIMEOUT_MS = 15 * 1000;
+    var EXTENDED_TIMEOUT_MS = 120 * 1000;
     var toolRunning = false;
     var idleTimer = null;
     var idleFired = false;
@@ -940,7 +959,7 @@ async function runLocalChatLoop({
             chatHistory.push(history[hi]);
           }
 
-          context = await createContextWithRetry(model, config.contextSize || CONTEXT_SIZE, config.batchSize || 512);
+          context = await createContextWithRetry(model, config.contextSize || defaultContextSize(), config.batchSize || 512);
           contextSize = context.contextSize;
 
           session = new LlamaChatSession({
@@ -984,7 +1003,7 @@ async function runLocalChatLoop({
               }
               session = null;
               if (context) { try { await context.dispose(); } catch (_) {} context = null; }
-              context = await createContextWithRetry(model, Math.min(config.contextSize || CONTEXT_SIZE, 8192), 128);
+              context = await createContextWithRetry(model, Math.min(config.contextSize || defaultContextSize(), 8192), 128);
               contextSize = context.contextSize;
               session = new LlamaChatSession({
                 contextSequence: context.getSequence(),
@@ -1121,8 +1140,8 @@ async function generateDocument({ description, researchContext, filename, onChun
     }
   }
 
-  var contextSize = (config && config.contextSize) || CONTEXT_SIZE;
-  console.log("[llm-local] generateDocument: creating context, size=" + contextSize);
+  var contextSize = (config && config.contextSize) || defaultContextSize();
+  console.log("[llm-local] generateDocument: creating context, size=" + contextSize + " (free RAM: " + Math.round(require("os").freemem() / 1024 / 1024) + " MB)");
 
   var context;
   try {
