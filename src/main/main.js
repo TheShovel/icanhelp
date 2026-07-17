@@ -46,6 +46,7 @@ const {
 const { createTray } = require("./tray");
 const {
   setProgressCallback,
+  setLowEndDevice,
   loadPipeline,
   shutdownVision,
 } = require("./vision");
@@ -141,7 +142,8 @@ function createWindow() {
   });
 
   setTimeout(async function () {
-    loadPipeline();
+    var totalRamGB = os.totalmem() / (1024 * 1024 * 1024);
+    setLowEndDevice(totalRamGB < 8);
   }, 500);
 
   mainWindow.webContents.on("did-finish-load", function () {

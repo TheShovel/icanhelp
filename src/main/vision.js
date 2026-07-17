@@ -22,6 +22,11 @@ let lastEmit = 0;
 let crashCount = 0;
 let firstCrashAt = 0;
 let shuttingDown = false;
+let isLowEndDevice = false;
+
+function setLowEndDevice(flag) {
+  isLowEndDevice = !!flag;
+}
 
 function setProgressCallback(cb) {
   progressCallback = cb;
@@ -276,15 +281,18 @@ function loadPipeline() {
 
 async function describeImage(imagePath) {
   if (!pipelineReady) {
-    log("describeImage: pipeline not ready, starting preload");
-    loadPipeline();
-    return null;
+    log("describeImage: pipeline not ready, loading on demand");
+    var ok = await loadPipeline();
+    if (!ok) {
+      log("describeImage: pipeline load failed");
+      return null;
+    }
   }
 
   var worker = startWorker();
   if (!worker) return null;
 
-  return await new Promise(function (resolve) {
+  var result = await new Promise(function (resolve) {
     var id = messageId++;
     var timer = setTimeout(function () {
       pendingDescriptions.delete(id);
@@ -304,6 +312,12 @@ async function describeImage(imagePath) {
       resolve(null);
     }
   });
+
+  if (isLowEndDevice && !shuttingDown) {
+    unloadPipeline();
+  }
+
+  return result;
 }
 
 function stopWorker() {
@@ -317,6 +331,14 @@ function stopWorker() {
   }
 }
 
+function unloadPipeline() {
+  if (!pipelineReady && !child) return;
+  log("Unloading vision pipeline to free memory");
+  resolveLoad(false);
+  failPendingDescriptions();
+  stopWorker();
+}
+
 function shutdownVision() {
   shuttingDown = true;
   resolveLoad(false);
@@ -327,6 +349,8 @@ function shutdownVision() {
 module.exports = {
   describeImage,
   setProgressCallback,
+  setLowEndDevice,
   loadPipeline,
+  unloadPipeline,
   shutdownVision,
 };
