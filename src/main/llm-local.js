@@ -98,21 +98,16 @@ function buildSystemPrompt() {
   var parts = [
     "You are Canhelpy, a Linux desktop AI assistant.",
     "",
-    "## Date & Location",
-    "- Current time: " + dateStr + ", " + timeStr + (tz ? " (" + tz + ")" : "") + (locale ? " [" + locale + "]" : ""),
+    "Date: " + dateStr + ", " + timeStr + (tz ? " " + tz : "") + ". Distro: " + (distro || "unknown") + ".",
     "",
-    "## System",
-    "- Distro: " + (distro || "unknown"),
-    "",
-    "## Rules",
-    "- Context window: " + (CONTEXT_SIZE / 1024) + "K tokens. Keep tool results and file reads small.",
-    "- After search_web, use extract_webpage(url) to get full page content from any result. It also extracts images with OCR.",
-    "- For this system's live state (CPU%, disk, services, packages, updates): run commands with run_bash().",
-    "- You MUST think before responding. Always reason step-by-step inside <think> tags before every answer. Even for simple questions, show your reasoning first, then give the answer.",
-    "- Use as few tools as possible.",
-    "- Be concise. Lead with the answer. No preambles. One sentence or a few bullets.",
-    "- CALL ALL TOOLS FIRST, ANSWER AFTER: Think about what information you need, then call every required tool from within your <think> block. Only after every tool result has been collected should you provide your final answer. Never generate response text, then call a tool, then continue the response — that wastes your context window and confuses the conversation.",
-    "- When asked to write a document, report, or letter: call create_docx(content, filename) IMMEDIATELY\n    - For math, arithmetic, algebra, or calculus problems: call math(expression) instead of calculating yourself. Describe the problem in plain language.. Never say 'I'll create...' — just call the tool with the full content.",
+    "Rules:",
+    "- Think inside <think> tags before answering.",
+    "- Be concise. No preambles.",
+    "- Call all tools first, then answer from results.",
+    "- For math: use math(expression) instead of calculating.",
+    "- For documents/letters: call create_docx(content, filename).",
+    "- After search_web: use extract_webpage(url) for full content.",
+    "- Live system state: use run_bash().",
   ];
 
   return parts.join("\n");
@@ -169,6 +164,10 @@ function estimateTokens(history) {
 function compressMessagesAggressive(messages, currentPrompt) {
   if (messages.length <= 2) return messages;
 
+  // First pass: truncate oversized messages.
+  var MAX_MSG_LEN = 3000;
+  messages = messages.map(function (m) { return truncateMsg(m, MAX_MSG_LEN); });
+
   var lastUserIdx = -1;
   for (var i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") { lastUserIdx = i; break; }
@@ -206,18 +205,43 @@ function compressMessagesAggressive(messages, currentPrompt) {
   ];
 }
 
+function truncateMsg(item, maxLen) {
+  var txt = item.text || item.content;
+  if (txt && txt.length > maxLen) {
+    var key = item.text != null ? "text" : "content";
+    item = { ...item };
+    item[key] = txt.slice(0, maxLen) + "\n...[truncated]";
+  }
+  if (item.response) {
+    var newResp = [];
+    var rem = maxLen;
+    for (var j = 0; j < item.response.length; j++) {
+      if (typeof item.response[j] !== "string") { newResp.push(item.response[j]); continue; }
+      if (item.response[j].length > rem) {
+        newResp.push(item.response[j].slice(0, rem) + "\n...[truncated]");
+        break;
+      }
+      newResp.push(item.response[j]);
+      rem -= item.response[j].length;
+    }
+    item = { ...item, response: newResp };
+  }
+  return item;
+}
+
 function compressHistory(history, contextSize) {
   var maxTokens = contextSize || CONTEXT_SIZE;
-  var threshold = Math.floor(maxTokens * 0.7);
+  var MAX_MSG_LEN = 2500;
 
-  if (estimateTokens(history) <= threshold) return history;
+  // Always truncate oversized messages regardless of threshold.
+  history = history.map(function (m) { return truncateMsg(m, MAX_MSG_LEN); });
+
+  if (estimateTokens(history) <= Math.floor(maxTokens * 0.7)) return history;
 
   var systemMsg = history[0].type === "system" ? history[0] : null;
   var rest = systemMsg ? history.slice(1) : history;
 
-  var keepRecent = 8;
-  if (rest.length <= keepRecent + 4) return history;
-
+  var keepRecent = 4;
   var recent = rest.slice(-keepRecent);
   var toCompress = rest.slice(0, -keepRecent);
 
@@ -289,7 +313,26 @@ function compressHistory(history, contextSize) {
   return systemMsg ? [systemMsg, ...result] : result;
 }
 
-function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop) {
+async function createContextWithRetry(model, ctxSize, batchSize) {
+  var size = ctxSize;
+  var minBatch = batchSize || 512;
+  while (true) {
+    try {
+      var ctx = await model.createContext({ contextSize: size, batchSize: Math.min(minBatch, size) });
+      console.log("[llm-local] Context created: size=" + ctx.contextSize);
+      return ctx;
+    } catch (e) {
+      if ((e.name === "InsufficientMemoryError" || (e.message && /context size.*too large/i.test(e.message))) && size >= 1024) {
+        size = Math.floor(size / 2);
+        console.log("[llm-local] Insufficient memory, retrying with contextSize=" + size);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop, summarizeResult) {
   var state = { total: 0, lastSig: null, lastSigCount: 0, consecutiveFailures: 0 };
   var MAX_SOFT_NUDGE = 4;
   var MAX_TOOLS = 10;
@@ -335,6 +378,16 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop) {
           try {
             var result = await executeTool(name, params);
             var resultStr = String(result);
+
+            // Truncate oversized tool results to save context.
+            if (summarizeResult) {
+              var summarized = await summarizeResult(name, resultStr);
+              if (summarized !== resultStr) {
+                console.log("[llm-local] Summarized " + name + " result from " + resultStr.length + " to " + summarized.length + " chars");
+                resultStr = summarized;
+              }
+            }
+
             onToolEnd({ name: name, output: resultStr });
             state.consecutiveFailures = 0;
 
@@ -399,21 +452,17 @@ async function runLocalChatLoop({
     return;
   }
 
-  console.log("[llm-local] Creating context with contextSize=" + (config.contextSize || CONTEXT_SIZE));
+  var desiredSize = config.contextSize || CONTEXT_SIZE;
+  console.log("[llm-local] Creating context with contextSize=" + desiredSize);
   var context;
   try {
-    context = await model.createContext({
-      contextSize: config.contextSize || CONTEXT_SIZE,
-      batchSize: config.batchSize || 512,
-    });
-    console.log("[llm-local] createContext returned");
+    context = await createContextWithRetry(model, desiredSize, config.batchSize || 512);
   } catch (e) {
     console.error("[llm-local] createContext failed:", e);
-    throw e;
+    onChunk({ error: "Failed to create model context: " + (e.message || String(e)) });
+    return;
   }
-
   var contextSize = context.contextSize;
-  console.log("[llm-local] Context size:", contextSize);
 
   console.log("[llm-local] Creating session...");
   var session = new LlamaChatSession({
@@ -510,12 +559,21 @@ async function runLocalChatLoop({
       internalAbort.abort();
     };
 
+    var maxToolResult = 4000;
+    var summarizeFn = async function (toolName, text) {
+      if (text.length <= maxToolResult) return text;
+      var head = Math.floor(maxToolResult * 0.7);
+      var tail = Math.floor(maxToolResult * 0.2);
+      return text.slice(0, head) + "\n\n...[truncated " + (text.length - head - tail) + " chars]...\n\n" + text.slice(-tail);
+    };
+
     var { functions, state } = buildFunctions(
       tools,
       executeTool,
       onToolStart,
       onToolEnd,
       hardStop,
+      summarizeFn,
     );
     console.log("[llm-local] Tools count:", Object.keys(functions).length);
 
@@ -759,10 +817,11 @@ async function runLocalChatLoop({
         } else {
           console.log("[llm-local] Aborted by user");
         }
-      } else if (e.message && e.message.includes("context shift strategy")) {
+      } else if (e.message && /context shift|Failed to compress|too long prompt|context size/i.test(e.message)) {
         console.log("[llm-local] Context size exceeded, compressing and retrying");
         try {
-          if (context) { try { context.dispose(); } catch (_) {} }
+          session = null;
+          if (context) { try { await context.dispose(); } catch (_) {} context = null; }
 
           var compressed = compressMessagesAggressive(messages, currentPrompt);
           console.log("[llm-local] Compressed messages from " + messages.length + " to " + compressed.length);
@@ -798,10 +857,7 @@ async function runLocalChatLoop({
             chatHistory.push(history[hi]);
           }
 
-          context = await model.createContext({
-            contextSize: config.contextSize || CONTEXT_SIZE,
-            batchSize: config.batchSize || 512,
-          });
+          context = await createContextWithRetry(model, config.contextSize || CONTEXT_SIZE, config.batchSize || 512);
           contextSize = context.contextSize;
 
           session = new LlamaChatSession({
@@ -826,15 +882,74 @@ async function runLocalChatLoop({
           }
         } catch (e2) {
           console.log("[llm-local] Retry also failed:", e2.message);
-          onChunk({
-            error: "Message too large even after compression. Try removing file attachments or reducing context size in settings.",
-          });
+          // Last-ditch: nuke everything except the last user turn and a trimmed system prompt.
+          try {
+            var lastUserIdx = -1;
+            for (var i = history.length - 1; i >= 0; i--) {
+              if (history[i].type === "user") { lastUserIdx = i; break; }
+            }
+            if (lastUserIdx >= 0) {
+              history = history.slice(lastUserIdx);
+              currentPrompt = "";
+              if (history.length > 0 && history[history.length - 1].type === "user") {
+                currentPrompt = history[history.length - 1].text;
+                history.pop();
+              }
+              session = null;
+              if (context) { try { await context.dispose(); } catch (_) {} context = null; }
+              context = await createContextWithRetry(model, Math.min(config.contextSize || CONTEXT_SIZE, 8192), 128);
+              contextSize = context.contextSize;
+              session = new LlamaChatSession({
+                contextSequence: context.getSequence(),
+                systemPrompt: "You are Canhelpy, a Linux desktop AI assistant. Be concise.",
+              });
+              var chatHistory = [{ type: "system", text: "You are Canhelpy, a Linux desktop AI assistant. Be concise." }];
+              for (var hi = 0; hi < history.length; hi++) {
+                chatHistory.push(history[hi]);
+              }
+              session.setChatHistory(chatHistory);
+              opts.maxTokens = 256;
+              var result = await session.promptWithMeta(currentPrompt, opts);
+              clearTimeout(idleTimer);
+              if ((state.total > 0 || idleFired) && (!result.responseText || result.responseText.trim().length === 0)) {
+                await forceContinue();
+              }
+            } else {
+              throw e2;
+            }
+          } catch (e3) {
+            console.log("[llm-local] Last-ditch retry also failed:", e3.message);
+            onChunk({
+              error: "Message too large even after compression. Try removing file attachments or reducing context size in settings.",
+            });
+          }
         }
       } else {
         onChunk({ error: e.message });
       }
   }
 
+  // Clean up timers that might still be running.
+  clearTimeout(idleTimer);
+  if (generatingInterval) { clearInterval(generatingInterval); generatingInterval = null; }
+  // context.dispose() is async and frees the native context including its
+  // sequences. The session / chat are pure JS wrappers that reference the
+  // context; disposing the context natively invalidates everything. We
+  // await it so the GPU backend can complete its sync before we return.
+  if (context) {
+    var memBefore = process.memoryUsage();
+    console.log("[llm-local] cleanup: rss=" + Math.round(memBefore.rss / 1024 / 1024) + "MB, waiting for GPU flush...");
+    // promptWithMeta returns before the GPU command queue has fully drained.
+    // Dispose too early and llama_free() tears down buffers the GPU is still
+    // touching → segfault. A yield here costs nothing but avoids the race.
+    await new Promise(function (r) { setTimeout(r, 100); });
+    console.log("[llm-local] cleanup: await context.dispose...");
+    try { await context.dispose(); } catch (_) {}
+    context = null;
+    session = null;
+    var memAfter = process.memoryUsage();
+    console.log("[llm-local] cleanup: disposed, rss=" + Math.round(memAfter.rss / 1024 / 1024) + "MB (freed " + Math.round((memBefore.rss - memAfter.rss) / 1024 / 1024) + "MB)");
+  }
   console.log("[llm-local] Returning");
 }
 
