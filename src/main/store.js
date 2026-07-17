@@ -2,9 +2,11 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const chatStore = require("./chat-store");
 
 const CONFIG_DIR = path.join(os.homedir(), ".config", "icanhelp");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.enc");
+const MIGRATED_FLAG = path.join(CONFIG_DIR, ".chats-migrated");
 
 function machineKey() {
   try {
@@ -86,20 +88,42 @@ function loadWindowPosition() {
   return null;
 }
 
-function loadChats() {
+function ensureMigration() {
+  if (fs.existsSync(MIGRATED_FLAG)) return;
   var cfg = loadConfig();
-  return (cfg && cfg.chats) || [];
+  if (cfg && Array.isArray(cfg.chats) && cfg.chats.length > 0) {
+    var count = chatStore.migrateFromConfig(cfg.chats);
+    if (count > 0) {
+      delete cfg.chats;
+      saveConfig(cfg);
+    }
+  }
+  try { fs.writeFileSync(MIGRATED_FLAG, "1", { mode: 0o600 }); } catch (_) {}
+}
+
+function loadChats() {
+  ensureMigration();
+  return chatStore.loadAllChats();
 }
 
 function saveChats(chats) {
-  var cfg = loadConfig();
-  console.log(
-    "[store] saveChats, cfg:",
-    cfg ? "loaded (keys: " + Object.keys(cfg).join(",") + ")" : "NULL",
-  );
-  if (!cfg) cfg = {};
-  cfg.chats = chats;
-  saveConfig(cfg);
+  ensureMigration();
+  if (!Array.isArray(chats)) return;
+  for (var i = 0; i < chats.length; i++) {
+    if (chats[i] && chats[i].id) {
+      chatStore.saveChat(chats[i]);
+    }
+  }
+}
+
+function saveChat(chat) {
+  ensureMigration();
+  return chatStore.saveChat(chat);
+}
+
+function deleteChat(chatId) {
+  ensureMigration();
+  return chatStore.deleteChat(chatId);
 }
 
 var DEFAULT_THEMES = {
@@ -230,6 +254,8 @@ module.exports = {
   loadWindowPosition,
   loadChats,
   saveChats,
+  saveChat,
+  deleteChat,
   loadThemes,
   saveTheme,
   deleteTheme,

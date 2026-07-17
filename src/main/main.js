@@ -33,6 +33,8 @@ const {
   loadWindowPosition,
   loadChats,
   saveChats,
+  saveChat,
+  deleteChat,
   loadThemes,
   saveTheme,
   deleteTheme,
@@ -404,9 +406,15 @@ ipcMain.handle("get-config", () => {
     return loadChats();
   });
   ipcMain.handle("save-chats", function (_, chats) {
-    console.log("[main] save-chats IPC, count:", chats ? chats.length : 0);
     saveChats(chats);
-    console.log("[main] save-chats done");
+    return true;
+  });
+  ipcMain.handle("save-chat", function (_, chat) {
+    saveChat(chat);
+    return true;
+  });
+  ipcMain.handle("delete-chat", function (_, chatId) {
+    deleteChat(chatId);
     return true;
   });
 

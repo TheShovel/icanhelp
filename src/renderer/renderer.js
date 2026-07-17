@@ -378,29 +378,16 @@ function getCurrentChat() {
   });
 }
 
-function saveChatsToStore() {
-  var toSave = chats.map(function (c) {
-    return {
-      id: c.id,
-      name: c.name || null,
-      messages: c.messages,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt || Date.now(),
-    };
-  });
-  window.electronAPI.saveChats(toSave);
+async function saveCurrentChat() {
+  var chat = getCurrentChat();
+  if (chat) {
+    await window.electronAPI.saveChat(chat);
+  }
 }
 
-var debouncedSaveChats = (function () {
-  var timer = null;
-  return function () {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(function () {
-      timer = null;
-      saveChatsToStore();
-    }, 500);
-  };
-})();
+function saveChatsToStore() {
+  saveCurrentChat();
+}
 
 function renderChatList() {
   chatListBody.innerHTML = "";
@@ -435,6 +422,7 @@ function renderChatList() {
       chats = chats.filter(function (c) {
         return c.id !== chat.id;
       });
+      window.electronAPI.deleteChat(chat.id);
       if (wasActive) {
         currentChatId = chats[0].id;
         chatMessages.querySelectorAll(".message").forEach(function (el) {
@@ -449,7 +437,7 @@ function renderChatList() {
         });
       }
       renderChatList();
-      debouncedSaveChats();
+      saveCurrentChat();
     });
 
     item.appendChild(nameSpan);
@@ -470,7 +458,7 @@ function createNewChat() {
     updatedAt: Date.now(),
   };
   chats.push(chat);
-  debouncedSaveChats();
+  window.electronAPI.saveChat(chat);
   return chat.id;
 }
 
@@ -528,7 +516,7 @@ function ensureCurrentChat() {
   }
 }
 
-window.electronAPI.loadChats().then(function (loaded) {
+window.electronAPI.loadChats().then(async function (loaded) {
   chats = (loaded || []).map(function (c) {
     return { updatedAt: 0, messages: [], name: "Chat", ...c };
   });
@@ -544,7 +532,7 @@ window.electronAPI.loadChats().then(function (loaded) {
       renderEmptyState();
     } else {
       for (var m of msgs) {
-        addMessage(m);
+        await addMessage(m);
       }
     }
     requestAnimationFrame(function () {
@@ -1345,7 +1333,7 @@ async function sendMessage() {
     if (chat.messages.length === 0) autoNameChat(chat, userText);
     chat.messages.push(userMsg);
     chat.updatedAt = Date.now();
-    debouncedSaveChats();
+    saveCurrentChat();
   }
 
   var conversation = chat
@@ -1415,13 +1403,13 @@ async function sendMessage() {
       }
       var chat = getCurrentChat();
       if (chat) {
-        var errMsg = { role: "assistant", content: "Error: " + chunk.error };
+        var errMsg = { role: "assistant", content: "Error: " + chunk.error, durationMs: Date.now() - responseStartTime };
         if (buffer) errMsg.content = buffer + "\n\n[Error: " + chunk.error + "]";
         if (thinkingBuf) errMsg.thinking = thinkingBuf;
         if (toolCalls.length > 0) errMsg.tools = toolCalls;
         chat.messages.push(errMsg);
         chat.updatedAt = Date.now();
-        debouncedSaveChats();
+        saveCurrentChat();
       }
       return;
     }
@@ -1480,20 +1468,20 @@ async function sendMessage() {
       var savedFiles = toolFilePaths.slice();
       toolFilePaths = [];
       if (chat) {
-        var msgData = { role: "assistant", content: buffer };
+        var msgData = { role: "assistant", content: buffer, durationMs: Date.now() - responseStartTime };
         if (thinkingBuf) msgData.thinking = thinkingBuf;
         if (toolCalls.length > 0) msgData.tools = toolCalls;
         if (sourcesToRender.length > 0) msgData.sources = sourcesToRender;
         if (savedFiles.length > 0) msgData.files = savedFiles;
         chat.messages.push(msgData);
         chat.updatedAt = Date.now();
-        debouncedSaveChats();
+        saveCurrentChat();
       }
       if (sourcesToRender.length > 0) {
         renderCitations(bubble, sourcesToRender);
       }
 
-      renderResponseFooter(bubble);
+      renderResponseFooter(bubble, msgData ? msgData.durationMs : 0);
       return;
     }
 
@@ -2020,14 +2008,14 @@ function removeEmptyState() {
 }
 
 async function addMessage(text, role, attachment) {
-  // Support passing a full message object for structured assistant messages
+  var durationMs = null;
   if (typeof text === "object" && text !== null && text.role) {
     var msg = text;
+    durationMs = msg.durationMs;
     if (msg.role === "assistant" && (msg.tools || msg.thinking || msg.sources || msg.files)) {
       renderStructuredMessage(msg);
       return;
     }
-    // Fall through for user messages or simple assistant messages
     role = msg.role;
     attachment = msg.attachment;
     text = msg.content;
@@ -2054,10 +2042,16 @@ async function addMessage(text, role, attachment) {
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  await renderContent(bubble, text);
   div.appendChild(bubble);
   chatMessages.appendChild(div);
-  requestAnimationFrame(() => {
+
+  await renderContent(bubble, text);
+
+  if (role === "assistant") {
+    renderResponseFooter(bubble, durationMs != null ? durationMs : 0);
+  }
+
+  requestAnimationFrame(function () {
     smoothScroll(chatMessages);
   });
 }
@@ -2084,10 +2078,16 @@ function renderStructuredMessage(msg) {
     thinkingBlock.classList.add("hidden");
   }
 
-  // Render response text — strip thinking tags that may be embedded in content
+  // Render response text — strip thinking tags and duplicated thinking text
   var contentResp = msg.content || "";
   var parsed = parseBuffer(contentResp);
-  renderContent(responseContent, parsed.response);
+  var cleanResponse = parsed.response;
+
+  if (msg.thinking && cleanResponse.indexOf(msg.thinking) === 0) {
+    cleanResponse = cleanResponse.slice(msg.thinking.length).replace(/^\s+/, "");
+  }
+
+  renderContent(responseContent, cleanResponse);
 
   // Restore tool calls
   if (msg.tools && msg.tools.length > 0) {
@@ -2178,7 +2178,7 @@ function renderStructuredMessage(msg) {
     linkifyFilePaths(responseContent, msg.files);
   }
 
-  renderResponseFooter(bubble);
+  renderResponseFooter(bubble, msg.durationMs || 0);
   requestAnimationFrame(function () {
     smoothScroll(chatMessages);
   });
@@ -2234,7 +2234,8 @@ async function processMathInHtml(html) {
 
 async function renderContent(el, text) {
   try {
-    var html = await window.electronAPI.parseMarkdown(text);
+    var parsed = parseBuffer(text);
+    var html = await window.electronAPI.parseMarkdown(parsed.response);
     html = await processMathInHtml(html);
     el.innerHTML = html;
   } catch (e) {
@@ -2341,11 +2342,10 @@ function renderDocxPreview(bubble, result) {
   bubble.appendChild(card);
 }
 
-function renderResponseFooter(bubble) {
-  // Guard against duplicates
+function renderResponseFooter(bubble, durationMs) {
   if (bubble.querySelector(".response-footer")) return;
 
-  var elapsed = Date.now() - responseStartTime;
+  var elapsed = durationMs || (Date.now() - responseStartTime);
   var seconds = (elapsed / 1000).toFixed(1);
 
   var footer = document.createElement("div");

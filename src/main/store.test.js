@@ -151,7 +151,11 @@ test("store - saveChats preserves other config keys", async (t) => {
     const cfg = store.loadConfig();
     assert.strictEqual(cfg.windowX, 50);
     assert.strictEqual(cfg.windowY, 60);
-    assert.deepStrictEqual(cfg.chats, [{ id: "a", name: "Test", messages: [] }]);
+
+    const chats = store.loadChats();
+    assert.strictEqual(chats.length, 1);
+    assert.strictEqual(chats[0].id, "a");
+    assert.strictEqual(chats[0].name, "Test");
   } finally {
     cleanupTestEnv();
   }
@@ -170,7 +174,11 @@ test("store - saveChats preserves theme settings", async (t) => {
     const cfg = store.loadConfig();
     assert.strictEqual(cfg.activeTheme, "dark");
     assert.ok(cfg.themes && cfg.themes.dark);
-    assert.deepStrictEqual(cfg.chats, [{ id: "x", name: "Chat", messages: [] }]);
+
+    const chats = store.loadChats();
+    assert.strictEqual(chats.length, 1);
+    assert.strictEqual(chats[0].id, "x");
+    assert.strictEqual(chats[0].name, "Chat");
   } finally {
     cleanupTestEnv();
   }
@@ -362,6 +370,11 @@ test("store - multiple chat threads save and load", async (t) => {
     }
     store.saveChats(chats);
     const loaded = store.loadChats();
+    loaded.sort(function (a, b) {
+      var na = parseInt(a.id.split("-")[1]);
+      var nb = parseInt(b.id.split("-")[1]);
+      return na - nb;
+    });
     assert.strictEqual(loaded.length, 20);
     assert.strictEqual(loaded[19].name, "Conversation 19");
     assert.strictEqual(loaded[19].messages.length, 29);

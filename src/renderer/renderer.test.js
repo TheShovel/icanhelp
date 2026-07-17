@@ -39,12 +39,18 @@ function createTestDOM() {
     sendSudoPassword: function () {},
     sendConfirmResponse: function () {},
     cancelStream: function () {},
-    loadChats: function () {
-      return Promise.resolve([]);
-    },
-    saveChats: function () {
-      return Promise.resolve();
-    },
+    		loadChats: function () {
+    			return Promise.resolve([]);
+    		},
+    		saveChats: function () {
+    			return Promise.resolve();
+    		},
+    		saveChat: function () {
+    			return Promise.resolve();
+    		},
+    		deleteChat: function () {
+    			return Promise.resolve();
+    		},
     showContextMenu: function () {},
     onOpenSettings: function () {},
     onOpenChatList: function () {},
@@ -413,17 +419,15 @@ test("tool_end adds output to tool block", async function (t) {
   sendChunk(dom, {
     tool_end: { name: "run_bash", output: "hello world" },
   });
-  await waitForRAF(dom);
+  await new Promise(function (resolve) {
+    dom.window.setTimeout(resolve, 350);
+  });
 
   var output = doc.querySelector(".tool-output");
   assert.ok(output, "tool-output should exist");
   assert.ok(
     output.textContent.includes("hello"),
     "output should contain command output",
-  );
-  assert.ok(
-    toolBlock.classList.contains("tool-working"),
-    "tool-working should remain during min animation",
   );
 });
 

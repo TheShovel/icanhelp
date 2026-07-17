@@ -24,8 +24,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   sendSudoPassword: (password) => ipcRenderer.send("sudo-response", password),
   sendConfirmResponse: (ok) => ipcRenderer.send("confirm-response", ok),
   cancelStream: () => ipcRenderer.send("cancel-stream"),
-  loadChats: () => ipcRenderer.invoke("load-chats"),
-  saveChats: (chats) => ipcRenderer.invoke("save-chats", chats),
+  	loadChats: () => ipcRenderer.invoke("load-chats"),
+  	saveChats: (chats) => ipcRenderer.invoke("save-chats", chats),
+  	saveChat: (chat) => ipcRenderer.invoke("save-chat", chat),
+  	deleteChat: (chatId) => ipcRenderer.invoke("delete-chat", chatId),
   showContextMenu: () => ipcRenderer.send("show-context-menu"),
   onOpenSettings: (callback) => {
     ipcRenderer.on("open-settings", () => callback());
