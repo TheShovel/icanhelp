@@ -2485,8 +2485,8 @@ window.electronAPI.onVisionProgress(function (info) {
   }
 
   var status = info.status;
-  if (status === "error") {
-    visionProgressLabel.textContent = "Vision model failed to load";
+  if (status === "error" || (typeof status === "string" && status.indexOf("failed") !== -1)) {
+    visionProgressLabel.textContent = (typeof status === "string" && status !== "error") ? status : "Vision model failed to load";
   } else if (
     (pct != null && pct >= 100) ||
     status === "done" ||

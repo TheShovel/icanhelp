@@ -209,8 +209,9 @@ function handleWorkerMessage(message) {
   }
 
   if (message.type === "load-error") {
-    log("Pipeline FAILED: " + (message.error || "unknown error"));
-    emitAggregateProgress("error", 0);
+    var errMsg = message.error || "unknown error";
+    log("Pipeline FAILED: " + errMsg);
+    emitAggregateProgress("Vision model failed: " + errMsg.slice(0, 80), 0);
     resolveLoad(false);
     return;
   }
@@ -264,7 +265,9 @@ function loadPipeline() {
   try {
     worker.send({ type: "load" });
   } catch (e) {
-    log("Could not start vision worker load: " + (e.message || String(e)));
+    var msg = "Could not start vision worker: " + (e.message || String(e));
+    log(msg);
+    emitAggregateProgress("Vision model failed: " + msg.slice(0, 80), 0);
     resolveLoad(false);
   }
 
