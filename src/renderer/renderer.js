@@ -20,6 +20,8 @@ const confirmOverlay = document.getElementById("confirm-overlay");
 const confirmCommand = document.getElementById("confirm-command");
 const confirmYes = document.getElementById("confirm-yes");
 const confirmNo = document.getElementById("confirm-no");
+const captchaOverlay = document.getElementById("captcha-overlay");
+const captchaOk = document.getElementById("captcha-ok");
 const avatarInner = document.getElementById("avatar-inner");
 const attachMenu = document.getElementById("attach-menu");
 const attachBtn = document.getElementById("attach-btn");
@@ -281,6 +283,10 @@ confirmYes.addEventListener("click", function () {
 confirmNo.addEventListener("click", function () {
   confirmOverlay.classList.add("hidden");
   window.electronAPI.sendConfirmResponse(false);
+});
+
+captchaOk.addEventListener("click", function () {
+  captchaOverlay.classList.add("hidden");
 });
 
 let chatOpen = false;
@@ -1524,6 +1530,11 @@ async function sendMessage() {
       return;
     }
 
+    if (chunk.captcha_prompt) {
+      captchaOverlay.classList.remove("hidden");
+      return;
+    }
+
     if (chunk.tool_generating) {
       if (!msgEl) {
         hideTyping();
@@ -1745,7 +1756,21 @@ async function sendMessage() {
         docStreamBody.textContent = docStreamBuf.slice(-3000);
         docStreamBody.scrollTop = docStreamBody.scrollHeight;
       }
+      if (docStreamCard) {
+        var spinner = docStreamCard.querySelector(".doc-stream-spinner");
+        if (spinner) spinner.remove();
+        var dsLabel = docStreamCard.querySelector(".doc-stream-label");
+        if (dsLabel) dsLabel.textContent = " Writing document...";
+      }
       smoothScroll(chatMessages);
+      return;
+    }
+
+    if (chunk.doc_status) {
+      if (docStreamCard) {
+        var dsLabel2 = docStreamCard.querySelector(".doc-stream-label");
+        if (dsLabel2) dsLabel2.textContent = " " + chunk.doc_status;
+      }
       return;
     }
 
@@ -2365,6 +2390,7 @@ function renderDocStreamCard(bubble, info) {
   header.appendChild(spinner);
 
   var label = document.createElement("span");
+  label.className = "doc-stream-label";
   label.textContent = " Generating document: " + escapeHtml(info.filename || "document") + ".docx";
   header.appendChild(label);
 

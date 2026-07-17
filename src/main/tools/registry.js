@@ -6,23 +6,33 @@ const { extractWebpage } = require("./extract");
 const { createDocx } = require("./docx");
 
 
-async function searchWeb({ query, resultSize }) {
+async function searchWeb({ query, resultSize, sessionCookies }) {
   try {
     var limit = resultSize || 5;
-    var res = await fetch(
-      "https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(query),
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        },
-      },
-    );
+    var url = "https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(query);
+    var headers = {
+      "User-Agent":
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    };
+    if (sessionCookies) {
+      headers["Cookie"] = sessionCookies;
+    }
+    var res = await fetch(url, { headers: headers });
     var html = await res.text();
 
     // Detect CAPTCHA challenge page
-    if (html.includes("challenge") && /[Dd]uck/i.test(html)) {
-      return JSON.stringify([]);
+    var isCaptcha = false;
+    if (res.status === 429 || res.status === 403) {
+      isCaptcha = true;
+    } else if (html.includes("challenge") && /[Dd]uck/i.test(html)) {
+      isCaptcha = true;
+    } else if (html.includes("h-captcha") || html.includes("hcaptcha")) {
+      isCaptcha = true;
+    } else if (/verify\s+(you\s+are|you're)\s+human/i.test(html)) {
+      isCaptcha = true;
+    }
+    if (isCaptcha) {
+      return JSON.stringify({ captcha: true, captchaUrl: url });
     }
 
     // Extract result links

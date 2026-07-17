@@ -1799,6 +1799,70 @@ body {
     background: var(--bg-code);
 }
 
+/* ---- Captcha Overlay ---- */
+#captcha-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+
+#captcha-overlay.hidden {
+    display: none;
+}
+
+#captcha-dialog {
+    background: var(--bg-header);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    width: 340px;
+    overflow: hidden;
+}
+
+#captcha-header {
+    padding: 12px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--fg);
+    border-bottom: 1px solid var(--border);
+}
+
+#captcha-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#captcha-message {
+    font-size: 12px;
+    color: var(--fg);
+    margin: 0;
+}
+
+#captcha-desc {
+    font-size: 12px;
+    color: var(--fg-dim);
+    margin: 0;
+    line-height: 1.4;
+}
+
+#captcha-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+#captcha-actions .btn-primary {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    margin: 0;
+}
+
 /* ---- Chat List ---- */
 #chat-list-body {
     flex: 1;

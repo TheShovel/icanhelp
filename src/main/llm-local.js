@@ -75,6 +75,13 @@ var cachedLlama = null;
 var cachedModelPath = null;
 var cachedGpuLayers = null;
 
+// Context cache — reusing the context between turns avoids re-prefilling
+// the entire chat history, which is the main source of first-token latency.
+var cachedContext = null;
+var cachedSession = null;
+var cachedContextModelPath = null;
+var cachedContextSize = 0;
+
 async function getOrLoadModel(resolvedPath, config) {
   var gpuLayers = config && config.gpuLayers != null ? config.gpuLayers : "max";
   if (
@@ -133,7 +140,7 @@ function buildSystemPrompt() {
     "- Be concise. No preambles.",
     "- Call all tools first, then answer from results.",
     "- For math: use math(expression) instead of calculating.",
-    "- For documents: first research the topic (search_web, extract_webpage), then call create_docx(description, filename). The system will handle the actual writing.",
+    "- For documents: do 2-4 quick searches, then call create_docx(description, filename). Do NOT exhaust all tools on research — the document writer has its own session with all your findings. Always call create_docx by tool 6 at the latest.",
     "- After search_web: use extract_webpage(url) for full content.",
     "- Live system state: use run_bash().",
   ];
@@ -413,7 +420,7 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop, su
           var nudge = "";
 
           if (state.total >= MAX_SOFT_NUDGE && state.total < MAX_TOOLS) {
-            nudge = "[Note: you've used " + state.total + " tools. Consider answering soon with what you have.]\n\n";
+            nudge = "[Note: you've used " + state.total + " tools. If the user asked for a document, call create_docx NOW. Otherwise, consider answering soon with what you have.]\n\n";
           }
 
           var sig = name + "\x1f" + JSON.stringify(params || {});
@@ -511,43 +518,64 @@ async function runLocalChatLoop({
     return;
   }
 
+  // Reuse the cached context if the model and size match, so we don't
+  // re-prefill the entire chat history from scratch every turn.
+  var reusingContext = false;
+  if (
+    cachedContext &&
+    cachedSession &&
+    cachedContextModelPath === resolvedPath &&
+    cachedContextSize === (config.contextSize || defaultContextSize())
+  ) {
+    console.log("[llm-local] Reusing cached context (size=" + cachedContextSize + ")");
+    context = cachedContext;
+    session = cachedSession;
+    reusingContext = true;
+  }
+
   var { getLlama, LlamaChatSession } = await import("node-llama-cpp");
 
-  console.log("[llm-local] Loading model from:", resolvedPath);
   var model;
-  try {
-    var loaded = await getOrLoadModel(resolvedPath, config);
-    model = loaded.model;
-    console.log("[llm-local] Model loaded successfully");
-  } catch (e) {
-    console.error("[llm-local] Failed to load model:", e);
-    onChunk({ error: "Failed to load model: " + (e.message || String(e)) });
-    return;
-  }
-
-  var desiredSize = config.contextSize || defaultContextSize();
-  console.log("[llm-local] Creating context with contextSize=" + desiredSize + " (free RAM: " + Math.round(require("os").freemem() / 1024 / 1024) + " MB)");
-  var context;
-  try {
-    context = await createContextWithRetry(model, desiredSize, config.batchSize || defaultBatchSize());
-  } catch (e) {
-    console.error("[llm-local] createContext failed:", e);
-    var minRamHint = "";
+  if (!reusingContext) {
+    console.log("[llm-local] Loading model from:", resolvedPath);
     try {
-      var freeMb = Math.round(require("os").freemem() / 1024 / 1024);
-      minRamHint = " (free RAM: " + freeMb + " MB — try a smaller model or close other apps)";
-    } catch (_) {}
-    onChunk({ error: "Failed to create model context: " + (e.message || String(e)) + minRamHint });
-    return;
+      var loaded = await getOrLoadModel(resolvedPath, config);
+      model = loaded.model;
+      console.log("[llm-local] Model loaded successfully");
+    } catch (e) {
+      console.error("[llm-local] Failed to load model:", e);
+      onChunk({ error: "Failed to load model: " + (e.message || String(e)) });
+      return;
+    }
   }
-  var contextSize = context.contextSize;
 
-  console.log("[llm-local] Creating session...");
-  var session = new LlamaChatSession({
-    contextSequence: context.getSequence(),
-    systemPrompt: buildSystemPrompt(),
-  });
-  console.log("[llm-local] Session created, wrapper:", session.chatWrapper?.wrapperName);
+  if (!reusingContext) {
+    var desiredSize = config.contextSize || defaultContextSize();
+    console.log("[llm-local] Creating context with contextSize=" + desiredSize + " (free RAM: " + Math.round(require("os").freemem() / 1024 / 1024) + " MB)");
+    try {
+      context = await createContextWithRetry(model, desiredSize, config.batchSize || defaultBatchSize());
+    } catch (e) {
+      console.error("[llm-local] createContext failed:", e);
+      var minRamHint = "";
+      try {
+        var freeMb = Math.round(require("os").freemem() / 1024 / 1024);
+        minRamHint = " (free RAM: " + freeMb + " MB — try a smaller model or close other apps)";
+      } catch (_) {}
+      onChunk({ error: "Failed to create model context: " + (e.message || String(e)) + minRamHint });
+      return;
+    }
+    var contextSize = context.contextSize;
+
+    console.log("[llm-local] Creating session...");
+    session = new LlamaChatSession({
+      contextSequence: context.getSequence(),
+      systemPrompt: buildSystemPrompt(),
+    });
+    console.log("[llm-local] Session created, wrapper:", session.chatWrapper?.wrapperName);
+  }
+
+  var contextSize = context.contextSize;
+  var desiredSize = contextSize; // for logging below
 
   console.log(
     "[llm-local] System prompt (" + buildSystemPrompt().length + " chars):",
@@ -565,64 +593,71 @@ async function runLocalChatLoop({
   }
 
   var history = [];
-  for (var i = 0; i < messages.length; i++) {
-    var msg = messages[i];
-    if (msg.role === "system") continue;
-    if (msg.role === "user") {
-      history.push({ type: "user", text: msg.content });
-    } else if (msg.role === "assistant") {
-      if (msg.content) {
-        history.push({ type: "model", response: [msg.content] });
-      }
-    } else if (msg.role === "tool") {
-      history.push({ type: "user", text: "Function result: " + msg.content });
-    }
-  }
-
-  history = compressHistory(history, contextSize);
-
   var currentPrompt = "";
-  if (history.length > 0) {
-    var last = history[history.length - 1];
-    if (last.type === "user") {
-      currentPrompt = last.text;
-      history.pop();
+
+  if (reusingContext) {
+    // Context is reused — the session already has the full history.
+    // We only need the new user message as the current prompt.
+    for (var i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        currentPrompt = messages[i].content;
+        break;
+      }
     }
-  }
-  if (!currentPrompt) {
-    console.log(
-      "[llm-local] WARNING: currentPrompt empty, history last type: " +
-        (history.length ? history[history.length - 1].type : "none"),
-    );
-  }
+    console.log("[llm-local] Reusing context, current prompt:", currentPrompt.slice(0, 80));
+  } else {
+    for (var i = 0; i < messages.length; i++) {
+      var msg = messages[i];
+      if (msg.role === "system") continue;
+      if (msg.role === "user") {
+        history.push({ type: "user", text: msg.content });
+      } else if (msg.role === "assistant") {
+        if (msg.content) {
+          history.push({ type: "model", response: [msg.content] });
+        }
+      } else if (msg.role === "tool") {
+        history.push({ type: "user", text: "Function result: " + msg.content });
+      }
+    }
 
-  // Feed the conversation as structured chat history so the chat wrapper
-  // formats each turn correctly. The current prompt is sent separately to
-  // promptWithMeta, which appends it as a new user turn.
-  var chatHistory = [{ type: "system", text: buildSystemPrompt() }];
-  for (var hi = 0; hi < history.length; hi++) {
-    chatHistory.push(history[hi]);
-  }
-  session.setChatHistory(chatHistory);
+    history = compressHistory(history, contextSize);
 
-  console.log("[llm-local] History items:", history.length);
-  for (var hi = 0; hi < history.length; hi++) {
-    var hitem = history[hi];
-    if (hitem.type === "user") {
-      console.log(
-        "[llm-local]   history[" + hi + "] user: " + hitem.text.slice(0, 80),
-      );
-    } else if (hitem.type === "model") {
-      console.log(
-        "[llm-local]   history[" +
-          hi +
-          "] model: " +
-          (hitem.response && hitem.response[0]
-            ? hitem.response[0].slice(0, 80)
-            : "(empty)"),
-      );
-    } else {
-      console.log("[llm-local]   history[" + hi + "] " + hitem.type);
+    if (history.length > 0) {
+      var last = history[history.length - 1];
+      if (last.type === "user") {
+        currentPrompt = last.text;
+        history.pop();
+      }
+    }
+
+    // Feed the conversation as structured chat history so the chat wrapper
+    // formats each turn correctly. The current prompt is sent separately to
+    // promptWithMeta, which appends it as a new user turn.
+    var chatHistory = [{ type: "system", text: buildSystemPrompt() }];
+    for (var hi = 0; hi < history.length; hi++) {
+      chatHistory.push(history[hi]);
+    }
+    session.setChatHistory(chatHistory);
+
+    console.log("[llm-local] History items:", history.length);
+    for (var hi = 0; hi < history.length; hi++) {
+      var hitem = history[hi];
+      if (hitem.type === "user") {
+        console.log(
+          "[llm-local]   history[" + hi + "] user: " + hitem.text.slice(0, 80),
+        );
+      } else if (hitem.type === "model") {
+        console.log(
+          "[llm-local]   history[" +
+            hi +
+            "] model: " +
+            (hitem.response && hitem.response[0]
+              ? hitem.response[0].slice(0, 80)
+              : "(empty)"),
+        );
+      } else {
+        console.log("[llm-local]   history[" + hi + "] " + hitem.type);
+      }
     }
   }
   console.log("[llm-local] Current prompt:", currentPrompt.slice(0, 100));
@@ -747,7 +782,9 @@ async function runLocalChatLoop({
 
     resetIdleTimer();
 
-    async function forceContinue() {
+    // Use var (function-scoped) so the catch block can call forceContinue.
+    // async function declarations are block-scoped in strict mode.
+    var forceContinue = async function () {
       forceContinueAttempts++;
       if (forceContinueAttempts > 2) {
         console.log("[llm-local] Too many force-continue attempts, giving up");
@@ -756,55 +793,68 @@ async function runLocalChatLoop({
       }
       idleFired = false;
       resetIdleTimer();
-      var contAbort = new AbortController();
-      if (signal) {
-        signal.addEventListener("abort", function () { contAbort.abort(); });
-      }
-      try {
-        var text = await session.prompt(
-          "You have all the information you need. Now answer the user's request directly in plain text. Do not output JSON, function calls, or code blocks unless the user asked for them. Just write a normal conversational response.",
-          {
-            maxTokens: Math.floor(contextSize * 0.25),
-            temperature: 0.7,
-            responsePrefix: "Based on what I found, ",
-            repeatPenalty: { penalty: 1.05 },
-            signal: contAbort.signal,
-            stopOnAbortSignal: true,
-            onTextChunk: function (chunk) {
-              resetIdleTimer();
-              if (repDetector.feed(chunk)) {
-                contAbort.abort();
-                throw new Error("REPETITION_DETECTED");
-              }
-              onChunk({ text: chunk });
-            },
-            onResponseChunk: function (chunk) {
-              if (chunk && chunk.type === "segment") {
+
+      // If the session is in a bad state (e.g. promptWithMeta was aborted
+      // mid-function-call), session.prompt() may throw. Retry once with a
+      // short delay to let the session settle.
+      for (var fcAttempt = 0; fcAttempt < 2; fcAttempt++) {
+        var contAbort = new AbortController();
+        if (signal) {
+          signal.addEventListener("abort", function () { contAbort.abort(); });
+        }
+        try {
+          var text = await session.prompt(
+            "You have all the information you need. Now answer the user's request directly in plain text. Do not output JSON, function calls, or code blocks unless the user asked for them. Just write a normal conversational response.",
+            {
+              maxTokens: Math.floor(contextSize * 0.25),
+              temperature: 0.7,
+              responsePrefix: "Based on what I found, ",
+              repeatPenalty: { penalty: 1.05 },
+              signal: contAbort.signal,
+              stopOnAbortSignal: true,
+              onTextChunk: function (chunk) {
                 resetIdleTimer();
-              }
-              if (
-                chunk &&
-                chunk.type === "segment" &&
-                chunk.segmentType === "thought"
-              ) {
-                if (repDetector.feed(chunk.text)) {
-                  console.log(
-                    "[llm-local] Repetition detected in force-continue thinking, aborting",
-                  );
+                if (repDetector.feed(chunk)) {
                   contAbort.abort();
                   throw new Error("REPETITION_DETECTED");
                 }
-                onChunk({ thinking: chunk.text });
-              }
-            },
+                onChunk({ text: chunk });
+              },
+              onResponseChunk: function (chunk) {
+                if (chunk && chunk.type === "segment") {
+                  resetIdleTimer();
+                }
+                if (
+                  chunk &&
+                  chunk.type === "segment" &&
+                  chunk.segmentType === "thought"
+                ) {
+                  if (repDetector.feed(chunk.text)) {
+                    console.log(
+                      "[llm-local] Repetition detected in force-continue thinking, aborting",
+                    );
+                    contAbort.abort();
+                    throw new Error("REPETITION_DETECTED");
+                  }
+                  onChunk({ thinking: chunk.text });
+                }
+              },
+            }
+          );
+          clearTimeout(idleTimer);
+          return text;
+        } catch (e) {
+          if (e.message === "REPETITION_DETECTED") throw e;
+          console.log("[llm-local] forceContinue prompt failed (attempt " + (fcAttempt + 1) + "): " + (e.message || e));
+          if (fcAttempt === 0) {
+            await new Promise(function (r) { setTimeout(r, 500); });
           }
-        );
-        clearTimeout(idleTimer);
-        return text;
-      } finally {
-        contAbort.abort();
+        } finally {
+          contAbort.abort();
+        }
       }
-    }
+      throw new Error("forceContinue failed after retry");
+    };
 
     var opts = {
       functions: functions,
@@ -905,6 +955,12 @@ async function runLocalChatLoop({
     }
   } catch (e) {
       clearTimeout(idleTimer);
+      // Invalidate the cached context on error — it might be in a bad state.
+      if (reusingContext) {
+        console.log("[llm-local] Error while reusing context, discarding cache");
+        disposeCachedContext();
+        reusingContext = false;
+      }
       if (e.message === "REPETITION_DETECTED") {
         console.log("[llm-local] Repetition loop detected, requesting retry");
         onChunk({ error: "Model got stuck in a loop. Please try again." });
@@ -913,13 +969,15 @@ async function runLocalChatLoop({
           console.log("[llm-local] Document generation triggered, stopping main loop cleanly");
         } else if (toolLimitReached) {
           console.log("[llm-local] Tool limit reached, forcing wrap-up continuation");
-          try { await forceContinue(); } catch (_) {
+          try { await forceContinue(); } catch (e2) {
+            console.error("[llm-local] forceContinue failed:", e2 && e2.message);
             onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
           }
         } else if (idleFired) {
           console.log("[llm-local] Idle timeout — forcing continuation");
           if (forceContinueAttempts < 2) {
-            try { await forceContinue(); } catch (_) {
+            try { await forceContinue(); } catch (e2) {
+              console.error("[llm-local] Idle forceContinue failed:", e2 && e2.message);
               onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
             }
           } else {
@@ -930,6 +988,7 @@ async function runLocalChatLoop({
         }
       } else if (e.message && /context shift|Failed to compress|too long prompt|context size/i.test(e.message)) {
         console.log("[llm-local] Context size exceeded, compressing and retrying");
+        disposeCachedContext();
         try {
           session = null;
           if (context) { try { await context.dispose(); } catch (_) {} context = null; }
@@ -1050,24 +1109,24 @@ async function runLocalChatLoop({
   // Clean up timers that might still be running.
   clearTimeout(idleTimer);
   if (generatingInterval) { clearInterval(generatingInterval); generatingInterval = null; }
-  // context.dispose() is async and frees the native context including its
-  // sequences. The session / chat are pure JS wrappers that reference the
-  // context; disposing the context natively invalidates everything. We
-  // await it so the GPU backend can complete its sync before we return.
-  if (context) {
-    var memBefore = process.memoryUsage();
-    console.log("[llm-local] cleanup: rss=" + Math.round(memBefore.rss / 1024 / 1024) + "MB, waiting for GPU flush...");
-    // promptWithMeta returns before the GPU command queue has fully drained.
-    // Dispose too early and llama_free() tears down buffers the GPU is still
-    // touching → segfault. A yield here costs nothing but avoids the race.
+
+  // Cache the context for reuse on the next turn instead of disposing it.
+  // This avoids re-prefilling the entire chat history every time the user
+  // sends a message — only the new message gets processed.
+  if (context && !reusingContext) {
+    // First creation: cache it.
     await new Promise(function (r) { setTimeout(r, 100); });
-    console.log("[llm-local] cleanup: await context.dispose...");
-    try { await context.dispose(); } catch (_) {}
-    context = null;
-    session = null;
-    var memAfter = process.memoryUsage();
-    console.log("[llm-local] cleanup: disposed, rss=" + Math.round(memAfter.rss / 1024 / 1024) + "MB (freed " + Math.round((memBefore.rss - memAfter.rss) / 1024 / 1024) + "MB)");
+    cachedContext = context;
+    cachedSession = session;
+    cachedContextModelPath = resolvedPath;
+    cachedContextSize = contextSize;
+    console.log("[llm-local] Context cached for reuse (size=" + contextSize + ")");
+  } else if (reusingContext) {
+    // Reused context: just flush the GPU queue, don't dispose.
+    await new Promise(function (r) { setTimeout(r, 100); });
+    console.log("[llm-local] Context kept alive for next turn");
   }
+
   console.log("[llm-local] Returning");
 }
 
@@ -1082,6 +1141,17 @@ function disposeModel() {
     cachedLlama = null;
     cachedModelPath = null;
     cachedGpuLayers = null;
+  }
+  disposeCachedContext();
+}
+
+function disposeCachedContext() {
+  if (cachedContext) {
+    try { cachedContext.dispose(); } catch (_) {}
+    cachedContext = null;
+    cachedSession = null;
+    cachedContextModelPath = null;
+    cachedContextSize = 0;
   }
 }
 
@@ -1149,7 +1219,20 @@ async function generateDocument({ description, researchContext, filename, onChun
     }
   }
 
-  var contextSize = (config && config.contextSize) || defaultContextSize();
+  var contextSize = Math.min((config && config.contextSize) || defaultContextSize(), 8192);
+
+  // Release the cached main context so the doc session doesn't compete with
+  // it for GPU/CPU resources. It'll be recreated on the next user message.
+  if (cachedContext) {
+    console.log("[llm-local] generateDocument: releasing cached main context");
+    try { await new Promise(function (r) { setTimeout(r, 100); }); } catch (_) {}
+    try { cachedContext.dispose(); } catch (_) {}
+    cachedContext = null;
+    cachedSession = null;
+    cachedContextModelPath = null;
+    cachedContextSize = 0;
+  }
+
   console.log("[llm-local] generateDocument: creating context, size=" + contextSize + " (free RAM: " + Math.round(require("os").freemem() / 1024 / 1024) + " MB)");
 
   var context;
@@ -1176,6 +1259,39 @@ async function generateDocument({ description, researchContext, filename, onChun
   var repDetector = RepetitionDetector();
   var internalAbort = new AbortController();
 
+  // Status cycling: when the model is thinking between chunks, show
+  // progress messages so the user knows it's still working.
+  var docStatusMessages = [
+    "Researching...",
+    "Outlining sections...",
+    "Writing content...",
+    "Adding details...",
+    "Structuring document...",
+    "Polishing...",
+  ];
+  var docStatusIndex = 0;
+  var docStatusTimer = null;
+
+  function startDocStatus() {
+    if (docStatusTimer) return;
+    docStatusIndex = 0;
+    if (onChunk) onChunk({ doc_status: docStatusMessages[0] });
+    docStatusTimer = setInterval(function () {
+      docStatusIndex = (docStatusIndex + 1) % docStatusMessages.length;
+      if (onChunk) onChunk({ doc_status: docStatusMessages[docStatusIndex] });
+    }, 4000);
+  }
+
+  function stopDocStatus() {
+    if (docStatusTimer) {
+      clearInterval(docStatusTimer);
+      docStatusTimer = null;
+    }
+  }
+
+  // Start the status indicator immediately — it'll stop when the first chunk arrives.
+  startDocStatus();
+
   if (signal) {
     signal.addEventListener("abort", function () {
       internalAbort.abort();
@@ -1184,6 +1300,13 @@ async function generateDocument({ description, researchContext, filename, onChun
 
   try {
     console.log("[llm-local] generateDocument: starting prompt");
+
+    // Timeout: if the model produces nothing for 5 minutes, abort.
+    var docTimeout = setTimeout(function () {
+      console.log("[llm-local] generateDocument: timeout, aborting");
+      internalAbort.abort();
+    }, 5 * 60 * 1000);
+
     var result = await session.prompt(
       "Write a comprehensive document about: " + description + "\n\nBegin writing now.",
       {
@@ -1201,6 +1324,7 @@ async function generateDocument({ description, researchContext, filename, onChun
         stopOnAbortSignal: true,
         onTextChunk: function (chunk) {
           if (!chunk) return;
+          stopDocStatus();
           if (repDetector.feed(chunk)) {
             console.log("[llm-local] generateDocument: repetition detected, stopping");
             internalAbort.abort();
@@ -1208,6 +1332,11 @@ async function generateDocument({ description, researchContext, filename, onChun
           }
           fullText += chunk;
           if (onChunk) onChunk({ text: chunk });
+          // Restart the status indicator after 5s of silence.
+          clearTimeout(docStatusTimer);
+          docStatusTimer = setTimeout(function () {
+            startDocStatus();
+          }, 5000);
         },
       }
     );
@@ -1216,9 +1345,11 @@ async function generateDocument({ description, researchContext, filename, onChun
       fullText = result;
     }
 
+    clearTimeout(docTimeout);
     console.log("[llm-local] generateDocument: complete, text length=" + fullText.length);
     return fullText;
   } catch (e) {
+    clearTimeout(docTimeout);
     if (e.name === "AbortError") {
       console.log("[llm-local] generateDocument: aborted");
     } else {
@@ -1227,6 +1358,8 @@ async function generateDocument({ description, researchContext, filename, onChun
     }
     return fullText;
   } finally {
+    stopDocStatus();
+    clearTimeout(docTimeout);
     // Yield to let the GPU command queue drain before tearing down buffers.
     // Without this delay, context.dispose() can race with in-flight GPU ops
     // and cause a native segfault that JS can't catch.
@@ -1248,5 +1381,6 @@ module.exports = {
   getOrLoadModel,
   preloadModel,
   disposeModel,
+  disposeCachedContext,
   generateDocument,
 };

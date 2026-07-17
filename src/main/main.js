@@ -14,7 +14,7 @@ const os = require("os");
 const { execFile } = require("child_process");
 const { marked } = require("marked");
 const katex = require("katex");
-const { runLocalChatLoop, generateDocument, preloadModel, disposeModel } = require("./llm-local");
+const { runLocalChatLoop, generateDocument, preloadModel, disposeModel, disposeCachedContext } = require("./llm-local");
 const {
   RECOMMENDED_MODELS,
   listDownloadedModels,
@@ -186,6 +186,7 @@ function createWindow() {
       currentAbort.abort();
       currentAbort = null;
     }
+    disposeCachedContext();
   });
 
   ipcMain.on("start-llm-stream", function (event, payload) {
@@ -237,7 +238,26 @@ function createWindow() {
     const { executeToolCall, resetToolBudget } = require("./tools/registry");
     resetToolBudget();
 
+    // Detect document requests and inject a mandatory instruction.
+    var lastUserMsg = "";
+    for (var mi = messages.length - 1; mi >= 0; mi--) {
+      if (messages[mi].role === "user") { lastUserMsg = messages[mi].content || ""; break; }
+    }
+    var isDocRequest = /\b(write|create|make|generate)\b.*\b(document|docx|report|essay|article|letter|guide|spec|proposal|paper|write.?up)\b/i.test(lastUserMsg)
+      || /\b(document|docx|report|essay|article|letter|guide|spec|proposal|paper)\b.*\b(write|create|make|generate|draft)\b/i.test(lastUserMsg)
+      || /\bcreate (a|the) doc/i.test(lastUserMsg);
+
+    if (isDocRequest) {
+      console.log("[main] Document request detected, injecting instruction");
+      messages = messages.slice();
+      messages.splice(messages.length - 1, 0, {
+        role: "user",
+        content: "[SYSTEM REMINDER: The user wants a document. You MUST call create_docx(description, filename) after 2-4 quick searches. Do not write the document yourself — call create_docx. Do this by tool 4 at the latest.]",
+      });
+    }
+
     var pendingDocSession = null;
+    var gatheredResearch = [];
     var retries = 0;
     var maxRetries = 2;
 
@@ -334,6 +354,77 @@ function createWindow() {
                 : null,
           });
 
+          // Handle DuckDuckGo CAPTCHA: open a window for the user to solve it, then retry.
+          if (name === "search_web") {
+            var parsedCaptcha;
+            try {
+              parsedCaptcha = JSON.parse(String(result));
+            } catch (_) {}
+            if (parsedCaptcha && parsedCaptcha.captcha) {
+              event.sender.send("llm-chunk", {
+                captcha_prompt: {
+                  url: parsedCaptcha.captchaUrl,
+                  query: args.query,
+                },
+              });
+
+              var captchaWin = new BrowserWindow({
+                width: 800,
+                height: 700,
+                parent: mainWindow,
+                modal: false,
+                title: "Solve captcha to search the web",
+                autoHideMenuBar: true,
+              });
+              captchaWin.loadURL(parsedCaptcha.captchaUrl);
+
+              await new Promise(function (resolve) {
+                captchaWin.on("closed", resolve);
+              });
+
+              // Collect session cookies so the retry request can use them.
+              var ddgCookies = await mainWindow.webContents.session.cookies.get({
+                url: "https://lite.duckduckgo.com",
+              });
+              var cookieStr = ddgCookies
+                .map(function (c) {
+                  return c.name + "=" + c.value;
+                })
+                .join("; ");
+              if (cookieStr) {
+                args.sessionCookies = cookieStr;
+              }
+
+              // Retry the search with cookies
+              tc.function.arguments = JSON.stringify(args);
+              result = await executeToolCall(tc, {
+                onSudoPrompt: onSudoPrompt,
+                onConfirm: onConfirm,
+                onOutput: null,
+              });
+            }
+          }
+
+          // Capture research results for document generation.
+          if (name === "search_web" || name === "extract_webpage") {
+            try {
+              var parsed = JSON.parse(String(result));
+              if (Array.isArray(parsed)) {
+                for (var ri = 0; ri < parsed.length; ri++) {
+                  if (parsed[ri].title && parsed[ri].snippet) {
+                    gatheredResearch.push(parsed[ri]);
+                  }
+                }
+              } else if (parsed && parsed.title && (parsed.text || parsed.snippet)) {
+                gatheredResearch.push({
+                  title: parsed.title,
+                  snippet: (parsed.text || parsed.snippet || "").slice(0, 2000),
+                  url: parsed.url || "",
+                });
+              }
+            } catch (_) {}
+          }
+
           // Detect document session request from create_docx.
           if (name === "create_docx") {
             try {
@@ -419,11 +510,23 @@ function createWindow() {
     }
 
     // After the main chat loop exits, check if a document session was requested.
+    // Also auto-trigger if the user asked for a document but the model never called
+    // create_docx (hit tool limit, timed out, etc).
+    if (!pendingDocSession && isDocRequest && gatheredResearch.length > 0) {
+      console.log("[main] Document was requested but never created — auto-triggering");
+      var filename = "document";
+      var description = lastUserMsg.slice(0, 200);
+      // Try to extract a reasonable filename from the user's request.
+      var fnMatch = lastUserMsg.match(/about\s+(.+?)(?:\s*\.|\s*$|\s+and|\s+with|\s+in|\s+for)/i);
+      if (fnMatch && fnMatch[1]) {
+        filename = fnMatch[1].replace(/[^a-zA-Z0-9 _-]/g, "").trim().slice(0, 40) || "document";
+      }
+      pendingDocSession = { description: description, filename: filename };
+    }
+
     if (pendingDocSession) {
       console.log("[main] Starting document generation session");
-
-      var researchContext = gatherResearchContext(messages);
-      console.log("[main] Research context gathered:", researchContext.length, "sources");
+      console.log("[main] Research gathered during this turn:", gatheredResearch.length, "sources");
 
       event.sender.send("llm-chunk", {
         doc_stream_start: {
@@ -439,13 +542,16 @@ function createWindow() {
       try {
         var markdown = await generateDocument({
           description: pendingDocSession.description,
-          researchContext: researchContext,
+          researchContext: gatheredResearch,
           filename: pendingDocSession.filename,
           config: cfg,
           signal: docSignal.signal,
           onChunk: function (chunk) {
             if (chunk.text) {
               event.sender.send("llm-chunk", { doc_stream_chunk: chunk.text });
+            }
+            if (chunk.doc_status) {
+              event.sender.send("llm-chunk", { doc_status: chunk.doc_status });
             }
             if (chunk.error) {
               event.sender.send("llm-chunk", { error: chunk.error });

@@ -13,14 +13,41 @@ function escapeXml(str) {
     .replace(/'/g, "&apos;");
 }
 
-const HEADING_STYLES = {
-  1: "Heading1",
-  2: "Heading2",
-  3: "Heading3",
-  4: "Heading4",
-  5: "Heading5",
-  6: "Heading6",
+function decodeHtmlEntities(str) {
+  return String(str)
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&#38;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&#60;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#62;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#160;/g, " ");
+}
+
+// Direct formatting for headings instead of relying on named styles
+// (the docx has no styles.xml, so Word ignores w:pStyle references).
+var HEADING_RPR = {
+  1: "<w:rPr><w:b/><w:bCs/><w:sz w:val=\"36\"/></w:rPr>",
+  2: "<w:rPr><w:b/><w:bCs/><w:sz w:val=\"28\"/></w:rPr>",
+  3: "<w:rPr><w:b/><w:bCs/><w:sz w:val=\"24\"/></w:rPr>",
+  4: "<w:rPr><w:b/><w:bCs/><w:sz w:val=\"22\"/></w:rPr>",
+  5: "<w:rPr><w:b/><w:sz w:val=\"20\"/></w:rPr>",
+  6: "<w:rPr><w:b/><w:sz w:val=\"20\"/></w:rPr>",
 };
+
+function renderHeading(token) {
+  var rpr = HEADING_RPR[token.depth] || HEADING_RPR[1];
+  // Render tokens as runs within a single paragraph, all with heading formatting.
+  var runs = renderInlineTokens(token.tokens, rpr);
+  var spacing = "<w:spacing w:before=\"200\" w:after=\"100\"/>";
+  return "<w:p><w:pPr>" + spacing + "</w:pPr>" + runs + "</w:p>";
+}
 
 function runOpen(rpr) {
   return "<w:r><w:rPr>" + rpr + "</w:rPr>";
@@ -35,7 +62,7 @@ function runClose() {
 }
 
 function renderInlineRun(text, rpr) {
-  return runOpen(rpr) + runText(text) + runClose();
+  return runOpen(rpr) + runText(decodeHtmlEntities(text)) + runClose();
 }
 
 var INLINE_STYLES = {
@@ -56,7 +83,7 @@ function renderInlineTokens(tokens, activeStyles) {
       if (t.tokens && t.tokens.length > 0) {
         parts.push(renderInlineTokens(t.tokens, activeStyles));
       } else if (activeStyles) {
-        parts.push(runOpen(activeStyles) + runText(t.text) + runClose());
+        parts.push(runOpen(activeStyles) + runText(decodeHtmlEntities(t.text)) + runClose());
       } else {
         parts.push(renderInlineRun(t.text, ""));
       }
@@ -86,7 +113,11 @@ function renderInlineTokens(tokens, activeStyles) {
 }
 
 function ppr(style) {
-  return style ? "<w:pPr><w:pStyle w:val=\"" + style + "\"/></w:pPr>" : "";
+  var spacing = "<w:spacing w:before=\"80\" w:after=\"80\"/>";
+  if (style) {
+    return "<w:pPr><w:pStyle w:val=\"" + style + "\"/>" + spacing + "</w:pPr>";
+  }
+  return "<w:pPr>" + spacing + "</w:pPr>";
 }
 
 function buildParagraph(content, style) {
@@ -137,10 +168,7 @@ function renderCodeBlock(text, lang) {
 function renderBlockToken(token, numberingState) {
   switch (token.type) {
     case "heading":
-      return buildParagraph(
-        renderInlineTokens(token.tokens),
-        HEADING_STYLES[token.depth] || "Heading1"
-      );
+      return renderHeading(token);
     case "paragraph":
       return buildParagraph(renderInlineTokens(token.tokens), "");
     case "list":
@@ -188,6 +216,16 @@ function renderTable(token) {
   var rows = token.rows || [];
 
   var allRows = header.length > 0 ? [header].concat(rows) : rows;
+  var tblBorders = "<w:tblBorders>" +
+    "<w:top w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>" +
+    "<w:left w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>" +
+    "<w:bottom w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>" +
+    "<w:right w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>" +
+    "<w:insideH w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>" +
+    "<w:insideV w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>" +
+    "</w:tblBorders>";
+
+  parts.push("<w:tbl><w:tblPr>" + tblBorders + "</w:tblPr>");
 
   for (var r = 0; r < allRows.length; r++) {
     var row = allRows[r];
@@ -206,6 +244,7 @@ function renderTable(token) {
       parts.push(buildParagraph("", ""));
     }
   }
+  parts.push("</w:tbl>");
   return parts.join("");
 }
 
@@ -225,7 +264,7 @@ function buildNumberingXml(numberingState) {
     '<w:lvl w:ilvl="0">' +
     '<w:start w:val="1"/>' +
     '<w:numFmt w:val="bullet"/>' +
-    '<w:lvlText w:val="\u2022"/>' +
+    '<w:lvlText w:val=""/>' +
     '<w:lvlJc w:val="left"/>' +
     '<w:pPr>' +
     '<w:ind w:left="720" w:hanging="360"/>' +
