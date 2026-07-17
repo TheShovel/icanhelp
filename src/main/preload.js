@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("model-download-progress", handler);
   },
   preloadModel: () => ipcRenderer.invoke("preload-model"),
+  preloadVision: () => ipcRenderer.invoke("preload-vision"),
   onModelPreloadProgress: (callback) => {
     const handler = (_event, info) => callback(info);
     ipcRenderer.on("model-preload-progress", handler);

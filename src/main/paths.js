@@ -20,5 +20,4 @@ module.exports = {
   visionLog: () => appPath("vision.log"),
   ocrLog: () => appPath("ocr.log"),
   tesseractCache: () => appPath("tesseract"),
-  visionModelDir: () => appPath("transformers", "ningpp--blip"),
 };

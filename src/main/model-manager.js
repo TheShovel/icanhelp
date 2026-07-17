@@ -146,6 +146,18 @@ const RECOMMENDED_MODELS = [
     filename: "LFM2-350M-Math-Q4_K_M.gguf",
     minRamGB: 4,
   },
+  {
+    id: "blip-vision",
+    name: "BLIP Image Captioning",
+    size: "~380 MB",
+    sizeBytes: 400000000,
+    quality: "Utility",
+    role: "vision",
+    description: "Vision model for describing images. Used by OCR and screenshot analysis.",
+    url: null,
+    filename: null,
+    minRamGB: 2,
+  },
 
 ];
 
@@ -173,8 +185,24 @@ function getExtraModels() {
   var usableRam = info.freeRamGB;
 
   return RECOMMENDED_MODELS.filter(function (m) {
-    return m.role === "math";
+    return m.role === "math" || m.role === "vision";
   }).map(function (m) {
+    var isDownloaded = false;
+    if (m.role === "vision") {
+      var visionDir = path.join(MODELS_DIR, "vision", "blip");
+      try {
+        var encPath = path.join(visionDir, "blip_vision_encoder.onnx");
+        var decPath = path.join(visionDir, "blip_text_decoder.onnx");
+        isDownloaded = fs.existsSync(encPath) && fs.existsSync(decPath)
+          && fs.statSync(encPath).size > 0 && fs.statSync(decPath).size > 0;
+      } catch (_) {}
+    } else if (m.filename) {
+      var fullPath = path.join(MODELS_DIR, m.filename);
+      try {
+        isDownloaded = fs.existsSync(fullPath) && fs.statSync(fullPath).size > 1000000;
+      } catch (_) {}
+    }
+
     return {
       id: m.id,
       name: m.name,
@@ -186,6 +214,7 @@ function getExtraModels() {
       compatible: m.minRamGB <= usableRam + 2,
       ramOk: m.minRamGB <= usableRam + 2,
       role: m.role,
+      downloaded: isDownloaded,
     };
   });
 }

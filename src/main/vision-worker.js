@@ -2,10 +2,10 @@ const ort = require("onnxruntime-node");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
-const { visionModelDir } = require("./paths");
+const { modelsDir } = require("./paths");
 
 const MODEL_ID = "ningpp/blip-image-captioning-base-ONNX";
-const CACHE_DIR = visionModelDir();
+const VISION_DIR = path.join(modelsDir(), "vision", "blip");
 const HF_BASE = "https://huggingface.co/" + MODEL_ID + "/resolve/main";
 
 const FILES = [
@@ -29,9 +29,11 @@ function send(msg) {
   if (process.send) process.send(msg);
 }
 
-async function downloadChunk(url, destPath, start, end, onChunkReceived) {
-  const res = await fetch(url, {
-    headers: { Range: `bytes=${start}-${end}` },
+// ── Robust parallel chunked download (same logic as model-manager) ──
+
+async function downloadChunk(url, destPath, start, end, onChunk) {
+  var res = await fetch(url, {
+    headers: { Range: "bytes=" + start + "-" + end },
     signal: AbortSignal.timeout(CHUNK_DOWNLOAD_TIMEOUT),
   });
 
@@ -39,101 +41,122 @@ async function downloadChunk(url, destPath, start, end, onChunkReceived) {
     throw new Error("Chunk download failed: HTTP " + res.status);
   }
 
-  const reader = res.body.getReader();
-  const fd = fs.openSync(destPath, "r+");
-  let offset = start;
+  var reader = res.body.getReader();
+  var fd = fs.openSync(destPath, "r+");
+  var offset = start;
 
   while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    fs.writeSync(fd, value, 0, value.length, offset);
-    offset += value.length;
-    if (onChunkReceived) onChunkReceived(value.length);
+    var chunk = await reader.read();
+    if (chunk.done) break;
+    fs.writeSync(fd, chunk.value, 0, chunk.value.length, offset);
+    offset += chunk.value.length;
+    if (onChunk) onChunk(chunk.value.length);
   }
 
   fs.closeSync(fd);
 }
 
 async function downloadFile(filename, progressCb) {
-  var dest = path.join(CACHE_DIR, filename);
+  var dest = path.join(VISION_DIR, filename);
   if (fs.existsSync(dest)) {
     var stat = fs.statSync(dest);
     if (stat.size > 0) return dest;
-    fs.unlinkSync(dest);
+    try { fs.unlinkSync(dest); } catch (_) {}
   }
 
-  fs.mkdirSync(CACHE_DIR, { recursive: true });
+  fs.mkdirSync(VISION_DIR, { recursive: true });
   var url = HF_BASE + "/" + filename;
-  send({ type: "log", message: "Downloading " + filename });
 
   var headRes = await fetch(url, { method: "HEAD" });
+  if (!headRes.ok) throw new Error("HEAD request failed: HTTP " + headRes.status);
   var total = parseInt(headRes.headers.get("content-length") || "0", 10);
 
-  if (total > 100 * 1024 * 1024) {
-      // Use parallel chunked download for files > 100MB
-      var destPath = dest + ".part";
-      var fd = fs.openSync(destPath, "w");
-      fs.ftruncateSync(fd, total);
-      fs.closeSync(fd);
-    
-    var numChunks = 4;
-    var chunkSize = Math.ceil(total / numChunks);
-    var downloads = [];
-    var totalReceived = 0;
+  if (total === 0) throw new Error("Could not determine file size for " + filename);
 
-    for (var i = 0; i < numChunks; i++) {
-      var start = i * chunkSize;
-      var end = Math.min(start + chunkSize - 1, total - 1);
-      if (start >= total) break;
+  var numChunks = 4;
+  var chunkSize = Math.ceil(total / numChunks);
+  var destPath = dest + ".part";
 
-      downloads.push(
-        downloadChunk(
-          url,
-          destPath,
-          start,
-          end,
-          function (received) {
-            totalReceived += received;
-            if (progressCb) {
-              progressCb({ file: filename, loaded: totalReceived, total: total });
-            }
-          },
-        ),
-      );
-    }
+  // Pre-allocate the file
+  var fd = fs.openSync(destPath, "w");
+  fs.ftruncateSync(fd, total);
+  fs.closeSync(fd);
 
-    await Promise.all(downloads);
-    fs.renameSync(destPath, dest);
-  } else {
-    // Regular sequential download for smaller files
-    var res = await fetch(url, { redirect: "follow" });
-    if (!res.ok)
-      throw new Error("Download failed: " + res.status + " " + filename);
+  var downloads = [];
+  var totalReceived = 0;
 
-    var reader = res.body.getReader();
-    var loaded = 0;
-    var fd = fs.openSync(dest, "w");
+  for (var i = 0; i < numChunks; i++) {
+    var start = i * chunkSize;
+    var end = Math.min(start + chunkSize - 1, total - 1);
+    if (start >= total) break;
 
-    while (true) {
-      var result = await reader.read();
-      if (result.done) break;
-      fs.writeSync(fd, Buffer.from(result.value));
-      loaded += result.value.length;
-      if (progressCb && total > 0) {
-        progressCb({ file: filename, loaded: loaded, total: total });
-      }
-    }
-
-    fs.closeSync(fd);
+    downloads.push(
+      downloadChunk(url, destPath, start, end, function (received) {
+        totalReceived += received;
+        if (progressCb) {
+          progressCb({
+            file: filename,
+            loaded: totalReceived,
+            total: total,
+          });
+        }
+      })
+    );
   }
 
-  send({ type: "log", message: "Downloaded " + filename + " (" + Math.round(total / 1024 / 1024) + " MB)" });
+  await Promise.all(downloads);
+
+  // Verify size
+  var partStat = fs.statSync(destPath);
+  if (partStat.size !== total) {
+    try { fs.unlinkSync(destPath); } catch (_) {}
+    throw new Error("Download incomplete: size mismatch for " + filename);
+  }
+
+  fs.renameSync(destPath, dest);
   return dest;
 }
 
 async function downloadAll() {
-  // Download all files in parallel for faster speed
-  var downloads = FILES.map(function (file) {
+  // Migrate from old location if files exist there
+  var oldDir = path.join(require("./paths").appPath("transformers", "ningpp--blip"));
+  try {
+    if (fs.existsSync(oldDir)) {
+      var oldEnc = path.join(oldDir, "blip_vision_encoder.onnx");
+      var oldDec = path.join(oldDir, "blip_text_decoder.onnx");
+      if (fs.existsSync(oldEnc) && fs.existsSync(oldDec)) {
+        var newEnc = path.join(VISION_DIR, "blip_vision_encoder.onnx");
+        var newDec = path.join(VISION_DIR, "blip_text_decoder.onnx");
+        if (!fs.existsSync(newEnc) || !fs.existsSync(newDec)) {
+          fs.mkdirSync(VISION_DIR, { recursive: true });
+          for (var fi = 0; fi < FILES.length; fi++) {
+            var f = FILES[fi];
+            var oldPath = path.join(oldDir, f);
+            var newPath = path.join(VISION_DIR, f);
+            if (fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
+              fs.copyFileSync(oldPath, newPath);
+              send({ type: "log", message: "Migrated " + f + " from old location" });
+            }
+          }
+        }
+      }
+    }
+  } catch (_) {}
+
+  // Download small config files first (sequential), then large ONNX files in parallel
+  for (var i = 0; i < FILES.length; i++) {
+    var file = FILES[i];
+    var isLarge = file.endsWith(".onnx");
+    if (!isLarge) {
+      await downloadFile(file, function (p) {
+        send({ type: "progress", progress: p });
+      });
+    }
+  }
+
+  // Download ONNX files in parallel
+  var onnxFiles = FILES.filter(function (f) { return f.endsWith(".onnx"); });
+  var downloads = onnxFiles.map(function (file) {
     return downloadFile(file, function (p) {
       send({ type: "progress", progress: p });
     });
@@ -141,9 +164,11 @@ async function downloadAll() {
   await Promise.all(downloads);
 }
 
+// ── Tokenizer ────────────────────────────────────────────────────
+
 function loadTokenizer() {
   var raw = JSON.parse(
-    fs.readFileSync(path.join(CACHE_DIR, "tokenizer.json"), "utf8"),
+    fs.readFileSync(path.join(VISION_DIR, "tokenizer.json"), "utf8"),
   );
   var vocab = raw.model.vocab;
   var idToToken = {};
@@ -161,6 +186,8 @@ function loadTokenizer() {
     padId: 0,
   };
 }
+
+// ── Image preprocessing ──────────────────────────────────────────
 
 async function preprocessImage(imagePath) {
   var result = await sharp(imagePath)
@@ -187,21 +214,21 @@ async function preprocessImage(imagePath) {
   return new ort.Tensor("float32", floatData, [1, 3, IMAGE_SIZE, IMAGE_SIZE]);
 }
 
+// ── Model loading ────────────────────────────────────────────────
+
 async function loadModels() {
   if (visionSession && textSession) return true;
 
-  var visionPath = path.join(CACHE_DIR, "blip_vision_encoder.onnx");
-  var textPath = path.join(CACHE_DIR, "blip_text_decoder.onnx");
+  var visionPath = path.join(VISION_DIR, "blip_vision_encoder.onnx");
+  var textPath = path.join(VISION_DIR, "blip_text_decoder.onnx");
   if (!fs.existsSync(visionPath) || !fs.existsSync(textPath)) return false;
 
   if (!visionSession) {
-    send({ type: "log", message: "Loading vision encoder ONNX" });
     visionSession = await ort.InferenceSession.create(visionPath, {
       executionProviders: ["cpu"],
     });
   }
   if (!textSession) {
-    send({ type: "log", message: "Loading text decoder ONNX" });
     textSession = await ort.InferenceSession.create(textPath, {
       executionProviders: ["cpu"],
     });
@@ -211,6 +238,8 @@ async function loadModels() {
   }
   return true;
 }
+
+// ── Inference ────────────────────────────────────────────────────
 
 function argmax(arr) {
   var best = -Infinity;
@@ -235,16 +264,12 @@ function isRepetitive(caption, generated) {
 
 async function describeImage(imagePath, retryCount) {
   retryCount = retryCount || 0;
-  if (retryCount >= MAX_RETRIES) {
-    send({ type: "log", message: "Max retries reached for image description" });
-    return null;
-  }
+  if (retryCount >= MAX_RETRIES) return null;
 
   if (!(await loadModels())) return null;
 
   var pixelValues = await preprocessImage(imagePath);
 
-  send({ type: "log", message: "Running vision encoder" });
   var vOut = await visionSession.run({ pixel_values: pixelValues });
   var encHidden = vOut.encoder_hidden_states;
 
@@ -268,7 +293,7 @@ async function describeImage(imagePath, retryCount) {
     var offset = (inputIds.length - 1) * vocabSize;
     var scores = logits.data.slice(offset, offset + vocabSize);
 
-    // Apply repetition penalty
+    // Repetition penalty
     var penalizedScores = new Float32Array(vocabSize);
     for (var i = 0; i < vocabSize; i++) {
       if (usedTokens.has(i)) {
@@ -279,7 +304,6 @@ async function describeImage(imagePath, retryCount) {
     }
 
     var nextToken = argmax(penalizedScores);
-
     if (nextToken === tokenizer.sepId) break;
     generated.push(nextToken);
     usedTokens.add(nextToken);
@@ -297,14 +321,14 @@ async function describeImage(imagePath, retryCount) {
   }
   caption = caption.trim();
 
-  // Check for repetition and retry if needed
   if (isRepetitive(caption, generated)) {
-    send({ type: "log", message: "Repetitive output detected, retrying (" + (retryCount + 1) + ")" });
     return describeImage(imagePath, retryCount + 1);
   }
 
   return caption || null;
 }
+
+// ── IPC message handling ─────────────────────────────────────────
 
 process.on("message", async function (message) {
   if (!message || typeof message !== "object") return;

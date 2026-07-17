@@ -630,6 +630,15 @@ ipcMain.handle("get-config", () => {
     }
   });
 
+  ipcMain.handle("preload-vision", async function () {
+    try {
+      var ok = await loadPipeline();
+      return { ok: ok };
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
   ipcMain.handle("reset-all-data", function () {
     const dirs = [
       path.join(os.homedir(), ".config", "icanhelp"),

@@ -903,13 +903,6 @@ async function renderAddonModels() {
 
   try {
     var models = await window.electronAPI.getExtraModels();
-    var downloaded = await window.electronAPI.listDownloadedModels();
-    var downloadedNames = {};
-    if (downloaded) {
-      for (var d of downloaded) {
-        downloadedNames[d.filename] = true;
-      }
-    }
 
     if (!models || models.length === 0) {
       list.innerHTML = '<p style="color: var(--fg-muted); font-size: 12px;">No addon models available.</p>';
@@ -917,7 +910,8 @@ async function renderAddonModels() {
     }
 
     models.forEach(function (m) {
-      var isDownloaded = downloadedNames[m.filename];
+      var isDownloaded = m.downloaded;
+      var isVision = m.role === "vision";
       var card = document.createElement("div");
       card.className = "addon-model-card";
       if (!m.compatible) card.classList.add("disabled");
@@ -931,7 +925,7 @@ async function renderAddonModels() {
       top.appendChild(nameEl);
       var roleEl = document.createElement("span");
       roleEl.className = "addon-model-role";
-      roleEl.textContent = (m.role || "addon") + (isDownloaded ? " · downloaded" : "");
+      roleEl.textContent = (isVision ? "vision" : m.role || "addon") + (isDownloaded ? " · ready" : "");
       top.appendChild(roleEl);
       card.appendChild(top);
 
@@ -948,7 +942,7 @@ async function renderAddonModels() {
       var note = document.createElement("div");
       note.className = "addon-model-note";
       if (isDownloaded) {
-        note.textContent = "Already downloaded";
+        note.textContent = "Ready to use";
       } else {
         note.textContent = m.compatible ? "Click to download" : "Needs ~" + m.minRamGB + " GB RAM";
       }
@@ -961,10 +955,22 @@ async function renderAddonModels() {
           clicked = true;
           card.classList.add("downloading");
           note.textContent = "Downloading...";
-          startModelDownload(m.id, m.name, "addons").finally(function () {
-            note.textContent = "Done";
-            card.classList.remove("downloading");
-          });
+
+          if (isVision) {
+            window.electronAPI.preloadVision().then(function () {
+              note.textContent = "Ready to use";
+              card.classList.remove("downloading");
+              card.classList.add("downloaded");
+            }).catch(function () {
+              note.textContent = "Download failed";
+              card.classList.remove("downloading");
+            });
+          } else {
+            startModelDownload(m.id, m.name, "addons").finally(function () {
+              note.textContent = "Done";
+              card.classList.remove("downloading");
+            });
+          }
         });
       }
 

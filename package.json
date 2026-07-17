@@ -57,6 +57,7 @@
     "marked": "^12.0.2",
     "node-llama-cpp": "^3.19.0",
     "onnxruntime-node": "^1.14.0",
+    "sharp": "^0.33.0",
     "tesseract.js": "^5.1.1"
   },
   "allowScripts": {
