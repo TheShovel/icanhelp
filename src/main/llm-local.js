@@ -316,20 +316,45 @@ function compressHistory(history, contextSize) {
 async function createContextWithRetry(model, ctxSize, batchSize) {
   var size = ctxSize;
   var minBatch = batchSize || 512;
-  while (true) {
+  var lastError = null;
+  var minSize = 256;
+
+  while (size >= minSize) {
     try {
-      var ctx = await model.createContext({ contextSize: size, batchSize: Math.min(minBatch, size) });
+      var ctx = await model.createContext({
+        contextSize: size,
+        batchSize: Math.min(minBatch, size),
+        flashAttention: true,
+      });
       console.log("[llm-local] Context created: size=" + ctx.contextSize);
       return ctx;
     } catch (e) {
-      if ((e.name === "InsufficientMemoryError" || (e.message && /context size.*too large/i.test(e.message))) && size >= 1024) {
-        size = Math.floor(size / 2);
-        console.log("[llm-local] Insufficient memory, retrying with contextSize=" + size);
+      lastError = e;
+      var prevSize = size;
+      size = Math.floor(size / 2);
+
+      // If the error is clearly about memory, keep halving aggressively.
+      var isMemoryError =
+        e.name === "InsufficientMemoryError" ||
+        (e.message && /memory|context size|too large|insufficient/i.test(e.message));
+
+      if (isMemoryError) {
+        console.log("[llm-local] Insufficient memory (size=" + prevSize + "), retrying with contextSize=" + size);
         continue;
       }
-      throw e;
+
+      // For any other error, still try smaller sizes in case it helps.
+      console.log("[llm-local] Context creation failed (size=" + prevSize + "): " + (e.message || String(e)) + " — retrying with contextSize=" + size);
     }
   }
+
+  // If we get here, even the minimum size failed.
+  var freeMb = "";
+  try { freeMb = " (free RAM: " + Math.round(require("os").freemem() / 1024 / 1024) + " MB)"; } catch (_) {}
+  throw new Error(
+    "Not enough memory to run the model. Even the smallest context size (" + minSize + " tokens) failed." +
+    freeMb + ". Try a smaller model or close other applications."
+  );
 }
 
 function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop, summarizeResult) {
@@ -473,7 +498,12 @@ async function runLocalChatLoop({
     context = await createContextWithRetry(model, desiredSize, config.batchSize || 512);
   } catch (e) {
     console.error("[llm-local] createContext failed:", e);
-    onChunk({ error: "Failed to create model context: " + (e.message || String(e)) });
+    var minRamHint = "";
+    try {
+      var freeMb = Math.round(require("os").freemem() / 1024 / 1024);
+      minRamHint = " (free RAM: " + freeMb + " MB — try a smaller model or close other apps)";
+    } catch (_) {}
+    onChunk({ error: "Failed to create model context: " + (e.message || String(e)) + minRamHint });
     return;
   }
   var contextSize = context.contextSize;
@@ -1058,7 +1088,9 @@ async function generateDocument({ description, researchContext, filename, onChun
     context = await createContextWithRetry(cachedModel, contextSize, (config && config.batchSize) || 512);
   } catch (e) {
     console.error("[llm-local] generateDocument: context creation failed:", e.message);
-    onChunk({ error: "Failed to create document context: " + (e.message || String(e)) });
+    var freeMb = "";
+    try { freeMb = " (free RAM: " + Math.round(require("os").freemem() / 1024 / 1024) + " MB)"; } catch (_) {}
+    onChunk({ error: "Failed to create document context: " + (e.message || String(e)) + freeMb });
     return "";
   }
 
