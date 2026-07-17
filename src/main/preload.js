@@ -84,4 +84,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   renderMath: (tex, displayMode) => ipcRenderer.invoke("render-math", tex, displayMode),
   resetAllData: () => ipcRenderer.invoke("reset-all-data"),
   openFolder: (key) => ipcRenderer.invoke("open-folder", key),
+  importBuddySkin: () => ipcRenderer.invoke("import-buddy-skin"),
+  resetBuddySkin: () => ipcRenderer.invoke("reset-buddy-skin"),
+  getActiveBuddySkin: () => ipcRenderer.invoke("get-active-buddy-skin"),
 });

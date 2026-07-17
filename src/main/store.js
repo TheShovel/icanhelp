@@ -247,6 +247,17 @@ function saveActiveTheme(name) {
   saveConfig(cfg);
 }
 
+function getActiveBuddySkin() {
+  var cfg = loadConfig();
+  return (cfg && cfg.activeBuddySkin) || null;
+}
+
+function setActiveBuddySkin(name) {
+  var cfg = loadConfig() || {};
+  cfg.activeBuddySkin = name || undefined;
+  saveConfig(cfg);
+}
+
 module.exports = {
   loadConfig,
   saveConfig,
@@ -263,4 +274,6 @@ module.exports = {
   getDefaultThemeNames,
   loadActiveTheme,
   saveActiveTheme,
+  getActiveBuddySkin,
+  setActiveBuddySkin,
 };

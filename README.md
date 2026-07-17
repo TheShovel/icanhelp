@@ -58,6 +58,7 @@ On first launch the setup panel appears. Select a model from the download list (
 - Bash command execution
 - Web search
 - Theme system
+- Buddy skins
 - Vision model
 - Word document creation (.docx)
 
@@ -95,3 +96,11 @@ Downloads automatically on first launch (~950 MB, cached at `~/.local/share/ican
   - Models: `~/.local/share/icanhelp/models/`
   - Vision model cache: `~/.local/share/icanhelp/transformers/`
   - Logs: `~/.local/share/icanhelp/vision.log`, `ocr.log`
+
+  ## Buddy Skins
+
+  The buddy avatar uses five PNG images — one per state: `idle.png`, `talking.png`, `thinking.png`, `bash.png`, and `search.png`. The default ones live in `assets/buddyArt/`.
+
+  You can replace them with a custom set by importing a ZIP through **Settings → Buddy Skins → Import Skin**. The ZIP must contain all five PNG files (at the zip root or in a single subdirectory). The skin is extracted to `~/.config/icanhelp/buddySkins/<name>/` and applied immediately.
+
+  To go back to the original icons, click **Reset Buddy Skin** in the same settings section.

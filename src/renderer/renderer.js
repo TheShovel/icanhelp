@@ -690,6 +690,65 @@ document
       window.electronAPI.openFolder("models");
     } else if (action === "open-buddy-art") {
       window.electronAPI.openFolder("buddy-art");
+    } else if (action === "import-skin") {
+      var importBtn = item.querySelector("span:first-child");
+      var importHint = item.querySelector(".settings-menu-hint");
+      var origText = importBtn.textContent;
+      var origHint = importHint.textContent;
+      importBtn.textContent = "Importing...";
+      importHint.textContent = "";
+      item.style.pointerEvents = "none";
+      item.style.opacity = "0.5";
+      window.electronAPI.importBuddySkin().then(function (result) {
+        item.style.pointerEvents = "";
+        item.style.opacity = "";
+        if (result.ok) {
+          importBtn.textContent = "Skin Applied!";
+          importHint.textContent = "\"" + result.name + "\" is now active";
+          // Force re-render with new skin
+          setAvatarState("idle");
+          setTimeout(function () {
+            importBtn.textContent = origText;
+            importHint.textContent = origHint;
+          }, 2500);
+        } else if (result.error !== "Cancelled") {
+          importBtn.textContent = "Failed";
+          importHint.textContent = result.error;
+          setTimeout(function () {
+            importBtn.textContent = origText;
+            importHint.textContent = origHint;
+          }, 4000);
+        } else {
+          importBtn.textContent = origText;
+          importHint.textContent = origHint;
+        }
+      });
+    } else if (action === "reset-skin") {
+      var resetBtn = item.querySelector("span:first-child");
+      var resetHint = item.querySelector(".settings-menu-hint");
+      var origText = resetBtn.textContent;
+      var origHint = resetHint.textContent;
+      resetBtn.textContent = "Resetting...";
+      resetHint.textContent = "";
+      item.style.pointerEvents = "none";
+      item.style.opacity = "0.5";
+      window.electronAPI.resetBuddySkin().then(function (result) {
+        item.style.pointerEvents = "";
+        item.style.opacity = "";
+        if (result.ok) {
+          resetBtn.textContent = "Reset!";
+          resetHint.textContent = "Default icons restored";
+          // Force re-render with original icons
+          setAvatarState("idle");
+          setTimeout(function () {
+            resetBtn.textContent = origText;
+            resetHint.textContent = origHint;
+          }, 2500);
+        } else {
+          resetBtn.textContent = origText;
+          resetHint.textContent = origHint;
+        }
+      });
     } else if (action === "reset") {
       if (item.dataset.confirmed !== "true") {
         item.dataset.confirmed = "true";

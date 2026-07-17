@@ -40,6 +40,8 @@ const {
   getDefaultThemeNames,
   loadActiveTheme,
   saveActiveTheme,
+  getActiveBuddySkin,
+  setActiveBuddySkin,
 } = require("./store");
 const { createTray } = require("./tray");
 const {
@@ -53,9 +55,13 @@ const {
 } = require("./attachments");
 const { appPath, visionLog, ocrLog } =
   require("./paths");
+const AdmZip = require("adm-zip");
 const { buildDocxFromMarkdown } = require("./tools/docx");
 
 marked.use({ breaks: true, gfm: true });
+
+const CONFIG_DIR = path.join(os.homedir(), ".config", "icanhelp");
+const BUDDY_SKINS_DIR = path.join(CONFIG_DIR, "buddySkins");
 
 let mainWindow;
 let pendingSudo = null;
@@ -850,6 +856,103 @@ ipcMain.handle("get-config", () => {
     return "Invalid folder key";
   });
 
+  ipcMain.handle("import-buddy-skin", async function () {
+    var result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openFile"],
+      filters: [
+        { name: "ZIP files", extensions: ["zip"] },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, error: "Cancelled" };
+    }
+
+    var zipPath = result.filePaths[0];
+    var skinName = path.basename(zipPath, ".zip");
+
+    try {
+      var zip = new AdmZip(zipPath);
+      var entries = zip.getEntries();
+
+      // Determine the skin directory: files might be at root or in a subfolder
+      var expectedFiles = ["idle.png", "talking.png", "thinking.png", "bash.png", "search.png"];
+      var foundFiles = {};
+
+      // Check root-level entries first
+      for (var entry of entries) {
+        var entryName = path.basename(entry.entryName);
+        if (expectedFiles.indexOf(entryName) !== -1 && !entry.isDirectory) {
+          foundFiles[entryName] = entry;
+        }
+      }
+
+      // If not all found at root, check first-level subdirectories
+      if (Object.keys(foundFiles).length < expectedFiles.length) {
+        foundFiles = {};
+        var prefix = null;
+        for (var entry of entries) {
+          var parts = entry.entryName.split("/");
+          if (parts.length === 2 && !entry.isDirectory) {
+            var name = parts[1];
+            if (expectedFiles.indexOf(name) !== -1) {
+              if (!prefix) prefix = parts[0];
+              if (parts[0] === prefix) {
+                foundFiles[name] = entry;
+              }
+            }
+          }
+        }
+      }
+
+      var missing = expectedFiles.filter(function (f) { return !foundFiles[f]; });
+      if (missing.length > 0) {
+        return {
+          ok: false,
+          error: "Missing images in ZIP: " + missing.join(", "),
+        };
+      }
+
+      // Ensure skin directory doesn't conflict; uniquify if needed
+      var targetDir = path.join(BUDDY_SKINS_DIR, skinName);
+      var finalName = skinName;
+      var counter = 1;
+      while (fs.existsSync(targetDir)) {
+        finalName = skinName + "_" + counter;
+        targetDir = path.join(BUDDY_SKINS_DIR, finalName);
+        counter++;
+      }
+
+      if (!fs.existsSync(BUDDY_SKINS_DIR)) {
+        fs.mkdirSync(BUDDY_SKINS_DIR, { recursive: true, mode: 0o700 });
+      }
+      fs.mkdirSync(targetDir, { mode: 0o700 });
+
+      // Extract the found PNG files
+      for (var name in foundFiles) {
+        var entry = foundFiles[name];
+        var destPath = path.join(targetDir, name);
+        fs.writeFileSync(destPath, entry.getData());
+      }
+
+      // Set as active skin
+      setActiveBuddySkin(finalName);
+
+      return { ok: true, name: finalName };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle("reset-buddy-skin", async function () {
+    setActiveBuddySkin(null);
+    return { ok: true };
+  });
+
+  ipcMain.handle("get-active-buddy-skin", async function () {
+    return { name: getActiveBuddySkin() };
+  });
+
   function execCommand(cmd, args) {
     return new Promise(function (resolve, reject) {
       execFile(
@@ -998,7 +1101,26 @@ app.whenReady().then(function () {
   protocol.handle("asset", function (request) {
     var url = new URL(request.url);
     var subdir = url.host === "buddyart" ? "buddyArt" : url.host;
-    var filePath = path.join(assetsDir, subdir, url.pathname);
+    // Strip leading slash from pathname for safe path joining
+    var cleanPath = url.pathname.replace(/^\//, "");
+    var filePath;
+
+    // Check if there's an active buddy skin overriding default assets
+    if (subdir === "buddyArt") {
+      var activeSkin = getActiveBuddySkin();
+      if (activeSkin) {
+        var skinDir = path.join(BUDDY_SKINS_DIR, activeSkin);
+        var skinPath = path.join(skinDir, cleanPath);
+        if (fs.existsSync(skinPath)) {
+          filePath = skinPath;
+        }
+      }
+    }
+
+    if (!filePath) {
+      filePath = path.join(assetsDir, subdir, cleanPath);
+    }
+
     try {
       return new Response(fs.readFileSync(filePath), {
         headers: { "content-type": "image/png" },
