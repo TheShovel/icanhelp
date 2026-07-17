@@ -2123,6 +2123,12 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.addon-model-card.downloaded {
+    border-color: var(--tool-border);
+    background: var(--bg-tool);
+    cursor: default;
+}
 .addon-model-top {
     display: flex;
     align-items: center;

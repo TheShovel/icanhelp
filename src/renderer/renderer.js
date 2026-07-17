@@ -903,15 +903,25 @@ async function renderAddonModels() {
 
   try {
     var models = await window.electronAPI.getExtraModels();
+    var downloaded = await window.electronAPI.listDownloadedModels();
+    var downloadedNames = {};
+    if (downloaded) {
+      for (var d of downloaded) {
+        downloadedNames[d.filename] = true;
+      }
+    }
+
     if (!models || models.length === 0) {
       list.innerHTML = '<p style="color: var(--fg-muted); font-size: 12px;">No addon models available.</p>';
       return;
     }
 
     models.forEach(function (m) {
+      var isDownloaded = downloadedNames[m.filename];
       var card = document.createElement("div");
       card.className = "addon-model-card";
       if (!m.compatible) card.classList.add("disabled");
+      if (isDownloaded) card.classList.add("downloaded");
 
       var top = document.createElement("div");
       top.className = "addon-model-top";
@@ -921,7 +931,7 @@ async function renderAddonModels() {
       top.appendChild(nameEl);
       var roleEl = document.createElement("span");
       roleEl.className = "addon-model-role";
-      roleEl.textContent = m.role || "addon";
+      roleEl.textContent = (m.role || "addon") + (isDownloaded ? " · downloaded" : "");
       top.appendChild(roleEl);
       card.appendChild(top);
 
@@ -937,10 +947,14 @@ async function renderAddonModels() {
 
       var note = document.createElement("div");
       note.className = "addon-model-note";
-      note.textContent = m.compatible ? "Click to download" : "Needs ~" + m.minRamGB + " GB RAM";
+      if (isDownloaded) {
+        note.textContent = "Already downloaded";
+      } else {
+        note.textContent = m.compatible ? "Click to download" : "Needs ~" + m.minRamGB + " GB RAM";
+      }
       card.appendChild(note);
 
-      if (m.compatible) {
+      if (m.compatible && !isDownloaded) {
         var clicked = false;
         card.addEventListener("click", function () {
           if (clicked) return;
