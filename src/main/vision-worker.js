@@ -56,7 +56,8 @@ async function downloadChunk(url, destPath, start, end, onChunk) {
   fs.closeSync(fd);
 }
 
-async function downloadFile(filename, progressCb) {
+async function downloadFile(filename, progressCb, retries) {
+  retries = retries || 0;
   var dest = path.join(VISION_DIR, filename);
   if (fs.existsSync(dest)) {
     var stat = fs.statSync(dest);
@@ -67,8 +68,18 @@ async function downloadFile(filename, progressCb) {
   fs.mkdirSync(VISION_DIR, { recursive: true });
   var url = HF_BASE + "/" + filename;
 
-  var headRes = await fetch(url, { method: "HEAD" });
-  if (!headRes.ok) throw new Error("HEAD request failed: HTTP " + headRes.status);
+  var headRes;
+  try {
+    headRes = await fetch(url, { method: "HEAD" });
+  } catch (e) {
+    if (retries < 3) {
+      send({ type: "log", message: "HEAD failed for " + filename + ", retrying (" + (retries + 1) + "/3): " + (e.message || e) });
+      await new Promise(function (r) { setTimeout(r, 2000); });
+      return downloadFile(filename, progressCb, retries + 1);
+    }
+    throw new Error("Failed to reach HuggingFace after 3 retries: " + (e.message || e));
+  }
+  if (!headRes.ok) throw new Error("HEAD request failed: HTTP " + headRes.status + " for " + filename);
   var total = parseInt(headRes.headers.get("content-length") || "0", 10);
 
   if (total === 0) throw new Error("Could not determine file size for " + filename);

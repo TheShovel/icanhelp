@@ -146,9 +146,20 @@ function startWorker() {
 
   var worker = fork(WORKER_PATH, [], {
     execPath: nodeExecPath(),
-    stdio: ["ignore", "ignore", "ignore", "ipc"],
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
     env: Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: "1" }),
   });
+
+  // Capture stderr from the worker so we can see startup errors.
+  var workerStderr = "";
+  if (worker.stderr) {
+    worker.stderr.on("data", function (chunk) {
+      workerStderr += String(chunk);
+    });
+  }
+  if (worker.stdout) {
+    worker.stdout.resume();
+  }
 
   child = worker;
   pipelineReady = false;
@@ -166,8 +177,13 @@ function startWorker() {
     if (!shuttingDown) {
       resetCrashWindow();
       crashCount += 1;
-      log("Vision worker exited: code=" + code + " signal=" + signal);
+      var exitMsg = "Vision worker exited: code=" + code;
+      if (workerStderr.trim()) exitMsg += " stderr=" + workerStderr.trim().slice(0, 200);
+      log(exitMsg);
       emitAggregateProgress("error", 0);
+      if (workerStderr.trim()) {
+        progressCallback && progressCallback({ percent: 0, status: "Vision model failed: " + workerStderr.trim().slice(0, 80) });
+      }
     }
   });
 
