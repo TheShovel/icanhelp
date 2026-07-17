@@ -3,56 +3,16 @@ const fs = require("fs");
 const { execFileSync } = require("child_process");
 const { modelsDir } = require("./paths");
 
-// Gather real, read-only system info once and cache it, so the system prompt
-// can tell the model the actual distro, CPU, GPU, memory, etc. This is more
-// reliable than asking the model to probe the system itself. Falls back to a
-// generic note if anything fails.
-var cachedSysInfo = null;
+var cachedDistro = null;
 
-function run(cmd, args, fallback) {
+function gatherDistro() {
+  if (cachedDistro) return cachedDistro;
   try {
-    return execFileSync(cmd, args, { encoding: "utf8", timeout: 5000 })
-      .toString()
-      .trim();
-  } catch (e) {
-    return fallback !== undefined ? fallback : "";
-  }
-}
-
-function gatherSystemInfo() {
-  if (cachedSysInfo) return cachedSysInfo;
-  var lines = [];
-  // Distro detection via /etc/os-release.
-  var detect = run("bash", [
-    "-c",
-    "source /etc/os-release 2>/dev/null && echo \"distro=$ID\"",
-  ]);
-  if (detect) lines.push(detect);
-  // CPU model + core count.
-  var cpuModel = run("bash", [
-    "-c",
-    "lscpu 2>/dev/null | grep -E 'Model name|^CPU\\(s\\):' | head -2",
-  ]);
-  if (cpuModel) lines.push(cpuModel);
-  // GPU(s) — identify the real hardware, don't assume NVIDIA.
-  var gpu = run("bash", [
-    "-c",
-    "lspci -k 2>/dev/null | grep -iE 'VGA|3D|Display' | head -3",
-  ]);
-  if (gpu) lines.push("GPU: " + gpu.replace(/\n/g, "; "));
-  // Memory total.
-  var mem = run("bash", [
-    "-c",
-    "free -h 2>/dev/null | awk '/^Mem:/ {print \"RAM total \" $2}'",
-  ]);
-  if (mem) lines.push(mem);
-  // Kernel.
-  var kernel = run("uname", ["-r"]);
-  if (kernel) lines.push("kernel: " + kernel);
-  cachedSysInfo = lines.length
-    ? lines.join("\n")
-    : "System info unavailable.";
-  return cachedSysInfo;
+    cachedDistro = execFileSync("bash", [
+      "-c", "source /etc/os-release 2>/dev/null && echo \"$ID\"",
+    ], { encoding: "utf8", timeout: 3000 }).toString().trim();
+  } catch (_) {}
+  return cachedDistro;
 }
 
 var CONTEXT_SIZE = 32768;
@@ -121,9 +81,8 @@ function resolveModelPath(config) {
   return defaultModelFile();
 }
 
-function buildSystemPrompt(sysInfo) {
-  if (sysInfo === undefined) sysInfo = gatherSystemInfo();
-
+function buildSystemPrompt() {
+  var distro = gatherDistro();
   var now = new Date();
   var tz = "";
   var locale = "";
@@ -142,8 +101,8 @@ function buildSystemPrompt(sysInfo) {
     "## Date & Location",
     "- Current time: " + dateStr + ", " + timeStr + (tz ? " (" + tz + ")" : "") + (locale ? " [" + locale + "]" : ""),
     "",
-    "## Your System",
-    sysInfo,
+    "## System",
+    "- Distro: " + (distro || "unknown"),
     "",
     "## Rules",
     "- Context window: " + (CONTEXT_SIZE / 1024) + "K tokens. Keep tool results and file reads small.",
