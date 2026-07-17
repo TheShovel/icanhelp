@@ -66,6 +66,11 @@ async function downloadFile(filename, progressCb, retries) {
   }
 
   fs.mkdirSync(VISION_DIR, { recursive: true });
+
+  // Clean up any stale .part file from a previous failed download.
+  var partPath = dest + ".part";
+  try { if (fs.existsSync(partPath)) fs.unlinkSync(partPath); } catch (_) {}
+
   var url = HF_BASE + "/" + filename;
 
   var headRes;
@@ -81,19 +86,27 @@ async function downloadFile(filename, progressCb, retries) {
   }
   if (!headRes.ok) throw new Error("HEAD request failed: HTTP " + headRes.status + " for " + filename);
   var total = parseInt(headRes.headers.get("content-length") || "0", 10);
+  var isOnnx = filename.endsWith(".onnx");
 
-  // Some CDN edge servers don't return Content-Length for small files.
-  // Fall back to a simple streaming download.
-  if (total === 0) {
-    send({ type: "log", message: "No content-length for " + filename + ", using streaming download" });
+  // For small files or when Content-Length is missing, use simple streaming.
+  // Only parallel-chunk large ONNX files where the speed matters.
+  if (!isOnnx || total === 0) {
+    if (total === 0) {
+      send({ type: "log", message: "No content-length for " + filename + ", using streaming" });
+    }
     var res = await fetch(url, { redirect: "follow" });
     if (!res.ok) throw new Error("Download failed: HTTP " + res.status + " for " + filename);
     var reader = res.body.getReader();
     var chunks = [];
+    var loaded = 0;
     while (true) {
       var chunk = await reader.read();
       if (chunk.done) break;
       chunks.push(Buffer.from(chunk.value));
+      loaded += chunk.value.length;
+      if (progressCb && total > 0) {
+        progressCb({ file: filename, loaded: loaded, total: total });
+      }
     }
     var data = Buffer.concat(chunks);
     fs.writeFileSync(dest, data);
