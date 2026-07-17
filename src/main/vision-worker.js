@@ -82,7 +82,24 @@ async function downloadFile(filename, progressCb, retries) {
   if (!headRes.ok) throw new Error("HEAD request failed: HTTP " + headRes.status + " for " + filename);
   var total = parseInt(headRes.headers.get("content-length") || "0", 10);
 
-  if (total === 0) throw new Error("Could not determine file size for " + filename);
+  // Some CDN edge servers don't return Content-Length for small files.
+  // Fall back to a simple streaming download.
+  if (total === 0) {
+    send({ type: "log", message: "No content-length for " + filename + ", using streaming download" });
+    var res = await fetch(url, { redirect: "follow" });
+    if (!res.ok) throw new Error("Download failed: HTTP " + res.status + " for " + filename);
+    var reader = res.body.getReader();
+    var chunks = [];
+    while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      chunks.push(Buffer.from(chunk.value));
+    }
+    var data = Buffer.concat(chunks);
+    fs.writeFileSync(dest, data);
+    if (progressCb) progressCb({ file: filename, loaded: data.length, total: data.length });
+    return dest;
+  }
 
   var numChunks = 4;
   var chunkSize = Math.ceil(total / numChunks);
