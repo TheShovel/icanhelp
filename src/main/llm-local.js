@@ -21,11 +21,8 @@ function defaultContextSize() {
   try {
     var freeMb = require("os").freemem() / (1024 * 1024);
     // Scale context to ~2K tokens per 1GB of free RAM, capped at 32768.
-    // A 0.8B Q4 model + KV cache for 32K context needs ~3-4GB.
-    // OS needs ~1GB, so we need ~5GB free for 32K to be comfortable.
     var size = Math.floor(freeMb / 1024 * 2048);
     size = Math.max(2048, Math.min(32768, size));
-    // Round to nearest power-of-2 friendly number
     var steps = [2048, 4096, 6144, 8192, 12288, 16384, 24576, 32768];
     for (var i = 0; i < steps.length; i++) {
       if (size <= steps[i]) return steps[i];
@@ -33,6 +30,18 @@ function defaultContextSize() {
     return 32768;
   } catch (_) {
     return 32768;
+  }
+}
+
+function defaultBatchSize() {
+  try {
+    var freeMb = require("os").freemem() / (1024 * 1024);
+    // Larger batch = faster prefill (fewer rounds to process the prompt).
+    // Scale: 256 batch per 1GB free RAM, capped at 2048.
+    var batch = Math.floor(freeMb / 1024 * 256);
+    return Math.max(256, Math.min(2048, batch));
+  } catch (_) {
+    return 512;
   }
 }
 
@@ -520,7 +529,7 @@ async function runLocalChatLoop({
   console.log("[llm-local] Creating context with contextSize=" + desiredSize + " (free RAM: " + Math.round(require("os").freemem() / 1024 / 1024) + " MB)");
   var context;
   try {
-    context = await createContextWithRetry(model, desiredSize, config.batchSize || 512);
+    context = await createContextWithRetry(model, desiredSize, config.batchSize || defaultBatchSize());
   } catch (e) {
     console.error("[llm-local] createContext failed:", e);
     var minRamHint = "";
@@ -959,7 +968,7 @@ async function runLocalChatLoop({
             chatHistory.push(history[hi]);
           }
 
-          context = await createContextWithRetry(model, config.contextSize || defaultContextSize(), config.batchSize || 512);
+          context = await createContextWithRetry(model, config.contextSize || defaultContextSize(), config.batchSize || defaultBatchSize());
           contextSize = context.contextSize;
 
           session = new LlamaChatSession({
@@ -1145,7 +1154,7 @@ async function generateDocument({ description, researchContext, filename, onChun
 
   var context;
   try {
-    context = await createContextWithRetry(cachedModel, contextSize, (config && config.batchSize) || 512);
+    context = await createContextWithRetry(cachedModel, contextSize, (config && config.batchSize) || defaultBatchSize());
   } catch (e) {
     console.error("[llm-local] generateDocument: context creation failed:", e.message);
     var freeMb = "";
