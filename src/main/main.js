@@ -120,6 +120,13 @@ function createWindow() {
     }
   });
 
+  ipcMain.on("sudo-response", function (_, password) {
+    if (pendingSudo) {
+      pendingSudo(password || "");
+      pendingSudo = null;
+    }
+  });
+
   ipcMain.on("close-window", function () {});
   setProgressCallback(function (info) {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -231,7 +238,6 @@ function createWindow() {
     resetToolBudget();
 
     var pendingDocSession = null;
-    var pendingConfirm = null;
     var retries = 0;
     var maxRetries = 2;
 

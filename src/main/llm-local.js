@@ -373,9 +373,13 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop, su
           state.total++;
 
           if (state.total > MAX_TOOLS) {
-            console.log("[llm-local] Tool limit reached (" + MAX_TOOLS + "), aborting");
-            if (hardStop) hardStop();
-            return "[SYSTEM: You have used " + MAX_TOOLS + " tools. You MUST stop now and answer the user with what you have. Do not call any more tools.]";
+            console.log("[llm-local] Tool limit exceeded (" + MAX_TOOLS + "), scheduling abort after result is fed");
+            // Don't abort inside the handler — let promptWithMeta finish processing
+            // the result first, then abort on the next token. Same timing as idle timeout.
+            setTimeout(function () {
+              if (hardStop) hardStop("tool_limit");
+            }, 0);
+            return "[SYSTEM: You have reached the tool limit. Answer the user now with everything you have.]";
           }
 
           var nudge = "";
@@ -431,9 +435,11 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop, su
             state.consecutiveFailures = 0;
 
             if (state.total === MAX_TOOLS) {
-              console.log("[llm-local] 10th tool completed, aborting inference");
-              if (hardStop) hardStop();
-              return nudge + resultStr + "\n\n[SYSTEM: That was your " + MAX_TOOLS + "th tool. Answer the user now with everything you have. Do not call more tools.]";
+              console.log("[llm-local] 10th tool completed, scheduling abort after result is fed");
+              setTimeout(function () {
+                if (hardStop) hardStop("tool_limit");
+              }, 0);
+              return nudge + resultStr + "\n\n[SYSTEM: Tool limit reached. Answer the user now with everything you have.]";
             }
 
             return nudge + resultStr;
@@ -599,6 +605,7 @@ async function runLocalChatLoop({
     var toolLimitReached = false;
 
     var stopReason = null;
+    var forceContinueAttempts = 0;
 
     var hardStop = function (reason) {
       toolLimitReached = true;
@@ -632,8 +639,8 @@ async function runLocalChatLoop({
       });
     }
 
-    var IDLE_TIMEOUT_MS = 10 * 1000;
-    var EXTENDED_TIMEOUT_MS = 30 * 1000;
+    var IDLE_TIMEOUT_MS = 60 * 1000;
+    var EXTENDED_TIMEOUT_MS = 15 * 1000;
     var toolRunning = false;
     var idleTimer = null;
     var idleFired = false;
@@ -713,6 +720,12 @@ async function runLocalChatLoop({
     resetIdleTimer();
 
     async function forceContinue() {
+      forceContinueAttempts++;
+      if (forceContinueAttempts > 2) {
+        console.log("[llm-local] Too many force-continue attempts, giving up");
+        onChunk({ error: "The model stopped responding. Try again with a simpler request." });
+        return "";
+      }
       idleFired = false;
       resetIdleTimer();
       var contAbort = new AbortController();
@@ -720,41 +733,44 @@ async function runLocalChatLoop({
         signal.addEventListener("abort", function () { contAbort.abort(); });
       }
       try {
-        var text = await session.prompt("", {
-          maxTokens: Math.floor(contextSize * 0.25),
-          temperature: 0.7,
-          responsePrefix: "<think>\nContinuing my response.\n</think>\n\n",
-          repeatPenalty: { penalty: 1.05 },
-          signal: contAbort.signal,
-          stopOnAbortSignal: true,
-          onTextChunk: function (chunk) {
-            resetIdleTimer();
-            if (repDetector.feed(chunk)) {
-              contAbort.abort();
-              throw new Error("REPETITION_DETECTED");
-            }
-            onChunk({ text: chunk });
-          },
-          onResponseChunk: function (chunk) {
-            if (chunk && chunk.type === "segment") {
+        var text = await session.prompt(
+          "You have all the information you need. Now answer the user's request directly in plain text. Do not output JSON, function calls, or code blocks unless the user asked for them. Just write a normal conversational response.",
+          {
+            maxTokens: Math.floor(contextSize * 0.25),
+            temperature: 0.7,
+            responsePrefix: "Based on what I found, ",
+            repeatPenalty: { penalty: 1.05 },
+            signal: contAbort.signal,
+            stopOnAbortSignal: true,
+            onTextChunk: function (chunk) {
               resetIdleTimer();
-            }
-            if (
-              chunk &&
-              chunk.type === "segment" &&
-              chunk.segmentType === "thought"
-            ) {
-              if (repDetector.feed(chunk.text)) {
-                console.log(
-                  "[llm-local] Repetition detected in force-continue thinking, aborting",
-                );
+              if (repDetector.feed(chunk)) {
                 contAbort.abort();
                 throw new Error("REPETITION_DETECTED");
               }
-              onChunk({ thinking: chunk.text });
-            }
-          },
-        });
+              onChunk({ text: chunk });
+            },
+            onResponseChunk: function (chunk) {
+              if (chunk && chunk.type === "segment") {
+                resetIdleTimer();
+              }
+              if (
+                chunk &&
+                chunk.type === "segment" &&
+                chunk.segmentType === "thought"
+              ) {
+                if (repDetector.feed(chunk.text)) {
+                  console.log(
+                    "[llm-local] Repetition detected in force-continue thinking, aborting",
+                  );
+                  contAbort.abort();
+                  throw new Error("REPETITION_DETECTED");
+                }
+                onChunk({ thinking: chunk.text });
+              }
+            },
+          }
+        );
         clearTimeout(idleTimer);
         return text;
       } finally {
@@ -845,6 +861,20 @@ async function runLocalChatLoop({
       console.log("[llm-local] Model stopped with no text — continuing");
       await forceContinue();
     }
+
+    // If the idle timer fired, the model was cut off mid-response.
+    // The partial text is useless — force it to finish its answer.
+    if (idleFired && result.responseText && result.responseText.trim().length > 0) {
+      console.log("[llm-local] Model was cut off by idle timeout — forcing continuation");
+      await forceContinue();
+    }
+
+    // Tool limit: the abort returns partial output (stopOnAbortSignal), not an error.
+    // Force the model to wrap up with what it has.
+    if (toolLimitReached) {
+      console.log("[llm-local] Tool limit reached, forcing wrap-up continuation");
+      await forceContinue();
+    }
   } catch (e) {
       clearTimeout(idleTimer);
       if (e.message === "REPETITION_DETECTED") {
@@ -860,7 +890,11 @@ async function runLocalChatLoop({
           }
         } else if (idleFired) {
           console.log("[llm-local] Idle timeout — forcing continuation");
-          try { await forceContinue(); } catch (_) {
+          if (forceContinueAttempts < 2) {
+            try { await forceContinue(); } catch (_) {
+              onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
+            }
+          } else {
             onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
           }
         } else {
@@ -929,6 +963,10 @@ async function runLocalChatLoop({
             console.log("[llm-local] Model stopped with no text after retry — continuing");
             await forceContinue();
           }
+          if (idleFired && result.responseText && result.responseText.trim().length > 0) {
+            console.log("[llm-local] Retry was cut off by idle timeout — forcing continuation");
+            await forceContinue();
+          }
         } catch (e2) {
           console.log("[llm-local] Retry also failed:", e2.message);
           // Last-ditch: nuke everything except the last user turn and a trimmed system prompt.
@@ -961,6 +999,9 @@ async function runLocalChatLoop({
               var result = await session.promptWithMeta(currentPrompt, opts);
               clearTimeout(idleTimer);
               if ((state.total > 0 || idleFired) && (!result.responseText || result.responseText.trim().length === 0)) {
+                await forceContinue();
+              }
+              if (idleFired && result.responseText && result.responseText.trim().length > 0) {
                 await forceContinue();
               }
             } else {
