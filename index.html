@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>icanhelp</title>
-  <meta name="description" content="icanhelp is a Linux desktop AI assistant that runs as a transparent overlay and works mostly offline.">
+  <meta name="description" content="icanhelp is a Linux desktop AI assistant that runs as a transparent overlay, creates documents, saves conversations, and works mostly offline.">
   <link rel="icon" type="image/png" href="assets/buddyArt/idle.png">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -28,8 +28,9 @@
       <h1>Your desktop AI assistant, always within reach.</h1>
       <p class="lede">
         icanhelp runs as a transparent overlay on your Linux desktop. It answers
-        questions, runs commands, reads your screen, and searches the web. All
-        running locally and fully offline, with no cloud bill and no GPU required.
+        questions, runs commands, reads your screen, searches the web, creates
+        documents, and saves your conversations. All running locally and fully
+        offline, with no cloud bill and no GPU required.
       </p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="#install">Get started</a>
@@ -117,6 +118,18 @@
           <h3>Theme system</h3>
           <p>Light and dark themes, with a custom theme editor to match your desktop.</p>
         </div>
+        <div class="card reveal">
+          <h3>Buddy skins</h3>
+          <p>Customize your AI avatar with different states — idle, talking, thinking, bash, and search. Import custom skin packs via ZIP.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Document creation</h3>
+          <p>Generate .docx Word documents on the fly. Describe what you need and get a formatted file ready to share.</p>
+        </div>
+        <div class="card reveal">
+          <h3>Chat history</h3>
+          <p>Conversations are saved automatically. Browse past chats, pick up where you left off, or delete old threads.</p>
+        </div>
       </div>
     </section>
 
@@ -145,6 +158,20 @@
             specialized model.
           </p>
           <p class="addon-card-ram">Needs ~4 GB RAM</p>
+        </div>
+        <div class="addon-card reveal">
+          <div class="addon-card-top">
+            <span class="addon-card-name">BLIP Image Captioning</span>
+            <span class="addon-card-badge badge-vision">Vision</span>
+          </div>
+          <div class="addon-card-meta">
+            <span class="addon-card-quality">Utility</span>
+            <span class="addon-card-size">~380 MB</span>
+          </div>
+          <p class="addon-card-desc">
+            Vision model for describing images. Used by OCR and screenshot analysis.
+          </p>
+          <p class="addon-card-ram">Needs ~2 GB RAM</p>
         </div>
       </div>
 

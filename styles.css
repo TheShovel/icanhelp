@@ -806,6 +806,10 @@ a:hover {
   background: #7c4a9c;
 }
 
+.badge-vision {
+  background: #2d7fbf;
+}
+
 .addon-card-meta {
   display: flex;
   align-items: center;
