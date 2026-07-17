@@ -466,22 +466,23 @@ var tools = [
     function: {
       name: "create_docx",
       description:
-        "Create a Word (.docx) document from text or markdown content. " +
-        "Use this when the user asks you to write a document, letter, report, or save something as a Word file. " +
-        "Returns a file path and preview that the user can download.",
+        "Create a Word (.docx) document on a topic. First research the topic (search web, extract pages), " +
+        "then write a short description of what the document should cover. The system will automatically gather " +
+        "all your search results and use them as context for a dedicated document-writing session. " +
+        "Only call this when you have finished researching and are ready to generate the final document.",
       parameters: {
         type: "object",
         properties: {
-          content: {
+          description: {
             type: "string",
-            description: "The full text content for the document. Use markdown-style formatting for structure.",
+            description: "A short description of what the document should cover. This guides the document writer.",
           },
           filename: {
             type: "string",
-            description: "Optional filename without extension (default: 'document'). Alphanumeric, spaces, hyphens, underscores only.",
+            description: "Filename without extension (default: 'document'). Alphanumeric, spaces, hyphens, underscores only.",
           },
         },
-        required: ["content"],
+        required: ["description"],
       },
     },
   },

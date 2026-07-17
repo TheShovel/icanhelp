@@ -1363,6 +1363,9 @@ async function sendMessage() {
   var buffer = "";
   var thinkingBuf = "";
   var toolCalls = [];
+  var docStreamBuf = "";
+  var docStreamCard = null;
+  var docStreamBody = null;
   webSources = [];
 
   sendBtn.classList.add("hidden");
@@ -1707,19 +1710,49 @@ async function sendMessage() {
               }
             } catch (_) {}
           }
-
-          // Show docx preview card when create_docx finishes.
-          if (chunk.tool_end.name === "create_docx") {
-            try {
-              var docxResult = JSON.parse(chunk.tool_end.output);
-              if (docxResult.ok && docxResult.path) {
-                renderDocxPreview(bubble, docxResult);
-              }
-            } catch (_) {}
-          }
         }
       }
       smoothScroll(chatMessages);
+      return;
+    }
+
+    if (chunk.doc_stream_start) {
+      if (!msgEl) {
+        hideTyping();
+        msgEl = createAssistantMessage();
+        bubble = msgEl.querySelector(".bubble");
+        thinkingContent = msgEl.querySelector(".thinking-content");
+        thinkingBlock = msgEl.querySelector(".thinking-block");
+        responseContent = msgEl.querySelector(".response-content");
+      }
+      setAvatarState("talking");
+      docStreamBuf = "";
+      var dsCard = renderDocStreamCard(bubble, chunk.doc_stream_start);
+      docStreamCard = dsCard;
+      docStreamBody = dsCard.querySelector(".doc-stream-body");
+      return;
+    }
+
+    if (chunk.doc_stream_chunk) {
+      docStreamBuf += chunk.doc_stream_chunk;
+      if (docStreamBody) {
+        docStreamBody.textContent = docStreamBuf.slice(-3000);
+        docStreamBody.scrollTop = docStreamBody.scrollHeight;
+      }
+      smoothScroll(chatMessages);
+      return;
+    }
+
+    if (chunk.doc_stream_end) {
+      if (docStreamCard) {
+        docStreamCard.classList.add("doc-stream-done");
+        var dsHeader = docStreamCard.querySelector(".doc-stream-header");
+        if (dsHeader) {
+          dsHeader.innerHTML = iconSvg("file", 16) + " Document ready";
+        }
+      }
+      docStreamCard = null;
+      docStreamBody = null;
       return;
     }
 
@@ -2312,6 +2345,31 @@ function renderCitations(bubble, sources) {
 
   citationsContainer.appendChild(citationsList);
   bubble.appendChild(citationsContainer);
+}
+
+function renderDocStreamCard(bubble, info) {
+  var card = document.createElement("div");
+  card.className = "doc-stream-card";
+
+  var header = document.createElement("div");
+  header.className = "doc-stream-header";
+
+  var spinner = document.createElement("span");
+  spinner.className = "doc-stream-spinner";
+  header.appendChild(spinner);
+
+  var label = document.createElement("span");
+  label.textContent = " Generating document: " + escapeHtml(info.filename || "document") + ".docx";
+  header.appendChild(label);
+
+  var body = document.createElement("div");
+  body.className = "doc-stream-body";
+  body.textContent = "Starting...";
+
+  card.appendChild(header);
+  card.appendChild(body);
+  bubble.appendChild(card);
+  return card;
 }
 
 function renderDocxPreview(bubble, result) {

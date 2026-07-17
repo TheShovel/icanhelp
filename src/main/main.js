@@ -14,9 +14,7 @@ const os = require("os");
 const { execFile } = require("child_process");
 const { marked } = require("marked");
 const katex = require("katex");
-const { runLocalChatLoop } = require("./llm-local");
-const { preloadModel } = require("./llm-local");
-const { disposeModel } = require("./llm-local");
+const { runLocalChatLoop, generateDocument, preloadModel, disposeModel } = require("./llm-local");
 const {
   RECOMMENDED_MODELS,
   listDownloadedModels,
@@ -55,6 +53,7 @@ const {
 } = require("./attachments");
 const { appPath, visionLog, ocrLog } =
   require("./paths");
+const { buildDocxFromMarkdown } = require("./tools/docx");
 
 marked.use({ breaks: true, gfm: true });
 
@@ -197,6 +196,31 @@ function createWindow() {
     });
   });
 
+  function gatherResearchContext(messages) {
+    var research = [];
+    for (var i = 0; i < messages.length; i++) {
+      var msg = messages[i];
+      if (msg.role !== "tool") continue;
+      try {
+        var parsed = JSON.parse(msg.content);
+        if (Array.isArray(parsed)) {
+          for (var j = 0; j < parsed.length; j++) {
+            if (parsed[j].title && parsed[j].snippet) {
+              research.push(parsed[j]);
+            }
+          }
+        } else if (parsed && parsed.title && (parsed.text || parsed.snippet)) {
+          research.push({
+            title: parsed.title,
+            snippet: (parsed.text || parsed.snippet || "").slice(0, 2000),
+            url: parsed.url || "",
+          });
+        }
+      } catch (_) {}
+    }
+    return research;
+  }
+
   async function runLocalLLMLoop(event, messages, effort, signal) {
     console.log("[main] runLocalLLMLoop started");
     if (signal && signal.aborted) return;
@@ -204,8 +228,9 @@ function createWindow() {
     console.log("[main] Config loaded:", cfg);
     const { tools } = require("./tools/registry");
     const { executeToolCall, resetToolBudget } = require("./tools/registry");
-    resetToolBudget(); // start each user turn with a fresh tool budget
+    resetToolBudget();
 
+    var pendingDocSession = null;
     var pendingConfirm = null;
     var retries = 0;
     var maxRetries = 2;
@@ -262,6 +287,12 @@ function createWindow() {
             "output len:",
             info.output.length,
           );
+          // For create_docx with a pending doc session, suppress tool_end here.
+          // The final tool_end (with the docx result) is sent after doc generation.
+          if (pendingDocSession && info.name === "create_docx") {
+            console.log("[main] Suppressing tool_end for create_docx (doc session pending)");
+            return;
+          }
           event.sender.send("llm-chunk", {
             tool_end: { name: info.name, output: info.output },
           });
@@ -296,6 +327,20 @@ function createWindow() {
                   }
                 : null,
           });
+
+          // Detect document session request from create_docx.
+          if (name === "create_docx") {
+            try {
+              var docParsed = JSON.parse(String(result));
+              if (docParsed.__doc_pending__) {
+                pendingDocSession = {
+                  description: docParsed.description || args.description || "",
+                  filename: docParsed.filename || args.filename || "document",
+                };
+                console.log("[main] Document session requested:", pendingDocSession.description);
+              }
+            } catch (_) {}
+          }
 
           if (name === "set_theme") {
             try {
@@ -365,6 +410,75 @@ function createWindow() {
           ")",
       );
       event.sender.send("llm-chunk", { replaceText: "" });
+    }
+
+    // After the main chat loop exits, check if a document session was requested.
+    if (pendingDocSession) {
+      console.log("[main] Starting document generation session");
+
+      var researchContext = gatherResearchContext(messages);
+      console.log("[main] Research context gathered:", researchContext.length, "sources");
+
+      event.sender.send("llm-chunk", {
+        doc_stream_start: {
+          filename: pendingDocSession.filename,
+          description: pendingDocSession.description,
+        },
+      });
+
+      var docSignal = new AbortController();
+      var docAbortHandler = function () { docSignal.abort(); };
+      if (signal) signal.addEventListener("abort", docAbortHandler);
+
+      try {
+        var markdown = await generateDocument({
+          description: pendingDocSession.description,
+          researchContext: researchContext,
+          filename: pendingDocSession.filename,
+          config: cfg,
+          signal: docSignal.signal,
+          onChunk: function (chunk) {
+            if (chunk.text) {
+              event.sender.send("llm-chunk", { doc_stream_chunk: chunk.text });
+            }
+            if (chunk.error) {
+              event.sender.send("llm-chunk", { error: chunk.error });
+            }
+          },
+        });
+
+        if (markdown && markdown.trim()) {
+          console.log("[main] Document generated, length:", markdown.length);
+          var docxResult = buildDocxFromMarkdown(markdown, pendingDocSession.filename);
+          console.log("[main] Docx result:", docxResult.ok ? "ok" : "error");
+
+          event.sender.send("llm-chunk", {
+            tool_end: {
+              name: "create_docx",
+              output: JSON.stringify(docxResult),
+            },
+          });
+        } else {
+          event.sender.send("llm-chunk", {
+            tool_end: {
+              name: "create_docx",
+              output: JSON.stringify({ error: "Document generation produced no content." }),
+            },
+          });
+        }
+      } catch (e) {
+        console.error("[main] Document generation failed:", e.message);
+        event.sender.send("llm-chunk", {
+          tool_end: {
+            name: "create_docx",
+            output: JSON.stringify({ error: "Document generation failed: " + (e.message || String(e)) }),
+          },
+        });
+      } finally {
+        if (signal) signal.removeEventListener("abort", docAbortHandler);
+      }
+
+      event.sender.send("llm-chunk", { doc_stream_end: true });
     }
 
     console.log("[main] Sending done");

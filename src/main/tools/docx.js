@@ -328,16 +328,12 @@ function sanitizeFilename(name) {
     .slice(0, 60) || "document";
 }
 
-async function createDocx(args) {
-  var content = (args && args.content) || "";
-  var filename = sanitizeFilename(args && args.filename);
-
-  if (!content.trim()) {
-    return JSON.stringify({
-      error: "content is required. Provide the text for the document.",
-    });
+function buildDocxFromMarkdown(content, filename) {
+  if (!content || !content.trim()) {
+    return { error: "content is required. Provide the text for the document." };
   }
 
+  var safeName = sanitizeFilename(filename);
   var result = buildDocumentXml(content);
   var hasNumbering = result.numberingXml.length > 0;
 
@@ -360,7 +356,7 @@ async function createDocx(args) {
     fs.mkdirSync(path.join(wordDir, "_rels"), { recursive: true });
     fs.writeFileSync(path.join(wordDir, "_rels", "document.xml.rels"), buildDocRelsXml(hasNumbering));
 
-    var docxPath = path.join(os.tmpdir(), filename + ".docx");
+    var docxPath = path.join(os.tmpdir(), safeName + ".docx");
 
     try {
       execFileSync("zip", ["-0", "-r", "-q", docxPath, "."], {
@@ -373,18 +369,44 @@ async function createDocx(args) {
       docxPath = docxPath.replace(/\.docx$/, ".xml");
     }
 
-    return JSON.stringify({
+    return {
       ok: true,
       path: docxPath,
       filename: path.basename(docxPath),
       size: fs.statSync(docxPath).size,
       preview: content.slice(0, 500),
-    });
+    };
   } catch (e) {
-    return JSON.stringify({ error: "Failed to create document: " + (e.message || String(e)) });
+    return { error: "Failed to create document: " + (e.message || String(e)) };
   } finally {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
   }
 }
 
-module.exports = { createDocx };
+async function createDocx(args) {
+  // New document generation flow: description-based.
+  // The LLM provides a description + filename; the system handles research
+  // gathering and launches a separate document-writing session.
+  if (args && args.description) {
+    return JSON.stringify({
+      __doc_pending__: true,
+      description: String(args.description || ""),
+      filename: sanitizeFilename(args.filename),
+    });
+  }
+
+  // Legacy flow: content-based (backward compatible).
+  var content = (args && args.content) || "";
+  var filename = sanitizeFilename(args && args.filename);
+
+  if (!content.trim()) {
+    return JSON.stringify({
+      error: "content is required. Provide the text for the document.",
+    });
+  }
+
+  var docxResult = buildDocxFromMarkdown(content, filename);
+  return JSON.stringify(docxResult);
+}
+
+module.exports = { createDocx, buildDocxFromMarkdown, sanitizeFilename };

@@ -7,6 +7,20 @@ description: Guide users through creating structured documents — technical spe
 
 Guide the user through creating great documents. This is a structured three-stage process: Context Gathering, Refinement & Structure, and Reader Testing.
 
+## How Document Generation Works
+
+When the user asks for a document to be created:
+1. **Research**: Search the web (`search_web`), extract webpage content (`extract_webpage`), and gather information on the topic.
+2. **Describe**: Write a short description of what the document should cover. This becomes the guide for the document writer.
+3. **Generate**: Call `create_docx(description, filename)`. The system will:
+   - Automatically gather all your search results as research context
+   - Stop the main conversation
+   - Launch a dedicated document-writing session
+   - Stream the document content live to the user
+   - Create a downloadable `.docx` file
+
+**Important**: Do NOT write the full document content yourself. Research the topic, then call `create_docx` with your description. The system handles the actual writing.
+
 ## When to Offer This Workflow
 
 **Trigger conditions**: user mentions writing a doc, draft, proposal, spec, PRD, design doc, RFC, guide, or report.
@@ -61,7 +75,9 @@ Verify the document works for readers.
 4. **Iterate** — until the document communicates clearly to someone without your shared context
 
 ## Tips
-- Use the app's `write_file` tool to create documents
-- Prefer markdown for technical documents
+- For generating the final `.docx`, always use `create_docx(description, filename)` — never try to write the full document inline
+- Research the topic thoroughly before generating
+- Your description should be a concise summary that guides the document writer
+- Prefer markdown for any draft content you write with `write_file`
 - Keep language clear and active
 - Every sentence should carry weight — cut filler

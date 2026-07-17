@@ -105,7 +105,7 @@ function buildSystemPrompt() {
     "- Be concise. No preambles.",
     "- Call all tools first, then answer from results.",
     "- For math: use math(expression) instead of calculating.",
-    "- For documents/letters: call create_docx(content, filename).",
+    "- For documents: first research the topic (search_web, extract_webpage), then call create_docx(description, filename). The system will handle the actual writing.",
     "- After search_web: use extract_webpage(url) for full content.",
     "- Live system state: use run_bash().",
   ];
@@ -379,6 +379,20 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop, su
             var result = await executeTool(name, params);
             var resultStr = String(result);
 
+            // Document session: create_docx returns a __doc_pending__ marker.
+            // Abort the main model so a dedicated document-writing session can take over.
+            if (name === "create_docx") {
+              try {
+                var docCheck = JSON.parse(resultStr);
+                if (docCheck.__doc_pending__) {
+                  console.log("[llm-local] Document session requested, stopping main model");
+                  onToolEnd({ name: name, output: resultStr });
+                  if (hardStop) hardStop("document");
+                  return resultStr;
+                }
+              } catch (_) {}
+            }
+
             // Truncate oversized tool results to save context.
             if (summarizeResult) {
               var summarized = await summarizeResult(name, resultStr);
@@ -554,8 +568,11 @@ async function runLocalChatLoop({
     var internalAbort = new AbortController();
     var toolLimitReached = false;
 
-    var hardStop = function () {
+    var stopReason = null;
+
+    var hardStop = function (reason) {
       toolLimitReached = true;
+      stopReason = reason || "tool_limit";
       internalAbort.abort();
     };
 
@@ -804,7 +821,9 @@ async function runLocalChatLoop({
         console.log("[llm-local] Repetition loop detected, requesting retry");
         onChunk({ error: "Model got stuck in a loop. Please try again." });
       } else if (e.name === "AbortError" || (signal && signal.aborted)) {
-        if (toolLimitReached) {
+        if (stopReason === "document") {
+          console.log("[llm-local] Document generation triggered, stopping main loop cleanly");
+        } else if (toolLimitReached) {
           console.log("[llm-local] Tool limit reached, forcing wrap-up continuation");
           try { await forceContinue(); } catch (_) {
             onChunk({ error: "Generation timed out — the model stopped responding. Try again." });
@@ -985,6 +1004,138 @@ async function preloadModel(modelPath, config, onProgress) {
   }
 }
 
+function buildDocWriterSystemPrompt(description, researchContext) {
+  var parts = [
+    "You are a professional document writer. Your task is to write a comprehensive, well-structured document.",
+    "",
+    "Topic: " + description,
+    "",
+  ];
+
+  if (researchContext && researchContext.length > 0) {
+    parts.push("Use the following research as source material:");
+    parts.push("");
+    for (var i = 0; i < researchContext.length; i++) {
+      var r = researchContext[i];
+      parts.push("--- Source " + (i + 1) + " ---");
+      if (r.title) parts.push("Title: " + r.title);
+      if (r.url) parts.push("URL: " + r.url);
+      if (r.snippet) parts.push("Content: " + r.snippet);
+      parts.push("");
+    }
+  }
+
+  parts.push("Write the complete document now. Use proper markdown formatting:");
+  parts.push("- Use # for the main title, ## for section headings, ### for subsections");
+  parts.push("- Use bullet lists and numbered lists where appropriate");
+  parts.push("- Use **bold** and *italic* for emphasis");
+  parts.push("- Be thorough and comprehensive");
+  parts.push("");
+  parts.push("Start writing the document directly — no preamble, no introduction about yourself. Begin with the document title.");
+
+  return parts.join("\n");
+}
+
+async function generateDocument({ description, researchContext, filename, onChunk, config, signal }) {
+  if (!cachedModel || !cachedLlama) {
+    var modelPath = config && config.modelPath ? config.modelPath : defaultModelFile();
+    if (!fs.existsSync(modelPath)) {
+      onChunk({ error: "No model loaded. Please load a model first." });
+      return "";
+    }
+    var loaded = await getOrLoadModel(modelPath, config || {});
+    if (!cachedModel) {
+      onChunk({ error: "Failed to load model for document generation." });
+      return "";
+    }
+  }
+
+  var contextSize = (config && config.contextSize) || CONTEXT_SIZE;
+  console.log("[llm-local] generateDocument: creating context, size=" + contextSize);
+
+  var context;
+  try {
+    context = await createContextWithRetry(cachedModel, contextSize, (config && config.batchSize) || 512);
+  } catch (e) {
+    console.error("[llm-local] generateDocument: context creation failed:", e.message);
+    onChunk({ error: "Failed to create document context: " + (e.message || String(e)) });
+    return "";
+  }
+
+  var { LlamaChatSession } = await import("node-llama-cpp");
+  var systemPrompt = buildDocWriterSystemPrompt(description, researchContext);
+  console.log("[llm-local] generateDocument: system prompt length=" + systemPrompt.length);
+
+  var session = new LlamaChatSession({
+    contextSequence: context.getSequence(),
+    systemPrompt: systemPrompt,
+  });
+
+  var fullText = "";
+  var repDetector = RepetitionDetector();
+  var internalAbort = new AbortController();
+
+  if (signal) {
+    signal.addEventListener("abort", function () {
+      internalAbort.abort();
+    });
+  }
+
+  try {
+    console.log("[llm-local] generateDocument: starting prompt");
+    var result = await session.prompt(
+      "Write a comprehensive document about: " + description + "\n\nBegin writing now.",
+      {
+        maxTokens: Math.floor(contextSize * 0.75),
+        temperature: 0.7,
+        repeatPenalty: {
+          penalty: (config && config.repeatPenalty != null) ? config.repeatPenalty : SAMPLING_DEFAULTS.repeatPenalty,
+        },
+        dryRepeatPenalty: {
+          strength: (config && config.dryStrength != null) ? config.dryStrength : SAMPLING_DEFAULTS.dryStrength,
+          allowedLength: (config && config.dryAllowedLength != null) ? config.dryAllowedLength : SAMPLING_DEFAULTS.dryAllowedLength,
+        },
+        minP: (config && config.minP != null) ? config.minP : SAMPLING_DEFAULTS.minP,
+        signal: internalAbort.signal,
+        stopOnAbortSignal: true,
+        onTextChunk: function (chunk) {
+          if (!chunk) return;
+          if (repDetector.feed(chunk)) {
+            console.log("[llm-local] generateDocument: repetition detected, stopping");
+            internalAbort.abort();
+            return;
+          }
+          fullText += chunk;
+          if (onChunk) onChunk({ text: chunk });
+        },
+      }
+    );
+
+    if (result && !fullText) {
+      fullText = result;
+    }
+
+    console.log("[llm-local] generateDocument: complete, text length=" + fullText.length);
+    return fullText;
+  } catch (e) {
+    if (e.name === "AbortError") {
+      console.log("[llm-local] generateDocument: aborted");
+    } else {
+      console.error("[llm-local] generateDocument: error:", e.message);
+      if (onChunk) onChunk({ error: "Document generation failed: " + (e.message || String(e)) });
+    }
+    return fullText;
+  } finally {
+    // Yield to let the GPU command queue drain before tearing down buffers.
+    // Without this delay, context.dispose() can race with in-flight GPU ops
+    // and cause a native segfault that JS can't catch.
+    await new Promise(function (r) { setTimeout(r, 100); });
+    console.log("[llm-local] generateDocument: disposing doc context...");
+    try { await context.dispose(); } catch (_) {}
+    console.log("[llm-local] generateDocument: context disposed");
+  }
+}
+
 module.exports = {
   runLocalChatLoop,
   buildFunctions,
@@ -996,4 +1147,5 @@ module.exports = {
   getOrLoadModel,
   preloadModel,
   disposeModel,
+  generateDocument,
 };

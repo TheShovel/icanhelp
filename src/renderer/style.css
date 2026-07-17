@@ -2437,6 +2437,62 @@ body {
     stroke: currentColor;
 }
 
+/* ---- Document stream card (live doc generation preview) ---- */
+.doc-stream-card {
+    margin: 8px 0;
+    padding: 10px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.doc-stream-card.doc-stream-done {
+    border-color: var(--tool-border);
+    background: var(--bg-tool);
+}
+
+.doc-stream-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--fg);
+    margin-bottom: 6px;
+}
+
+.doc-stream-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: doc-spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+.doc-stream-card.doc-stream-done .doc-stream-spinner {
+    display: none;
+}
+
+@keyframes doc-spin {
+    to { transform: rotate(360deg); }
+}
+
+.doc-stream-body {
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--tool-text-fg);
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--bg-code);
+    border-radius: 4px;
+    padding: 8px;
+}
+
 /* ---- Math Tool Block ---- */
 .tool-block.tool-math .tool-header {
     color: var(--thinking-fg);
