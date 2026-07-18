@@ -7,8 +7,6 @@ const os = require("os");
 const { createDocx, buildDocxFromMarkdown, sanitizeFilename } = require("./tools/docx");
 const { tools } = require("./tools/registry");
 
-// ── createDocx: description-based flow ──────────────────────────
-
 test("createDocx - description flow returns __doc_pending__ marker", async (t) => {
   const result = await createDocx({ description: "What oranges are", filename: "oranges" });
   const parsed = JSON.parse(result);
@@ -31,8 +29,6 @@ test("createDocx - description flow handles missing filename", async (t) => {
   assert.strictEqual(parsed.filename, "document");
 });
 
-// ── createDocx: legacy content-based flow (backward compat) ─────
-
 test("createDocx - legacy flow with content still works", async (t) => {
   const result = await createDocx({ content: "# Hello\n\nWorld", filename: "legacy-test" });
   const parsed = JSON.parse(result);
@@ -54,8 +50,6 @@ test("createDocx - legacy flow without content returns error", async (t) => {
   const parsed = JSON.parse(result);
   assert.ok(parsed.error);
 });
-
-// ── buildDocxFromMarkdown ───────────────────────────────────────
 
 test("buildDocxFromMarkdown - creates valid docx from markdown", (t) => {
   const markdown = `# Test Document
@@ -110,8 +104,6 @@ test("buildDocxFromMarkdown - large document works", (t) => {
   assert.ok(result.size > 5000, "Large doc should be at least 5KB, got: " + result.size);
   try { fs.unlinkSync(result.path); } catch (_) {}
 });
-
-// ── gatherResearchContext (from main.js) ────────────────────────
 
 // Replicate the function from main.js for testing
 function gatherResearchContext(messages) {
@@ -201,8 +193,6 @@ test("gatherResearchContext - trims long snippet from extract_webpage", (t) => {
   assert.ok(research[0].snippet.length <= 2000);
 });
 
-// ── Tool definition verification ────────────────────────────────
-
 test("create_docx tool definition has correct params", (t) => {
   const docTool = tools.find(function(tool) { return tool.function.name === "create_docx"; });
   assert.ok(docTool, "create_docx tool should exist");
@@ -213,8 +203,6 @@ test("create_docx tool definition has correct params", (t) => {
   assert.ok(!("content" in docTool.function.parameters.properties),
     "content param should not be in new tool definition");
 });
-
-// ── Doc session system prompt building ──────────────────────────
 
 // Replicate the function from llm-local.js
 function buildDocWriterSystemPrompt(description, researchContext) {
@@ -272,8 +260,6 @@ test("buildDocWriterSystemPrompt - handles null research", (t) => {
   assert.ok(prompt.indexOf("Use the following research") === -1);
 });
 
-// ── sanitizeFilename ────────────────────────────────────────────
-
 test("sanitizeFilename - removes special characters", (t) => {
   assert.strictEqual(sanitizeFilename("hello/world:test"), "helloworldtest");
   assert.strictEqual(sanitizeFilename("doc@#$%^&*()"), "doc");
@@ -289,8 +275,6 @@ test("sanitizeFilename - returns 'document' for empty/whitespace", (t) => {
   assert.strictEqual(sanitizeFilename(""), "document");
   assert.strictEqual(sanitizeFilename("   "), "document");
 });
-
-// ── Full end-to-end simulation ──────────────────────────────────
 
 test("full pipeline - description to docx (simulated)", async (t) => {
   // Step 1: Simulate conversation with search results
@@ -389,8 +373,6 @@ Oranges are not only delicious but also incredibly nutritious. Their rich histor
   // Cleanup
   try { fs.unlinkSync(docxResult.path); } catch (_) {}
 });
-
-// ── IPC message format verification ─────────────────────────────
 
 test("doc_stream_start message format", (t) => {
   const msg = {

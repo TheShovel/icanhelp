@@ -199,7 +199,6 @@ function estimateTokens(history) {
 function compressMessagesAggressive(messages, currentPrompt) {
   if (messages.length <= 2) return messages;
 
-  // First pass: truncate oversized messages.
   var MAX_MSG_LEN = 3000;
   messages = messages.map(function (m) { return truncateMsg(m, MAX_MSG_LEN); });
 
@@ -268,7 +267,6 @@ function compressHistory(history, contextSize) {
   var maxTokens = contextSize || CONTEXT_SIZE;
   var MAX_MSG_LEN = 2500;
 
-  // Always truncate oversized messages regardless of threshold.
   history = history.map(function (m) { return truncateMsg(m, MAX_MSG_LEN); });
 
   if (estimateTokens(history) <= Math.floor(maxTokens * 0.7)) return history;
@@ -457,7 +455,6 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop, su
               } catch (_) {}
             }
 
-            // Truncate oversized tool results to save context.
             if (summarizeResult) {
               var summarized = await summarizeResult(name, resultStr);
               if (summarized !== resultStr) {

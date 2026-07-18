@@ -22,14 +22,11 @@ function stripHtml(html) {
     .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, "")
     .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, "")
 
-  // Replace block elements with newlines
   text = text
     .replace(/<\/?(div|p|h[1-6]|li|tr|br|article|section|main|pre|blockquote|table|ul|ol|dl)[^>]*>/gi, "\n")
 
-  // Remove remaining tags
   text = text.replace(/<[^>]+>/g, "");
 
-  // Decode HTML entities
   text = text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -42,10 +39,8 @@ function stripHtml(html) {
       return String.fromCharCode(parseInt(code, 10));
     });
 
-  // Collapse whitespace
   text = text.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").trim();
 
-  // Remove very short lines (menu items, nav crumbs)
   var lines = text.split("\n").filter(function (line) {
     var trimmed = line.trim();
     return trimmed.length > 3 || /^[A-Z][a-z]/.test(trimmed);

@@ -43,7 +43,6 @@ var HEADING_RPR = {
 
 function renderHeading(token) {
   var rpr = HEADING_RPR[token.depth] || HEADING_RPR[1];
-  // Render tokens as runs within a single paragraph, all with heading formatting.
   var runs = renderInlineTokens(token.tokens, rpr);
   var spacing = "<w:spacing w:before=\"200\" w:after=\"100\"/>";
   return "<w:p><w:pPr>" + spacing + "</w:pPr>" + runs + "</w:p>";

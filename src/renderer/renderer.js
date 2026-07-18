@@ -297,7 +297,6 @@ let lastChatSize = { width: 400, height: 550 };
 let responseStartTime = 0;
 var modelInfo = { name: "", backend: "CPU" };
 
-// Load model config info for the response footer
 window.electronAPI.getConfig().then(function (cfg) {
   if (cfg && cfg.modelPath) {
     var name = cfg.modelPath.split("/").pop().replace(/\.gguf$/i, "").replace(/_/g, " ");
@@ -367,7 +366,6 @@ document.addEventListener("mousemove", function (e) {
   window.electronAPI.resizeWindow(newW, newH);
 });
 
-// --- Chat Management ---
 var chats = [];
 var currentChatId = null;
 
@@ -910,7 +908,7 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Register download progress handler globally (needed for both initial install and settings)
+// Register globally (needed for both initial install and settings)
 window.electronAPI.onModelDownloadProgress(function (info) {
   if (info.stage === "downloading") {
     installProgressFill.style.width = info.progress + "%";
@@ -923,7 +921,6 @@ window.electronAPI.onModelDownloadProgress(function (info) {
   }
 });
 
-// --- Install Screen ---
 (async function initInstall() {
   var hasCfg = await window.electronAPI.hasConfig();
   if (hasCfg) {
@@ -1735,9 +1732,8 @@ async function sendMessage() {
           }
 
           var outText = stripEmojis(chunk.tool_end.output);
-          // Find the matching tool call and update its output.
-          // (The doc generation pipeline sends tool_end for create_docx
-          // without a preceding tool_start, so we can't assume it's last.)
+          // The doc generation pipeline sends tool_end for create_docx
+          // without a preceding tool_start, so we can't assume it's last.
           for (var ti = toolCalls.length - 1; ti >= 0; ti--) {
             if (toolCalls[ti].name === chunk.tool_end.name) {
               toolCalls[ti].output = outText;
@@ -1763,7 +1759,6 @@ async function sendMessage() {
             }, delay + 800);
           }
 
-          // Replace scanning animation with result summary for ocr/extract.
           if (tbEnd.classList.contains("tool-scanning")) {
             tbEnd.classList.remove("tool-scanning");
             var scanSpinner = tbEnd.querySelector(".tool-scan-spinner");
@@ -1778,7 +1773,6 @@ async function sendMessage() {
               }
             }
           }
-          // Show docx preview card when create_docx finishes.
           if (chunk.tool_end.name === "create_docx") {
             try {
               var docxResult = JSON.parse(chunk.tool_end.output);
@@ -2038,7 +2032,6 @@ function linkifyFilePaths(root, paths) {
     var node = nodes[i];
     var text = node.textContent;
 
-    // Find all path occurrences
     var matches = [];
     for (var p = 0; p < paths.length; p++) {
       var idx = text.indexOf(paths[p]);
@@ -2048,7 +2041,6 @@ function linkifyFilePaths(root, paths) {
     }
     if (matches.length === 0) continue;
 
-    // Sort by position, prefer longer match at same position
     matches.sort(function (a, b) {
       if (a.index !== b.index) return a.index - b.index;
       return b.length - a.length;
@@ -2242,7 +2234,6 @@ function renderStructuredMessage(msg) {
     thinkingBlock.classList.add("hidden");
   }
 
-  // Render response text — strip thinking tags and duplicated thinking text
   var contentResp = msg.content || "";
   var parsed = parseBuffer(contentResp);
   var cleanResponse = parsed.response;
@@ -2369,7 +2360,6 @@ async function processMathInHtml(html) {
   var displayPattern = /\$\$([\s\S]*?)\$\$/g;
   var inlinePattern = /(?<!\\)\$(?!\$)([^\$\n]+?)(?<!\\)\$/g;
 
-  // Replace display math $...$
   var displayMatches = [];
   var m;
   while ((m = displayPattern.exec(html)) !== null) {

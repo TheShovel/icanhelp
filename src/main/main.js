@@ -867,7 +867,6 @@ ipcMain.handle("get-config", () => {
       var expectedFiles = ["idle.png", "talking.png", "thinking.png", "bash.png", "search.png"];
       var foundFiles = {};
 
-      // Check root-level entries first
       for (var entry of entries) {
         var entryName = path.basename(entry.entryName);
         if (expectedFiles.indexOf(entryName) !== -1 && !entry.isDirectory) {
@@ -923,7 +922,6 @@ ipcMain.handle("get-config", () => {
         fs.writeFileSync(destPath, entry.getData());
       }
 
-      // Set as active skin
       setActiveBuddySkin(finalName);
 
       return { ok: true, name: finalName };
@@ -1089,11 +1087,9 @@ app.whenReady().then(function () {
   protocol.handle("asset", function (request) {
     var url = new URL(request.url);
     var subdir = url.host === "buddyart" ? "buddyArt" : url.host;
-    // Strip leading slash from pathname for safe path joining
     var cleanPath = url.pathname.replace(/^\//, "");
     var filePath;
 
-    // Check if there's an active buddy skin overriding default assets
     if (subdir === "buddyArt") {
       var activeSkin = getActiveBuddySkin();
       if (activeSkin) {

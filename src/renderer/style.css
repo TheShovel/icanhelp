@@ -425,7 +425,7 @@ body {
     justify-content: center;
     cursor: pointer;
     z-index: 20;
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.2s ease;
     -webkit-app-region: no-drag;
 }
 
@@ -495,16 +495,7 @@ body {
     }
 }
 
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
-}
 
-/* ---- Panels ---- */
 #chat-panel,
 #setup-panel,
 #chat-list-panel {
@@ -537,7 +528,6 @@ body {
     }
 }
 
-/* ---- Headers ---- */
 #setup-header,
 #chat-list-header {
     display: flex;
@@ -549,7 +539,6 @@ body {
     background: var(--bg-header);
 }
 
-/* ---- Chat Panel Header ---- */
 #chat-panel-header {
     display: flex;
     align-items: center;
@@ -576,7 +565,6 @@ body {
     z-index: 25;
 }
 
-/* ---- Burger Menu ---- */
 #burger-menu {
     position: absolute;
     top: 44px;
@@ -626,7 +614,6 @@ body {
     margin: 4px 8px;
 }
 
-/* ---- Vision Download Progress ---- */
 #vision-progress {
     display: flex;
     align-items: center;
@@ -670,9 +657,6 @@ body {
     text-align: right;
 }
 
-/* ---- Header Controls ---- */
-
-/* ---- Icon Buttons ---- */
 .btn-icon {
     background: none;
     border: none;
@@ -715,7 +699,6 @@ body {
     stroke: var(--tool-fg);
 }
 
-/* ---- Messages ---- */
 #chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -906,7 +889,6 @@ body {
     border-left: 2px solid var(--accent);
 }
 
-/* ---- Chat Input ---- */
 #chat-input-area {
     display: flex;
     align-items: flex-end;
@@ -1020,7 +1002,6 @@ body {
     color: var(--danger);
 }
 
-/* ---- Thinking Blocks ---- */
 .thinking-block {
     margin-bottom: 4px;
     border-left: 2px solid var(--thinking-border);
@@ -1123,7 +1104,6 @@ body {
     }
 }
 
-/* ---- Tool Blocks ---- */
 .tool-block {
     margin: 4px 0;
     border-left: 2px solid var(--tool-border);
@@ -1261,7 +1241,6 @@ body {
     max-width: 100%;
 }
 
-/* ---- File Tool Capsules ---- */
 .tool-block.tool-file .tool-header::after {
     display: none;
 }
@@ -1321,7 +1300,6 @@ body {
     color: var(--accent-hover);
 }
 
-/* ---- Citations ---- */
 .citations-container {
     margin-top: 12px;
     padding-top: 8px;
@@ -1416,7 +1394,6 @@ body {
     color: var(--fg-dim);
 }
 
-/* ---- Markdown Content ---- */
 .message .bubble pre {
     margin: 4px 0;
     padding: 8px 10px;
@@ -1518,7 +1495,6 @@ body {
     opacity: 0.6;
 }
 
-/* ---- Typing Indicator ---- */
 #typing-indicator {
     display: flex;
     gap: 5px;
@@ -1558,7 +1534,6 @@ body {
     }
 }
 
-/* ---- Setup Panel ---- */
 #setup-body {
     flex: 1;
     padding: 16px;
@@ -1626,7 +1601,6 @@ body {
     min-height: 18px;
 }
 
-/* ---- Sudo Overlay ---- */
 #sudo-overlay {
     position: absolute;
     inset: 0;
@@ -1721,7 +1695,6 @@ body {
     min-height: 16px;
 }
 
-/* ---- Confirm Overlay ---- */
 #confirm-overlay {
     position: absolute;
     inset: 0;
@@ -1810,7 +1783,6 @@ body {
 
 
 
-/* ---- Chat List ---- */
 #chat-list-body {
     flex: 1;
     overflow-y: auto;
@@ -1887,7 +1859,6 @@ body {
     stroke: currentColor;
 }
 
-/* ---- Settings Menu ---- */
 #settings-menu-panel {
     position: absolute;
     inset: 12px 12px 80px 12px;
@@ -1968,7 +1939,6 @@ body {
     padding: 8px 14px 4px;
 }
 
-/* ---- Theme Panel ---- */
 #theme-panel {
     position: absolute;
     inset: 12px 12px 80px 12px;
@@ -2014,7 +1984,6 @@ body {
     align-self: flex-start;
 }
 
-/* ---- Theme List ---- */
 #theme-list {
     flex: 1;
     overflow-y: auto;
@@ -2068,7 +2037,6 @@ body {
     stroke: currentColor;
 }
 
-/* ---- Addons Panel ---- */
 #addons-panel {
     position: absolute;
     inset: 12px 12px 80px 12px;
@@ -2208,7 +2176,6 @@ body {
     vertical-align: middle;
 }
 
-/* ---- Attach Menu ---- */
 #attach-menu {
     position: absolute;
     bottom: 56px;
@@ -2367,7 +2334,6 @@ body {
     text-align: right;
 }
 
-/* ---- OCR / Extract scanning animation ---- */
 .tool-block.tool-scanning {
     animation: tool-working-pulse 0.8s ease infinite;
 }
@@ -2391,7 +2357,6 @@ body {
     font-style: italic;
 }
 
-/* ---- Docx preview card ---- */
 .docx-preview-card {
     margin: 8px 0;
     padding: 10px 12px;
@@ -2448,7 +2413,6 @@ body {
     stroke: currentColor;
 }
 
-/* ---- Document stream card (live doc generation preview) ---- */
 .doc-stream-card {
     margin: 8px 0;
     padding: 10px 12px;
@@ -2509,7 +2473,6 @@ body {
     font-style: italic;
 }
 
-/* ---- Math Tool Block ---- */
 .tool-block.tool-math .tool-header {
     color: var(--thinking-fg);
     border-color: var(--thinking-border);

@@ -29,8 +29,6 @@ function send(msg) {
   if (process.send) process.send(msg);
 }
 
-// ── Robust parallel chunked download (same logic as model-manager) ──
-
 async function downloadChunk(url, destPath, start, end, onChunk) {
   var res = await fetch(url, {
     headers: { Range: "bytes=" + start + "-" + end },
@@ -205,8 +203,6 @@ async function downloadAll() {
   await Promise.all(downloads);
 }
 
-// ── Tokenizer ────────────────────────────────────────────────────
-
 function loadTokenizer() {
   var raw = JSON.parse(
     fs.readFileSync(path.join(VISION_DIR, "tokenizer.json"), "utf8"),
@@ -227,8 +223,6 @@ function loadTokenizer() {
     padId: 0,
   };
 }
-
-// ── Image preprocessing ──────────────────────────────────────────
 
 async function preprocessImage(imagePath) {
   var result = await sharp(imagePath)
@@ -255,8 +249,6 @@ async function preprocessImage(imagePath) {
   return new ort.Tensor("float32", floatData, [1, 3, IMAGE_SIZE, IMAGE_SIZE]);
 }
 
-// ── Model loading ────────────────────────────────────────────────
-
 async function loadModels() {
   if (visionSession && textSession) return true;
 
@@ -279,8 +271,6 @@ async function loadModels() {
   }
   return true;
 }
-
-// ── Inference ────────────────────────────────────────────────────
 
 function argmax(arr) {
   var best = -Infinity;
@@ -368,8 +358,6 @@ async function describeImage(imagePath, retryCount) {
 
   return caption || null;
 }
-
-// ── IPC message handling ─────────────────────────────────────────
 
 process.on("message", async function (message) {
   if (!message || typeof message !== "object") return;

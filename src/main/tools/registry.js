@@ -175,7 +175,6 @@ async function setTheme({ properties, name }) {
     );
   }
 
-  // Validate variable names and values.
   var errors = [];
   for (var ki = 0; ki < keys.length; ki++) {
     var k = keys[ki];
@@ -197,7 +196,6 @@ async function setTheme({ properties, name }) {
       continue;
     }
 
-    // Validate color format: hex, rgb(), rgba(), hsl(), hsla(), or CSS named color.
     var isHex = /^#[0-9a-fA-F]{3,8}$/.test(v);
     var isFunc = /^(rgb|rgba|hsl|hsla)\s*\(/.test(v);
     var isNamed = /^[a-zA-Z]+$/.test(v) && v.length < 30;
