@@ -41,6 +41,10 @@ npm install
 npm start
 ```
 
+## Contributing
+
+Bug reports, feature suggestions, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, code style, and our stance on AI.
+
 ## Compatibility
 
 The installer supports **x86_64** and **ARM64 (aarch64)** machines running a glibc-based Linux distro with a desktop environment. It does not work on musl-based systems like Alpine Linux, on headless/WSL setups without a desktop, or on 32-bit ARM.
