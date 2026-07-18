@@ -6,86 +6,92 @@ const { extractWebpage } = require("./extract");
 const { createDocx } = require("./docx");
 
 
-async function searchWeb({ query, resultSize, sessionCookies }) {
+function isCaptchaResponse(res, html) {
+  if (res.status === 429 || res.status === 403) return true;
+  if (html.includes("challenge") && /[Dd]uck/i.test(html)) return true;
+  if (html.includes("h-captcha") || html.includes("hcaptcha")) return true;
+  if (/verify\s+(you\s+are|you're)\s+human/i.test(html)) return true;
+  return false;
+}
+
+async function fetchSearchResults(url, query, extraHeaders) {
+  var headers = {
+    "User-Agent":
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  };
+  if (extraHeaders) Object.assign(headers, extraHeaders);
+  var res = await fetch(url, { headers: headers });
+  var html = await res.text();
+  if (isCaptchaResponse(res, html)) return null;
+  return { res: res, html: html };
+}
+
+function parseSearchResults(html, limit) {
+  var links = [];
+  var linkRe =
+    /<a rel="nofollow" href="(.*?)" class='result-link'>(.*?)<\/a>/g;
+  var m;
+  while ((m = linkRe.exec(html)) !== null) {
+    links.push({ href: m[1], title: m[2].replace(/<[^>]*>/g, "").trim() });
+  }
+
+  var snippets = [];
+  var snippetRe = /<td class='result-snippet'>(.*?)<\/td>/g;
+  while ((m = snippetRe.exec(html)) !== null) {
+    snippets.push(m[1].replace(/<[^>]*>/g, "").trim());
+  }
+
+  var displayUrls = [];
+  var urlRe = /<span class='link-text'>(.*?)<\/span>/g;
+  while ((m = urlRe.exec(html)) !== null) {
+    displayUrls.push(m[1].trim());
+  }
+
+  var results = [];
+  for (var i = 0; i < links.length && i < limit; i++) {
+    var href = links[i].href;
+    var title = links[i].title;
+    if (!title) continue;
+    var url = displayUrls[i] || "";
+    var uddg = href.match(/uddg=([^&]+)/);
+    if (uddg) {
+      try { url = decodeURIComponent(uddg[1]); } catch (_) {}
+    }
+    results.push({
+      title: title.slice(0, 120),
+      url: url,
+      snippet: (snippets[i] || "").slice(0, 200),
+    });
+  }
+  return results;
+}
+
+async function searchWeb({ query, resultSize }) {
   try {
     var limit = resultSize || 5;
-    var url = "https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(query);
-    var headers = {
-      "User-Agent":
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    };
-    if (sessionCookies) {
-      headers["Cookie"] = sessionCookies;
-    }
-    var res = await fetch(url, { headers: headers });
-    var html = await res.text();
+    var encoded = encodeURIComponent(query);
 
-    // Detect CAPTCHA challenge page
-    var isCaptcha = false;
-    if (res.status === 429 || res.status === 403) {
-      isCaptcha = true;
-    } else if (html.includes("challenge") && /[Dd]uck/i.test(html)) {
-      isCaptcha = true;
-    } else if (html.includes("h-captcha") || html.includes("hcaptcha")) {
-      isCaptcha = true;
-    } else if (/verify\s+(you\s+are|you're)\s+human/i.test(html)) {
-      isCaptcha = true;
-    }
-    if (isCaptcha) {
-      return JSON.stringify({ captcha: true, captchaUrl: url, captchaHtml: html });
-    }
+    // Try multiple DuckDuckGo endpoints to avoid CAPTCHAs
+    var endpoints = [
+      "https://lite.duckduckgo.com/lite/?q=" + encoded,
+      "https://html.duckduckgo.com/html/?q=" + encoded,
+    ];
 
-    // Extract result links
-    var links = [];
-    var linkRe =
-      /<a rel="nofollow" href="(.*?)" class='result-link'>(.*?)<\/a>/g;
-    var m;
-    while ((m = linkRe.exec(html)) !== null) {
-      links.push({
-        href: m[1],
-        title: m[2].replace(/<[^>]*>/g, "").trim(),
-      });
-    }
-
-    // Extract snippets
-    var snippets = [];
-    var snippetRe = /<td class='result-snippet'>(.*?)<\/td>/g;
-    while ((m = snippetRe.exec(html)) !== null) {
-      snippets.push(m[1].replace(/<[^>]*>/g, "").trim());
-    }
-
-    // Extract display URLs
-    var displayUrls = [];
-    var urlRe = /<span class='link-text'>(.*?)<\/span>/g;
-    while ((m = urlRe.exec(html)) !== null) {
-      displayUrls.push(m[1].trim());
-    }
-
-    var results = [];
-    for (var i = 0; i < links.length && i < limit; i++) {
-      var href = links[i].href;
-      var title = links[i].title;
-      if (!title) continue;
-
-      // Decode real URL from DuckDuckGo's redirect URL
-      var url = displayUrls[i] || "";
-      var uddg = href.match(/uddg=([^&]+)/);
-      if (uddg) {
-        try {
-          url = decodeURIComponent(uddg[1]);
-        } catch (_) {}
+    for (var ei = 0; ei < endpoints.length; ei++) {
+      var result = await fetchSearchResults(endpoints[ei], query);
+      if (result) {
+        var results = parseSearchResults(result.html, limit);
+        if (results.length > 0) return JSON.stringify(results);
       }
-
-      results.push({
-        title: title.slice(0, 120),
-        url: url,
-        snippet: (snippets[i] || "").slice(0, 200),
-      });
+      // Small delay before trying the next endpoint
+      if (ei < endpoints.length - 1) {
+        await new Promise(function (r) { setTimeout(r, 500); });
+      }
     }
 
-    return JSON.stringify(results);
+    return JSON.stringify({ error: "Search failed: DuckDuckGo returned a CAPTCHA challenge. Please try again later." });
   } catch (e) {
-    return "Search failed: " + e.message;
+    return JSON.stringify({ error: "Search failed: " + e.message });
   }
 }
 

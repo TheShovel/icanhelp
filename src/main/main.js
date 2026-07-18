@@ -67,7 +67,6 @@ const BUDDY_SKINS_DIR = path.join(CONFIG_DIR, "buddySkins");
 let mainWindow;
 let pendingSudo = null;
 let pendingConfirm = null;
-let pendingCaptchaWin = null;
 
 function requestSudoPassword(event) {
   event.sender.send("llm-chunk", { sudo_prompt: {} });
@@ -136,12 +135,6 @@ function createWindow() {
   });
 
   ipcMain.on("close-window", function () {});
-  ipcMain.on("close-captcha", function () {
-    if (pendingCaptchaWin && !pendingCaptchaWin.isDestroyed()) {
-      pendingCaptchaWin.close();
-    }
-    pendingCaptchaWin = null;
-  });
   setProgressCallback(function (info) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("vision-download-progress", info);
@@ -258,16 +251,50 @@ function createWindow() {
     for (var mi = messages.length - 1; mi >= 0; mi--) {
       if (messages[mi].role === "user") { lastUserMsg = messages[mi].content || ""; break; }
     }
-    var isDocRequest = /\b(write|create|make|generate)\b.*\b(document|docx|report|essay|article|letter|guide|spec|proposal|paper|write.?up)\b/i.test(lastUserMsg)
-      || /\b(document|docx|report|essay|article|letter|guide|spec|proposal|paper)\b.*\b(write|create|make|generate|draft)\b/i.test(lastUserMsg)
-      || /\bcreate (a|the) doc/i.test(lastUserMsg);
+    var isDocRequest = /\b(write|create|make|generate)\b.*\b(doc\b|docx|document|report|essay|article|letter|guide|spec|proposal|paper|write.?up)\b/i.test(lastUserMsg)
+      || /\b(doc\b|docx|document|report|essay|article|letter|guide|spec|proposal|paper)\b.*\b(write|create|make|generate|draft)\b/i.test(lastUserMsg)
+      || /\b(create|write|make|generate) (a|the) doc\b/i.test(lastUserMsg);
+
+    // Don't re-trigger document generation if a docx was already produced in this conversation.
+    var alreadyHasDoc = false;
+    if (isDocRequest) {
+      for (var mj = 0; mj < messages.length; mj++) {
+        var mmsg = messages[mj];
+        // Check tool results stored in assistant message metadata.
+        var msgTools = mmsg.tools;
+        if (!msgTools && mmsg.role === "tool") {
+          // Legacy: standalone tool message.
+          try { var pc = JSON.parse(mmsg.content); if (pc) msgTools = [pc]; } catch (_) {}
+        }
+        if (msgTools) {
+          for (var tk = 0; tk < msgTools.length; tk++) {
+            var t = msgTools[tk];
+            if (t.name === "create_docx" && t.output) {
+              try {
+                var tco = JSON.parse(t.output);
+                if (tco && tco.ok && tco.path && /\.docx$/i.test(tco.path)) {
+                  alreadyHasDoc = true;
+                  break;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+        if (alreadyHasDoc) break;
+      }
+    }
 
     if (isDocRequest) {
+      // If a document already exists in this conversation, nudge the LLM
+      // that it CAN regenerate, but don't force it.
+      var reminder = alreadyHasDoc
+        ? "[SYSTEM NOTE: The user may be asking you to refine the existing document. If they want a new version, call create_docx with an updated description. Otherwise, just respond conversationally.]"
+        : "[SYSTEM REMINDER: The user wants a document. You MUST call create_docx(description, filename) after 2-4 quick searches. Do not write the document yourself — call create_docx. Do this by tool 4 at the latest.]";
       console.log("[main] Document request detected, injecting instruction");
       messages = messages.slice();
       messages.splice(messages.length - 1, 0, {
         role: "user",
-        content: "[SYSTEM REMINDER: The user wants a document. You MUST call create_docx(description, filename) after 2-4 quick searches. Do not write the document yourself — call create_docx. Do this by tool 4 at the latest.]",
+        content: reminder,
       });
     }
 
@@ -368,85 +395,6 @@ function createWindow() {
                   }
                 : null,
           });
-
-          // Handle DuckDuckGo CAPTCHA: open a window for the user to solve it, then retry.
-          if (name === "search_web") {
-            var parsedCaptcha;
-            try {
-              parsedCaptcha = JSON.parse(String(result));
-            } catch (_) {}
-            if (parsedCaptcha && parsedCaptcha.captcha) {
-              event.sender.send("llm-chunk", {
-                captcha_prompt: {
-                  url: parsedCaptcha.captchaUrl,
-                  query: args.query,
-                },
-              });
-
-              var captchaHtml = parsedCaptcha.captchaHtml || "";
-              var captchaFilePath = null;
-              if (captchaHtml) {
-                var baseTag = '<base href="https://lite.duckduckgo.com/">';
-                if (/<head[^>]*>/i.test(captchaHtml)) {
-                  captchaHtml = captchaHtml.replace(/<head[^>]*>/i, "$&" + baseTag);
-                } else if (/<html[^>]*>/i.test(captchaHtml)) {
-                  captchaHtml = captchaHtml.replace(/<html[^>]*>/i, "$&<head>" + baseTag + "</head>");
-                } else {
-                  captchaHtml = "<head>" + baseTag + "</head>" + captchaHtml;
-                }
-                captchaFilePath = path.join(os.tmpdir(), "icanhelp-captcha-" + Date.now() + ".html");
-                fs.writeFileSync(captchaFilePath, captchaHtml, "utf-8");
-              }
-
-              var captchaWin = new BrowserWindow({
-                width: 800,
-                height: 700,
-                parent: mainWindow,
-                modal: false,
-                title: "Solve captcha to search the web",
-                autoHideMenuBar: true,
-              });
-              pendingCaptchaWin = captchaWin;
-
-              if (captchaFilePath) {
-                captchaWin.loadFile(captchaFilePath);
-              } else {
-                captchaWin.loadURL(parsedCaptcha.captchaUrl);
-              }
-
-              await new Promise(function (resolve) {
-                captchaWin.on("closed", function () {
-                  pendingCaptchaWin = null;
-                  resolve();
-                });
-              });
-
-              if (captchaFilePath) {
-                try { fs.unlinkSync(captchaFilePath); } catch (_) {}
-              }
-
-              // Collect session cookies so the retry request can use them.
-              var ddgCookies = await captchaWin.webContents.session.cookies.get({
-                url: "https://lite.duckduckgo.com",
-              });
-              var cookieStr = ddgCookies
-                .map(function (c) {
-                  return c.name + "=" + c.value;
-                })
-                .join("; ");
-              if (cookieStr) {
-                args.sessionCookies = cookieStr;
-              }
-
-              // Retry the search with cookies
-              tc.function.arguments = JSON.stringify(args);
-              result = await executeToolCall(tc, {
-                onSudoPrompt: onSudoPrompt,
-                onConfirm: onConfirm,
-                onOutput: null,
-              });
-            }
-          }
 
           // Capture research results for document generation.
           if (name === "search_web" || name === "extract_webpage") {
@@ -555,7 +503,7 @@ function createWindow() {
     // After the main chat loop exits, check if a document session was requested.
     // Also auto-trigger if the user asked for a document but the model never called
     // create_docx (hit tool limit, timed out, etc).
-    if (!pendingDocSession && isDocRequest) {
+    if (!pendingDocSession && isDocRequest && !alreadyHasDoc) {
       console.log("[main] Document was requested but never created — auto-triggering");
       var filename = "document";
       var description = lastUserMsg.slice(0, 200);

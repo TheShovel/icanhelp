@@ -20,8 +20,7 @@ const confirmOverlay = document.getElementById("confirm-overlay");
 const confirmCommand = document.getElementById("confirm-command");
 const confirmYes = document.getElementById("confirm-yes");
 const confirmNo = document.getElementById("confirm-no");
-const captchaOverlay = document.getElementById("captcha-overlay");
-const captchaOk = document.getElementById("captcha-ok");
+
 const avatarInner = document.getElementById("avatar-inner");
 const attachMenu = document.getElementById("attach-menu");
 const attachBtn = document.getElementById("attach-btn");
@@ -285,10 +284,7 @@ confirmNo.addEventListener("click", function () {
   window.electronAPI.sendConfirmResponse(false);
 });
 
-captchaOk.addEventListener("click", function () {
-  captchaOverlay.classList.add("hidden");
-  window.electronAPI.closeCaptcha();
-});
+
 
 let chatOpen = false;
 let isDragging = false;
@@ -1591,10 +1587,7 @@ async function sendMessage() {
       return;
     }
 
-    if (chunk.captcha_prompt) {
-      captchaOverlay.classList.remove("hidden");
-      return;
-    }
+
 
     if (chunk.tool_generating) {
       if (!msgEl) {
@@ -1742,8 +1735,14 @@ async function sendMessage() {
           }
 
           var outText = stripEmojis(chunk.tool_end.output);
-          if (toolCalls.length > 0) {
-            toolCalls[toolCalls.length - 1].output = outText;
+          // Find the matching tool call and update its output.
+          // (The doc generation pipeline sends tool_end for create_docx
+          // without a preceding tool_start, so we can't assume it's last.)
+          for (var ti = toolCalls.length - 1; ti >= 0; ti--) {
+            if (toolCalls[ti].name === chunk.tool_end.name) {
+              toolCalls[ti].output = outText;
+              break;
+            }
           }
 
           if (!existingOut) {
@@ -1784,6 +1783,9 @@ async function sendMessage() {
             try {
               var docxResult = JSON.parse(chunk.tool_end.output);
               if (docxResult.ok && docxResult.path) {
+                if (toolFilePaths.indexOf(docxResult.path) === -1) {
+                  toolFilePaths.push(docxResult.path);
+                }
                 renderDocxPreview(bubble, docxResult);
               }
             } catch (_) {}
@@ -2338,6 +2340,20 @@ function renderStructuredMessage(msg) {
   // Restore file paths as clickable links in the response text
   if (msg.files && msg.files.length > 0) {
     linkifyFilePaths(responseContent, msg.files);
+  }
+
+  // Restore docx preview cards from create_docx tool results
+  if (msg.tools) {
+    msg.tools.forEach(function (tool) {
+      if (tool.name === "create_docx" && tool.output) {
+        try {
+          var docxResult = JSON.parse(tool.output);
+          if (docxResult.ok && docxResult.path) {
+            renderDocxPreview(bubble, docxResult);
+          }
+        } catch (_) {}
+      }
+    });
   }
 
   renderResponseFooter(bubble, msg.durationMs || 0);
