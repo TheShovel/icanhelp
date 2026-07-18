@@ -1150,7 +1150,7 @@ a:hover {
   width: auto;
   max-width: 120px;
   flex-shrink: 0;
-  image-rendering: pixelated;
+  image-rendering: auto;
   object-fit: contain;
 }
 
