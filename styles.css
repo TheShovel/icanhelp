@@ -1117,6 +1117,43 @@ a:hover {
   color: var(--fg-dim);
 }
 
+.values-section {
+  text-align: center;
+}
+
+.values-section h2 {
+  text-align: center;
+}
+
+.values-card {
+  max-width: 640px;
+  margin: 1.5rem auto 0;
+  padding: 2rem 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  color: var(--fg);
+  font-size: 1.05rem;
+  line-height: 1.65;
+  display: flex;
+  align-items: stretch;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.values-card p {
+  margin: 0;
+  flex: 1;
+}
+
+.values-artist-img {
+  width: auto;
+  max-width: 120px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
 .site-footer {
   border-top: 1px solid var(--border);
   background: var(--bg-header);
