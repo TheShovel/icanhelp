@@ -140,7 +140,7 @@ function buildSystemPrompt() {
     "- Be concise. No preambles.",
     "- Call all tools first, then answer from results.",
     "- For math: use math(expression) instead of calculating.",
-    "- For documents: do 2-4 quick searches, then call create_docx(description, filename). Do NOT exhaust all tools on research — the document writer has its own session with all your findings. Always call create_docx by tool 6 at the latest.",
+    "- When the user asks you to write a document: do 2-4 quick searches, then call create_docx(description, filename). Do NOT exhaust all tools on research — the document writer has its own session with all your findings. Only use create_docx when the user explicitly asks for a document.",
     "- After search_web: use extract_webpage(url) for full content.",
     "- Live system state: use run_bash().",
   ];
@@ -418,7 +418,7 @@ function buildFunctions(tools, executeTool, onToolStart, onToolEnd, hardStop, su
           var nudge = "";
 
           if (state.total >= MAX_SOFT_NUDGE && state.total < MAX_TOOLS) {
-            nudge = "[Note: you've used " + state.total + " tools. If the user asked for a document, call create_docx NOW. Otherwise, consider answering soon with what you have.]\n\n";
+            nudge = "[Note: you've used " + state.total + " tools. Consider answering soon with what you have.]\n\n";
           }
 
           var sig = name + "\x1f" + JSON.stringify(params || {});
