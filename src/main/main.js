@@ -417,10 +417,17 @@ function createWindow() {
           }
 
           // Detect document session request from create_docx.
+          // Only allow document creation when the user explicitly asked for one.
           if (name === "create_docx") {
             try {
               var docParsed = JSON.parse(String(result));
               if (docParsed.__doc_pending__) {
+                if (!isDocRequest) {
+                  console.log("[main] Blocked create_docx — user did not request a document");
+                  return JSON.stringify({
+                    error: "The user did not ask you to write a document. Do NOT call create_docx unless the user explicitly requests a document, report, essay, article, letter, guide, spec, proposal, or paper. Respond conversationally instead.",
+                  });
+                }
                 pendingDocSession = {
                   description: docParsed.description || args.description || "",
                   filename: docParsed.filename || args.filename || "document",
