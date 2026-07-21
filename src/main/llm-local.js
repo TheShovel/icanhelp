@@ -515,20 +515,10 @@ async function runLocalChatLoop({
     return;
   }
 
-  // Reuse the cached context if the model and size match, so we don't
-  // re-prefill the entire chat history from scratch every turn.
+  // Always dispose any cached context from a previous run — we recreate
+  // from scratch each turn to keep memory usage low.
+  disposeCachedContext();
   var reusingContext = false;
-  if (
-    cachedContext &&
-    cachedSession &&
-    cachedContextModelPath === resolvedPath &&
-    cachedContextSize === (config.contextSize || defaultContextSize())
-  ) {
-    console.log("[llm-local] Reusing cached context (size=" + cachedContextSize + ")");
-    context = cachedContext;
-    session = cachedSession;
-    reusingContext = true;
-  }
 
   var { getLlama, LlamaChatSession } = await import("node-llama-cpp");
 
@@ -1107,22 +1097,15 @@ async function runLocalChatLoop({
   clearTimeout(idleTimer);
   if (generatingInterval) { clearInterval(generatingInterval); generatingInterval = null; }
 
-  // Cache the context for reuse on the next turn instead of disposing it.
-  // This avoids re-prefilling the entire chat history every time the user
-  // sends a message — only the new message gets processed.
-  if (context && !reusingContext) {
-    // First creation: cache it.
-    await new Promise(function (r) { setTimeout(r, 100); });
-    cachedContext = context;
-    cachedSession = session;
-    cachedContextModelPath = resolvedPath;
-    cachedContextSize = contextSize;
-    console.log("[llm-local] Context cached for reuse (size=" + contextSize + ")");
-  } else if (reusingContext) {
-    // Reused context: just flush the GPU queue, don't dispose.
-    await new Promise(function (r) { setTimeout(r, 100); });
-    console.log("[llm-local] Context kept alive for next turn");
+  // Dispose the context after each run to free memory instead of caching it.
+  if (context) {
+    console.log("[llm-local] Disposing context after run (size=" + contextSize + ")");
+    await new Promise(function (r) { setTimeout(r, 200); });
+    try { await context.dispose(); } catch (_) {}
+    context = null;
+    session = null;
   }
+  disposeCachedContext();
 
   console.log("[llm-local] Returning");
 }
